@@ -88,7 +88,7 @@ function render() {
 function renderStart() {
   const r = cfg().restaurant;
   app.innerHTML = `
-  <div class="kstart">
+  <div class="kstart" style="--kbg:url('${esc(absUrl(cfg().categories.find((c) => c.hero)?.hero || ""))}')">
     ${logoHtml(r, "logo logo-xl")}
     <h1>${esc(r.name)}</h1>
     <p>Oshxona ekrani</p>
@@ -117,16 +117,17 @@ function ticket(o) {
     <header class="kt-head">
       <div class="kt-table"><small>STOL</small><b>${esc(o.tableNo)}</b></div>
       <div class="kt-info">
+        ${o.status === "new" ? `<span class="kt-flag">YANGI</span>` : ""}
         <span class="kt-no">#${esc(shortNo(o))} · ${clock(o.createdAt)}${o.guests ? ` · 👤${o.guests}` : ""}</span>
         <span class="kt-waiter">🧑‍💼 ${esc(o.waiterName || "")}${o.byGuest ? " · 📱 Mijoz o'zi" : ""}</span>
       </div>
       <div class="kt-timer" data-timer="${o.createdAt}">${mmss(Date.now() - o.createdAt)}</div>
     </header>
-    ${o.status === "new" ? `<div class="kt-flag">YANGI</div>` : ""}
     <ul class="kt-items">
       ${o.items.map((it, idx) => `
         <li class="${it.done ? "done" : ""}" data-item="${idx}">
           <span class="kt-qty">${it.qty}</span>
+          ${thumb(it)}
           <span class="kt-name">${esc(it.name)}${it.note ? `<em>📝 ${esc(it.note)}</em>` : ""}</span>
         </li>`).join("")}
     </ul>
@@ -137,6 +138,13 @@ function ticket(o) {
         : `<button class="btn btn-ok btn-lg btn-block" data-ready>✓ TAYYOR ${done ? `<small>${done}/${o.items.length}</small>` : ""}</button>`}
     </footer>
   </article>`;
+}
+
+const absUrl = (u) => (u && !/^(data:|https?:)/.test(u) ? new URL(u, location.href).href : u || "");
+function thumb(it) {
+  const item = cfg().items.find((i) => i.id === it.itemId);
+  const img = item?.img;
+  return img ? `<span class="kt-img ${item.fit === "contain" ? "contain" : ""}" style="background-image:url('${esc(absUrl(img))}')"></span>` : `<span class="kt-img">${esc(it.emoji || item?.emoji || "🍽️")}</span>`;
 }
 
 function boardReady() {
@@ -154,15 +162,17 @@ function boardReady() {
 
 function allDay(list) {
   const agg = {};
+  const imgs = {};
   list.forEach((o) => o.items.forEach((it) => {
     if (it.done) return;
     agg[it.name] = (agg[it.name] || 0) + it.qty;
+    imgs[it.name] = imgs[it.name] || it;
   }));
   const rows = Object.entries(agg).sort((a, b) => b[1] - a[1]);
   return `
     <h3>Σ Umumiy</h3>
     <p>Hamma faol cheklardagi tayyorlanishi kerak bo'lgan taomlar</p>
-    ${rows.length ? `<ul>${rows.map(([n, q]) => `<li><b>${q}</b><span>${esc(n)}</span></li>`).join("")}</ul>` : `<p class="muted">Bo'sh</p>`}`;
+    ${rows.length ? `<ul>${rows.map(([n, q]) => `<li><b>${q}</b>${thumb(imgs[n])}<span>${esc(n)}</span></li>`).join("")}</ul>` : `<p class="muted">Bo'sh</p>`}`;
 }
 
 function bindBoard() {
