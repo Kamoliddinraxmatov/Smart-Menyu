@@ -349,6 +349,17 @@ function catEditor() {
   });
 }
 
+// QR kod qurilmaning o'zida yasaladi (internet shart emas)
+function qrSrc(url) {
+  try {
+    const q = window.qrcode(0, "M");
+    q.addData(url); q.make();
+    return q.createDataURL(6, 2);
+  } catch {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(url)}`;
+  }
+}
+
 // ---------- Ofitsiantlar ----------
 function tabWaiters(c) {
   c.innerHTML = `
@@ -504,7 +515,7 @@ function tabDevices(c) {
       const url = base + link(page, rid);
       return `<div class="card dev">
         <div class="dev-ic">${ic}</div><h3>${name}</h3><p class="muted">${hint}</p>
-        <img class="qr" alt="QR" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(url)}">
+        <img class="qr" alt="QR" src="${qrSrc(url)}">
         <div class="url">${esc(url)}</div>
         <div class="dev-actions"><button class="btn btn-ghost" data-copy="${esc(url)}">📋 Nusxa olish</button><a class="btn btn-primary" href="${esc(url)}" target="_blank">Ochish</a></div>
       </div>`;

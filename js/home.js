@@ -12,6 +12,7 @@ function render() {
   applyBrand(r);
   app.innerHTML = `
   <div class="home">
+    <div class="h-bg"></div>
     <header class="h-top">
       <div class="h-logo"><img src="img/icon.svg" alt=""><b>Smart Menyu</b></div>
       ${connBadge(S.online)}
@@ -21,25 +22,34 @@ function render() {
       <div>
         <small>Restoran</small>
         <h1>${esc(r.name)}</h1>
-        <p>Kod: <b class="code">${esc(rid)}</b> · <button class="link" id="switch">Boshqa restoran</button></p>
+        <p>${esc(r.slogan || "")}</p>
+        <p class="h-code">Kod: <b class="code">${esc(rid)}</b> · <button class="link" id="switch">Boshqa restoran</button></p>
       </div>
     </section>
     <section class="h-apps">
-      <a class="h-app a-waiter" href="${link("waiter.html", rid)}">
-        <span class="h-ic">🧑‍💼</span><b>Ofitsiant</b><small>Menyu, stollar va buyurtma berish. Planshet uchun.</small><i>Ochish →</i>
+      <a class="h-app a-waiter" href="${link("waiter.html", rid)}" style="--pic:url('${new URL("img/m/steak-veg.jpg", location.href)}')">
+        <span class="h-ic">🧑‍💼</span><b>Ofitsiant va menyu</b><small>Stollar, chiroyli menyu, buyurtma. Planshetni mijozga berish mumkin.</small><i>Ochish →</i>
       </a>
-      <a class="h-app a-kitchen" href="${link("kitchen.html", rid)}">
-        <span class="h-ic">👨‍🍳</span><b>Oshxona</b><small>Buyurtmalar realtime tushadi, "Tayyor" tugmasi ofitsiantga xabar beradi.</small><i>Ochish →</i>
+      <a class="h-app a-kitchen" href="${link("kitchen.html", rid)}" style="--pic:url('${new URL("img/m/ramen3.jpg", location.href)}')">
+        <span class="h-ic">👨‍🍳</span><b>Oshxona ekrani</b><small>Buyurtmalar bir zumda tushadi. "Tayyor" ofitsiantga xabar beradi.</small><i>Ochish →</i>
       </a>
-      <a class="h-app a-admin" href="${link("admin.html", rid)}">
-        <span class="h-ic">⚙️</span><b>Admin</b><small>Logo, rang, menyu, narxlar, stollar, ofitsiantlar va hisobot.</small><i>Ochish →</i>
+      <a class="h-app a-admin" href="${link("admin.html", rid)}" style="--pic:url('${new URL("img/m/negroni.jpg", location.href)}')">
+        <span class="h-ic">⚙️</span><b>Boshqaruv</b><small>Logo, rang, menyu, narxlar, stollar, ofitsiantlar va hisobot.</small><i>Ochish →</i>
       </a>
+    </section>
+    <section class="h-feats">
+      ${[
+        ["📱", "Mijoz rejimi", "Planshet stolda qoladi, mijoz o'zi tanlaydi"],
+        ["🙋", "Chaqiruv", "Ofitsiant va hisobni bir tugmada chaqirish"],
+        ["🌐", "3 til", "O'zbek, rus va ingliz tillarida menyu"],
+        ["⚡", "Realtime", "Oshxona va ofitsiant bir soniyada xabardor"]
+      ].map(([i, b, t]) => `<div class="h-feat"><span>${i}</span><b>${b}</b><small>${t}</small></div>`).join("")}
     </section>
     <section class="h-how">
       <h2>Qanday ishlaydi</h2>
       <ol>
-        <li><b>Ofitsiant</b> stolni tanlaydi, mijoz bilan menyudan taom tanlaydi va buyurtmani tasdiqlaydi.</li>
-        <li>Buyurtma bir zumda <b>oshxona ekraniga</b> tushadi: stol raqami, ofitsiant ismi, taomlar va izohlar.</li>
+        <li><b>Ofitsiant</b> stolni tanlaydi, mijoz bilan menyudan taom tanlaydi yoki planshetni mijozga beradi.</li>
+        <li>Buyurtma bir zumda <b>oshxona ekraniga</b> tushadi: stol raqami, ofitsiant ismi, taomlar, porsiya va izohlar.</li>
         <li>Oshpaz <b>Boshlash</b>, keyin <b>Tayyor</b> tugmasini bosadi.</li>
         <li>Stolga biriktirilgan ofitsiantning planshetiga <b>"Stol N tayyor ✓"</b> xabari ovoz va tebranish bilan keladi.</li>
       </ol>

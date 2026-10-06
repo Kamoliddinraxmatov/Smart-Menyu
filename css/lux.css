@@ -1,0 +1,39 @@
+/* Umumiy qorong'i premium mavzu (admin, bosh sahifa) */
+body.lux {
+  --bg: #0D0B0A;
+  --surface: #171412;
+  --surface-2: #211D1A;
+  --glass: rgba(23, 20, 18, .72);
+  --line: rgba(255, 255, 255, .09);
+  --text: #F5F0E8;
+  --muted: #A69C91;
+  --gold: #D6B370;
+  --gold-soft: rgba(214, 179, 112, .14);
+  --ok-soft: rgba(31, 157, 85, .16);
+  --warn-soft: rgba(224, 138, 0, .16);
+  --info-soft: rgba(37, 99, 235, .18);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .35);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, .55);
+  --serif: "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  background: var(--bg);
+  color: var(--text);
+}
+.lux input[type=tel], .lux input[type=password], .lux input[type=email], .lux input[type=url], .lux input[type=text], .lux input[type=search], .lux input[type=number], .lux select, .lux textarea {
+  background: rgba(255,255,255,.05); border-color: var(--line); color: var(--text);
+}
+.lux input::placeholder { color: #7d746b; }
+.lux input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+.lux .btn-ghost { background: rgba(255,255,255,.06); border-color: var(--line); color: var(--text); }
+.lux .btn-ghost:hover { background: rgba(255,255,255,.1); }
+.lux .icon-btn { background: rgba(255,255,255,.06); border-color: var(--line); color: var(--text); }
+.lux .modal { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+.lux .modal-actions { background: var(--surface-2); border-color: var(--line); }
+.lux .conn.on { background: var(--ok-soft); }
+.lux .conn.off { background: rgba(217,45,32,.18); }
+.lux .b-served { background: rgba(255,255,255,.08); color: var(--muted); }
+.lux .b-cooking { color: #FFB547; }
+.lux .b-new { color: #7EB0FF; }
+.serif { font-family: var(--serif); }
+.muted { color: var(--muted); }
+.center { text-align: center; }
+.small { font-size: 13px; }

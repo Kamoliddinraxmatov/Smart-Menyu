@@ -22,7 +22,7 @@ body.lux {
   background: var(--bg);
   color: var(--text);
 }
-.lux input[type=text], .lux input[type=search], .lux input[type=number], .lux select, .lux textarea {
+.lux input[type=tel], .lux input[type=password], .lux input[type=email], .lux input[type=url], .lux input[type=text], .lux input[type=search], .lux input[type=number], .lux select, .lux textarea {
   background: rgba(255,255,255,.05); border-color: var(--line); color: var(--text);
 }
 .lux input::placeholder { color: #7d746b; }

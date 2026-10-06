@@ -33,3 +33,33 @@
   .h-rest { flex-direction: column; text-align: center; padding: 22px; }
   .h-rest h1 { font-size: 28px; }
 }
+
+/* ===== Premium qorong'i bosh sahifa ===== */
+.lux .home { position: relative; isolation: isolate; max-width: 1100px; }
+.h-bg { position: fixed; inset: 0; z-index: -1; background: url('../img/m/bg-hot.jpg') center/cover; filter: blur(22px) brightness(.28) saturate(1.2); transform: scale(1.1); }
+.h-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(90% 70% at 50% 0%, transparent, rgba(13,11,10,.85)); }
+.lux .h-logo b { font-family: var(--serif); font-weight: 600; letter-spacing: .02em; color: var(--gold); }
+.lux .h-rest { background: linear-gradient(135deg, rgba(214,179,112,.14), rgba(23,20,18,.75)); border: 1px solid rgba(214,179,112,.28); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: var(--shadow-lg); padding: 32px; }
+.lux .h-rest small { color: var(--gold); opacity: 1; letter-spacing: .3em; }
+.lux .h-rest h1 { font-family: var(--serif); font-weight: 600; font-size: 44px; letter-spacing: 0; }
+.lux .h-rest p { color: var(--muted); opacity: 1; font-style: italic; }
+.lux .h-rest .h-code { font-style: normal; margin-top: 10px; font-size: 14px; }
+.lux .h-rest .code { background: var(--gold-soft); color: var(--gold); }
+.lux .link { color: var(--gold); }
+.lux .h-app { position: relative; overflow: hidden; min-height: 250px; justify-content: flex-end; background: #120f0d; border: 1px solid var(--line); isolation: isolate; }
+.lux .h-app::before { content: ""; position: absolute; inset: 0; z-index: -2; background: var(--pic) center/cover; transition: transform .5s ease; }
+.lux .h-app::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(13,11,10,.1) 0%, rgba(13,11,10,.65) 45%, rgba(13,11,10,.96) 100%); }
+.lux .h-app:hover { border-color: rgba(214,179,112,.5); }
+.lux .h-app:hover::before { transform: scale(1.06); }
+.lux .h-ic { background: rgba(13,11,10,.6); backdrop-filter: blur(8px); border: 1px solid var(--line); width: 54px; height: 54px; font-size: 28px; position: absolute; top: 18px; left: 18px; }
+.lux .h-app b { font-family: var(--serif); font-weight: 600; font-size: 24px; }
+.lux .h-app small { flex: 0; }
+.lux .h-app i { color: var(--gold); }
+.h-feats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 26px; }
+.h-feat { padding: 16px; border-radius: 18px; background: rgba(23,20,18,.7); border: 1px solid var(--line); display: grid; gap: 4px; }
+.h-feat span { font-size: 24px; }
+.h-feat small { color: var(--muted); }
+.lux .h-how { background: rgba(23,20,18,.75); border: 1px solid var(--line); backdrop-filter: blur(10px); }
+.lux .h-how h2 { font-family: var(--serif); font-weight: 600; }
+.lux .btn-primary { background: var(--gold); color: #1a1208; }
+@media (max-width: 760px) { .h-feats { grid-template-columns: 1fr 1fr; } .lux .h-rest h1 { font-size: 32px; } .lux .h-app { min-height: 200px; } }
