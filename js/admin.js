@@ -101,6 +101,10 @@ function tabBrand(c) {
         <label class="field"><span>Telefon</span><input type="tel" data-r="phone" value="${esc(r.phone || "")}"></label>
       </div>
       <label class="field"><span>Manzil</span><input type="text" data-r="address" value="${esc(r.address || "")}"></label>
+      <div class="row2">
+        <label class="field"><span>Chek kengligi (termoprinter)</span><select data-r="receiptWidth">${["80", "58"].map((w) => `<option value="${w}" ${String(r.receiptWidth || "80") === w ? "selected" : ""}>${w} mm</option>`).join("")}</select></label>
+        <label class="field"><span>Chek pastidagi matn</span><input type="text" data-r="receiptNote" value="${esc(r.receiptNote || "")}" placeholder="Rahmat! Yana kutib qolamiz"></label>
+      </div>
       <label class="field"><span>Admin PIN (bo'sh qoldirsangiz, parolsiz ochiladi)</span><input type="text" inputmode="numeric" id="adminPin" value="${esc(cfg().adminPin || "")}"></label>
     </div>
     <div class="preview">
