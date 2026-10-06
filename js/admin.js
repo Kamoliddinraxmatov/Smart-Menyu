@@ -459,49 +459,146 @@ function tabTables(c) {
 }
 
 // ---------- Hisobot ----------
+// ---------- Hisobot: kun / hafta / oy, Excel (CSV) ----------
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const dayStart = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
+const PERIODS = [["today", "Bugun"], ["yesterday", "Kecha"], ["week", "7 kun"], ["month", "30 kun"], ["thismonth", "Shu oy"], ["custom", "Sana tanlash"]];
+ui.period = ui.period || "today";
+
+function periodRange() {
+  const now = new Date(), today = dayStart(now);
+  const add = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  switch (ui.period) {
+    case "yesterday": return [add(today, -1), today];
+    case "week": return [add(today, -6), add(today, 1)];
+    case "month": return [add(today, -29), add(today, 1)];
+    case "thismonth": return [new Date(now.getFullYear(), now.getMonth(), 1), add(today, 1)];
+    case "custom": {
+      const f = ui.from ? dayStart(new Date(ui.from)) : add(today, -6);
+      const t = ui.to ? add(dayStart(new Date(ui.to)), 1) : add(today, 1);
+      return [f, t];
+    }
+    default: return [today, add(today, 1)];
+  }
+}
+
+// Arxiv (sales) + hali arxivga tushmagan yopilgan cheklar
+function salesInRange(from, to) {
+  const all = { ...S.sales };
+  Object.values(S.orders).forEach((o) => {
+    if (o.status !== "closed" || all[o.id]) return;
+    const sum = orderTotal(o);
+    all[o.id] = { id: o.id, no: o.no, day: ymd(new Date(o.closedAt || o.createdAt)), at: o.closedAt || o.createdAt, createdAt: o.createdAt, tableNo: o.tableNo, zone: o.zone || "",
+      waiterId: o.waiterId, waiterName: o.waiterName, guests: o.guests || 0, pay: o.pay || "naqd", sum, svc: Math.round(sum * (o.serviceRate || 0) / 100),
+      cook: o.readyAt ? o.readyAt - (o.startedAt || o.createdAt) : 0, byGuest: !!o.byGuest, items: o.items.map((it) => [it.name + (it.opts ? ` (${it.opts})` : ""), it.qty, it.price]) };
+  });
+  return Object.values(all).filter((x) => x.at >= from.getTime() && x.at < to.getTime()).sort((a, b) => a.at - b.at);
+}
+
 function tabReport(c) {
-  const start = new Date(); start.setHours(0, 0, 0, 0);
-  const today = Object.values(S.orders).filter((o) => o.createdAt >= start.getTime());
-  const closed = today.filter((o) => o.status === "closed");
-  const revenue = closed.reduce((s, o) => s + orderTotal(o), 0);
-  const service = closed.reduce((s, o) => s + Math.round(orderTotal(o) * (o.serviceRate || 0) / 100), 0);
-  const cookTimes = today.filter((o) => o.readyAt && o.createdAt).map((o) => o.readyAt - o.createdAt);
-  const avgCook = cookTimes.length ? Math.round(cookTimes.reduce((a, b) => a + b, 0) / cookTimes.length / 60000) : 0;
+  store.loadSales();
+  const [from, to] = periodRange();
+  const list = salesInRange(from, to);
+  const oneDay = to - from <= 86400000 + 3600000;
+  const revenue = list.reduce((s, x) => s + x.sum + x.svc, 0);
+  const svc = list.reduce((s, x) => s + x.svc, 0);
+  const guests = list.reduce((s, x) => s + (x.guests || 0), 0);
+  const cooks = list.filter((x) => x.cook > 0).map((x) => x.cook);
+  const avgCook = cooks.length ? Math.round(cooks.reduce((a, b) => a + b, 0) / cooks.length / 60000) : 0;
+  const openNow = Object.values(S.orders).filter((o) => o.status !== "closed");
+  const openSum = openNow.reduce((s, o) => s + orderTotal(o), 0);
+
+  // Grafik: bir kun bo'lsa soatlar, aks holda kunlar
+  const buckets = [];
+  if (oneDay) for (let h = 8; h <= 23; h++) buckets.push({ key: h, label: String(h).padStart(2, "0"), v: 0 });
+  else for (let d = new Date(from); d < to; d.setDate(d.getDate() + 1)) buckets.push({ key: ymd(d), label: `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, "0")}`, v: 0 });
+  list.forEach((x) => {
+    const k = oneDay ? Math.min(23, Math.max(8, new Date(x.at).getHours())) : x.day;
+    const b = buckets.find((y) => y.key === k); if (b) b.v += x.sum + x.svc;
+  });
+  const maxB = Math.max(1, ...buckets.map((b) => b.v));
+
   const byWaiter = {};
-  today.forEach((o) => {
-    const k = o.waiterId || "-";
-    byWaiter[k] = byWaiter[k] || { name: o.waiterName || "—", orders: 0, sum: 0, service: 0, tables: new Set() };
-    byWaiter[k].orders++;
-    byWaiter[k].tables.add(o.tableNo);
-    if (o.status === "closed") { byWaiter[k].sum += orderTotal(o); byWaiter[k].service += Math.round(orderTotal(o) * (o.serviceRate || 0) / 100); }
+  list.forEach((x) => {
+    const k = x.waiterId || "-";
+    const w = (byWaiter[k] = byWaiter[k] || { name: x.waiterName || "—", n: 0, sum: 0, svc: 0, guests: 0 });
+    w.n++; w.sum += x.sum + x.svc; w.svc += x.svc; w.guests += x.guests || 0;
   });
   const byItem = {};
-  today.forEach((o) => o.items.forEach((i) => { byItem[i.name] = (byItem[i.name] || 0) + i.qty; }));
-  const top = Object.entries(byItem).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const maxTop = top[0]?.[1] || 1;
+  list.forEach((x) => x.items.forEach(([n, q, p]) => { const i = (byItem[n] = byItem[n] || { q: 0, sum: 0 }); i.q += q; i.sum += q * p; }));
+  const top = Object.entries(byItem).sort((a, b) => b[1].q - a[1].q).slice(0, 10);
+  const maxTop = top[0]?.[1].q || 1;
   const pays = {};
-  closed.forEach((o) => { pays[o.pay || "naqd"] = (pays[o.pay || "naqd"] || 0) + orderTotal(o) * (1 + (o.serviceRate || 0) / 100); });
+  list.forEach((x) => { pays[x.pay] = (pays[x.pay] || 0) + x.sum + x.svc; });
+  const payName = { naqd: "💵 Naqd", karta: "💳 Karta", click: "📱 Click/Payme" };
+  const fmtD = (d) => d.toLocaleDateString("ru-RU");
+  const rangeTxt = oneDay ? fmtD(from) : `${fmtD(from)} — ${fmtD(new Date(to - 1))}`;
 
   c.innerHTML = `
-  <div class="page-head"><h1>Bugungi hisobot</h1><p>${new Date().toLocaleDateString("uz-UZ")} · real vaqtda yangilanadi</p></div>
+  <div class="page-head row-between">
+    <div><h1>Hisobot</h1><p>${rangeTxt} · ${S.salesLoaded ? "real vaqtda yangilanadi" : "arxiv yuklanmoqda…"}</p></div>
+    <div class="head-actions">
+      <button class="btn btn-ghost" data-csv="checks" ${list.length ? "" : "disabled"}>⬇ Cheklar (Excel)</button>
+      <button class="btn btn-ghost" data-csv="items" ${list.length ? "" : "disabled"}>⬇ Taomlar (Excel)</button>
+    </div>
+  </div>
+  <div class="chips-row period-row">
+    ${PERIODS.map(([id, name]) => `<button class="chip ${ui.period === id ? "on" : ""}" data-period="${id}">${name}</button>`).join("")}
+    ${ui.period === "custom" ? `<span class="range"><input type="date" id="from" value="${ymd(from)}"> — <input type="date" id="to" value="${ymd(new Date(to - 1))}"></span>` : ""}
+  </div>
   <div class="kpis">
-    <div class="kpi"><small>Tushum (yopilgan)</small><b>${money(revenue + service, cur())}</b></div>
-    <div class="kpi"><small>Cheklar</small><b>${today.length}</b></div>
-    <div class="kpi"><small>O'rtacha chek</small><b>${money(closed.length ? (revenue + service) / closed.length : 0, cur())}</b></div>
-    <div class="kpi"><small>O'rtacha tayyorlash</small><b>${avgCook} daq</b></div>
+    <div class="kpi"><small>Tushum</small><b>${money(revenue, cur())}</b><span class="kpi-sub">xizmat haqi: ${money(svc, cur())}</span></div>
+    <div class="kpi"><small>Cheklar</small><b>${list.length}</b><span class="kpi-sub">mehmonlar: ${guests}</span></div>
+    <div class="kpi"><small>O'rtacha chek</small><b>${money(list.length ? revenue / list.length : 0, cur())}</b><span class="kpi-sub">1 mehmonga: ${money(guests ? revenue / guests : 0, cur())}</span></div>
+    <div class="kpi"><small>O'rtacha tayyorlash</small><b>${avgCook} daq</b><span class="kpi-sub">hozir ochiq: ${openNow.length} ta · ${money(openSum, cur())}</span></div>
+  </div>
+  <div class="card">
+    <h3>${oneDay ? "Soatlar bo'yicha tushum" : "Kunlar bo'yicha tushum"}</h3>
+    <div class="chart">${buckets.map((b) => `<div class="col" title="${esc(b.label)}: ${money(b.v, cur())}"><i style="height:${Math.round((b.v / maxB) * 100)}%"></i><small>${esc(b.label)}</small></div>`).join("")}</div>
   </div>
   <div class="cols">
     <div class="card">
       <h3>Ofitsiantlar bo'yicha</h3>
-      <table class="tbl"><thead><tr><th>Ofitsiant</th><th>Cheklar</th><th>Stollar</th><th>Savdo</th><th>Xizmat haqi</th></tr></thead>
-      <tbody>${Object.values(byWaiter).map((w) => `<tr><td><b>${esc(w.name)}</b></td><td>${w.orders}</td><td>${w.tables.size}</td><td>${money(w.sum, cur())}</td><td>${money(w.service, cur())}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Bugun hali buyurtma yo'q</td></tr>`}</tbody></table>
-      ${Object.keys(pays).length ? `<h3>To'lov turlari</h3><div class="pays">${Object.entries(pays).map(([k, v]) => `<span><small>${esc(k)}</small><b>${money(v, cur())}</b></span>`).join("")}</div>` : ""}
+      <table class="tbl"><thead><tr><th>Ofitsiant</th><th>Cheklar</th><th>Mehmon</th><th>Savdo</th><th>Xizmat haqi</th></tr></thead>
+      <tbody>${Object.values(byWaiter).sort((a, b) => b.sum - a.sum).map((w) => `<tr><td><b>${esc(w.name)}</b></td><td>${w.n}</td><td>${w.guests}</td><td>${money(w.sum, cur())}</td><td>${money(w.svc, cur())}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Bu davrda yopilgan chek yo'q</td></tr>`}</tbody></table>
+      ${Object.keys(pays).length ? `<h3 class="mt">To'lov turlari</h3><div class="pays">${Object.entries(pays).map(([k, v]) => `<span><small>${payName[k] || esc(k)}</small><b>${money(v, cur())}</b></span>`).join("")}</div>` : ""}
     </div>
     <div class="card">
-      <h3>Eng ko'p buyurtma qilingan</h3>
-      ${top.length ? top.map(([n, q]) => `<div class="bar"><span>${esc(n)}</span><div><i style="width:${(q / maxTop) * 100}%"></i></div><b>${q}</b></div>`).join("") : `<p class="muted">Ma'lumot yo'q</p>`}
+      <h3>Eng ko'p sotilgan taomlar</h3>
+      ${top.length ? top.map(([n, i]) => `<div class="bar"><span>${esc(n)}</span><div><i style="width:${(i.q / maxTop) * 100}%"></i></div><b>${i.q}</b></div>`).join("") : `<p class="muted">Ma'lumot yo'q</p>`}
     </div>
+  </div>
+  <div class="card">
+    <h3>Cheklar ro'yxati</h3>
+    <table class="tbl"><thead><tr><th>Vaqt</th><th>Chek</th><th>Stol</th><th>Ofitsiant</th><th>Taomlar</th><th>To'lov</th><th>Summa</th></tr></thead>
+    <tbody>${list.slice().reverse().slice(0, 100).map((x) => `<tr><td>${oneDay ? clock(x.at) : `${fmtD(new Date(x.at))} ${clock(x.at)}`}</td><td>#${esc(String(x.no || x.id.slice(-4)))}</td><td>${esc(x.tableNo)}</td><td>${esc(x.waiterName || "")}</td><td class="muted">${x.items.reduce((s, i) => s + i[1], 0)} ta</td><td>${payName[x.pay] || esc(x.pay)}</td><td><b>${money(x.sum + x.svc, cur())}</b></td></tr>`).join("") || `<tr><td colspan="7" class="muted">Bo'sh</td></tr>`}</tbody></table>
+    ${list.length > 100 ? `<p class="hint">Oxirgi 100 ta ko'rsatildi. To'liq ro'yxat Excel faylida.</p>` : ""}
   </div>`;
+
+  c.querySelectorAll("[data-period]").forEach((b) => b.addEventListener("click", () => { ui.period = b.dataset.period; render(); }));
+  c.querySelector("#from")?.addEventListener("change", (e) => { ui.from = e.target.value; render(); });
+  c.querySelector("#to")?.addEventListener("change", (e) => { ui.to = e.target.value; render(); });
+  c.querySelectorAll("[data-csv]").forEach((b) => b.addEventListener("click", () => {
+    const name = `${cfg().restaurant.name.replace(/[^\w\-]+/g, "_")}_${ymd(from)}_${ymd(new Date(to - 1))}`;
+    if (b.dataset.csv === "checks") {
+      downloadCsv(`${name}_cheklar.csv`, [["Sana", "Vaqt", "Chek", "Stol", "Zona", "Ofitsiant", "Mehmonlar", "Taomlar", "Summa", "Xizmat haqi", "Jami", "To'lov turi"],
+        ...list.map((x) => [fmtD(new Date(x.at)), clock(x.at), x.no || x.id, x.tableNo, x.zone, x.waiterName, x.guests, x.items.map(([n, q]) => `${q}x ${n}`).join(", "), x.sum, x.svc, x.sum + x.svc, x.pay])]);
+    } else {
+      downloadCsv(`${name}_taomlar.csv`, [["Taom", "Soni", "Summa"], ...Object.entries(byItem).sort((a, b) => b[1].sum - a[1].sum).map(([n, i]) => [n, i.q, i.sum])]);
+    }
+  }));
+}
+
+// Excel to'g'ri ochishi uchun: UTF-8 BOM va ";" ajratuvchi
+function downloadCsv(filename, rows) {
+  const cell = (v) => { const t = String(v ?? ""); return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const csv = "﻿" + rows.map((r) => r.map(cell).join(";")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast("✓ Fayl yuklab olindi: " + esc(filename), { kind: "ok" });
 }
 
 // ---------- Qurilmalar ----------

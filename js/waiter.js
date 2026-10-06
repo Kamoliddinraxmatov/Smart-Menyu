@@ -962,7 +962,10 @@ function billModal(t) {
       m.querySelector("[data-act=print]").addEventListener("click", () => printReceipt({ t, w, orders, lines, pay, split: split.mode === "equal" ? split.n : 0 }));
       m.querySelector("#close").addEventListener("click", () => {
         const now = Date.now();
-        orders.forEach((o) => store.updateOrder(o.id, { status: "closed", closedAt: now, servedAt: o.servedAt || now, serviceRate: rate, pay, closedBy: fullName(meW()), split: split.mode === "equal" ? split.n : undefined }));
+        orders.forEach((o) => {
+          const done = store.updateOrder(o.id, { status: "closed", closedAt: now, servedAt: o.servedAt || now, serviceRate: rate, pay, closedBy: fullName(meW()), split: split.mode === "equal" ? split.n : undefined });
+          if (done) store.recordSale(done);
+        });
         if (S.calls[t.id]) store.setCall(t.id, null);
         close();
         toast(`Stol ${esc(t.no)} yopildi · ${money(total, cur())}`, { kind: "ok" });

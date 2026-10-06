@@ -7,6 +7,7 @@
 //   <base>/stop            stop-list (tugagan taomlar): { itemId: true }
 //   <base>/orders/<id>     har bir buyurtma (chek)
 //   <base>/calls/<tableId> stoldan signal: ofitsiantni chaqirish yoki hisobni so'rash
+//   <base>/sales/<sana>/<id> yopilgan chekning ixcham nusxasi (hisobot uchun, faqat admin o'qiydi)
 import { DEFAULT_CONFIG } from "./defaults.js";
 
 const PREFIX = "menyuuz/v1";
@@ -57,6 +58,8 @@ export function createStore(rid) {
     stop: cached?.stop || {},
     orders: cached?.orders || {},
     calls: {},
+    sales: {},
+    salesLoaded: false,
     configLoaded: !!cached?.config
   };
 
@@ -126,6 +129,12 @@ export function createStore(rid) {
     if (topic === `${base}/stop`) {
       state.stop = data || {};
       changed({ type: "stop" });
+      return;
+    }
+    const sm = topic.match(/\/sales\/[^/]+\/([^/]+)$/);
+    if (sm) {
+      if (data) state.sales[sm[1]] = data; else delete state.sales[sm[1]];
+      changed({ type: "sales" });
       return;
     }
     const cm = topic.match(/\/calls\/([^/]+)$/);
@@ -201,6 +210,30 @@ export function createStore(rid) {
       if (call) state.calls[tableId] = call; else delete state.calls[tableId];
       publish(`${base}/calls/${tableId}`, call);
       changed({ type: "call", tableId, call, prev, local: true });
+    },
+
+    // Yopilgan chekni hisobot arxiviga yozish (kun/hafta/oy hisobotlari shundan olinadi)
+    recordSale(o) {
+      const d = new Date(o.closedAt || Date.now());
+      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const sum = (o.items || []).reduce((s, it) => s + it.price * it.qty, 0);
+      const sale = {
+        id: o.id, no: o.no, day, at: o.closedAt || Date.now(), createdAt: o.createdAt, tableNo: o.tableNo, zone: o.zone || "",
+        waiterId: o.waiterId || "", waiterName: o.waiterName || "", guests: o.guests || 0, pay: o.pay || "naqd",
+        sum, svc: Math.round(sum * (o.serviceRate || 0) / 100), cook: o.readyAt ? o.readyAt - (o.startedAt || o.createdAt) : 0,
+        byGuest: !!o.byGuest, items: (o.items || []).map((it) => [it.name + (it.opts ? ` (${it.opts})` : ""), it.qty, it.price])
+      };
+      state.sales[o.id] = sale;
+      publish(`${base}/sales/${day}/${o.id}`, sale);
+    },
+
+    // Hisobot arxivini yuklash (faqat admin ochganda)
+    loadSales() {
+      if (api._salesSub) return;
+      api._salesSub = true;
+      const sub = () => client.subscribe(`${base}/sales/#`, { qos: 1 }, () => setTimeout(() => { state.salesLoaded = true; changed({ type: "sales" }); }, 1500));
+      if (state.online) sub();
+      client.on("connect", sub);
     },
 
     removeOrder(id) {
