@@ -436,3 +436,4 @@ body.lux {
 .tv-stats small { font-size: 12px; }
 .table-card.st-free { background: rgba(23,20,18,.45); }
 @media (max-width: 700px) { .tv-hello h1 { font-size: 26px; } .tv-stats { display: grid; grid-template-columns: 1fr 1fr; width: 100%; } .tv-stats span { min-width: 0; } }
+.receipt-preview { width: 100%; height: 60vh; border: 0; border-radius: 12px; background: #fff; }

@@ -1054,6 +1054,14 @@ function receiptHtml({ t, w, orders, lines, pay, split = 0, title = "" }) {
 
 function printReceipt(opts) {
   const html = receiptHtml(opts);
+  // Android ilovasi (APK) ichida brauzer chop etish oynasi yo'q: chekni ko'rsatamiz
+  if (window.Capacitor?.isNativePlatform?.()) {
+    modal(`
+      <div class="modal-head"><h3>🧾 Chek</h3><button class="icon-btn" data-close>✕</button></div>
+      <div class="modal-body"><iframe class="receipt-preview" srcdoc="${esc(html)}"></iframe>
+        <p class="muted small">Termoprinterga to'g'ridan-to'g'ri chop etish ilovaning keyingi versiyasida (Bluetooth printer) qo'shiladi. Hozircha brauzerdagi versiyadan chop etish mumkin.</p></div>`);
+    return;
+  }
   const old = document.getElementById("printFrame");
   old?.remove();
   const f = document.createElement("iframe");
