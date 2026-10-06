@@ -96,8 +96,9 @@ function topbar(extra = "") {
 
 function renderLogin() {
   const r = cfg().restaurant;
+  const loginBg = cfg().categories.find((c) => c.hero)?.hero || "";
   app.innerHTML = `
-  <div class="login">
+  <div class="login" style="--login-bg:url('${esc(absUrl(loginBg))}')">
     <div class="login-card">
       <div class="login-brand">${logoHtml(r, "logo logo-xl")}<h1>${esc(r.name)}</h1><p>${esc(r.slogan || "")}</p></div>
       <h2>Ofitsiant, ismingizni tanlang</h2>
@@ -219,14 +220,15 @@ function renderTable() {
   app.innerHTML = `
   ${topbar()}
   <div class="table-view">
-    <section class="menu-pane">
+    <div class="mood" id="mood"><i></i><i></i></div>
+    <section class="menu-pane" id="menuPane">
       <div class="menu-head">
         <button class="icon-btn" data-act="back" title="Orqaga">←</button>
         <div class="mh-title"><h2>Stol ${esc(t.no)}</h2><small>${esc(t.zone || "")} · Ofitsiant: <b>${esc(fullName(w) || "—")}</b></small></div>
         <div class="search"><input type="search" id="q" placeholder="Taom qidirish…" value="${esc(ui.q)}"></div>
       </div>
       <nav class="cats" id="cats"></nav>
-      <div class="menu-grid" id="grid"></div>
+      <div id="grid"></div>
     </section>
     <aside class="cart-pane ${ui.cartOpen ? "open" : ""}" id="cartPane"></aside>
     <button class="cart-fab" id="cartFab"></button>
@@ -241,13 +243,43 @@ function renderTable() {
   renderCart();
 }
 
+// ---------- Kayfiyat foni ----------
+let moodUrl = null;
+let moodFlip = 0;
+function setMood(url) {
+  const el = app.querySelector("#mood");
+  if (!el || url === moodUrl) return;
+  moodUrl = url;
+  const layers = el.querySelectorAll("i");
+  const next = layers[moodFlip % 2];
+  const prev = layers[(moodFlip + 1) % 2];
+  moodFlip++;
+  next.style.backgroundImage = url ? `url('${url}')` : "none";
+  next.classList.add("on");
+  prev.classList.remove("on");
+}
+// CSS o'zgaruvchisidagi url() css/ papkaga nisbatan hisoblanadi, shuning uchun to'liq manzil beramiz
+const absUrl = (u) => (u && !/^(data:|https?:)/.test(u) ? new URL(u, location.href).href : u || "");
+const catById = (id) => cfg().categories.find((c) => c.id === id);
+
 function renderCats() {
   const el = app.querySelector("#cats");
   if (!el) return;
-  const hasPopular = cfg().items.some((i) => i.popular);
+  const hasPopular = cfg().items.some((i) => i.popular && !i.hidden);
   const cats = [{ id: "all", name: "Hammasi", emoji: "🍽️" }, ...(hasPopular ? [{ id: "popular", name: "Mashhur", emoji: "⭐" }] : []), ...cfg().categories];
-  el.innerHTML = cats.map((c) => `<button class="cat ${ui.cat === c.id ? "on" : ""}" data-cat="${esc(c.id)}"><span>${esc(c.emoji || "")}</span>${esc(c.name)}</button>`).join("");
-  el.querySelectorAll("[data-cat]").forEach((b) => b.addEventListener("click", () => { ui.cat = b.dataset.cat; renderCats(); renderGrid(); }));
+  el.innerHTML = cats.map((c) => {
+    const pic = c.hero || c.bg;
+    return `<button class="cat ${ui.cat === c.id ? "on" : ""}" data-cat="${esc(c.id)}">
+      <span class="cat-thumb" ${pic ? `style="background-image:url('${esc(pic)}')"` : ""}>${pic ? "" : esc(c.emoji || "")}</span>${esc(c.name)}${c.adult ? "<sup>18+</sup>" : ""}
+    </button>`;
+  }).join("");
+  el.querySelectorAll("[data-cat]").forEach((b) => b.addEventListener("click", () => {
+    ui.cat = b.dataset.cat;
+    renderCats(); renderGrid();
+    const pane = app.querySelector("#menuPane");
+    if (pane && pane.scrollHeight > pane.clientHeight) pane.scrollTo({ top: 0 }); else window.scrollTo({ top: 0 });
+    b.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }));
 }
 
 function visibleItems() {
@@ -261,45 +293,86 @@ function visibleItems() {
   });
 }
 
+function dishCard(i, cart) {
+  const inCart = cart.filter((c) => c.itemId === i.id).reduce((s, c) => s + c.qty, 0);
+  const stop = !!S.stop[i.id];
+  const img = i.img
+    ? `<div class="dish-img ${i.fit === "contain" ? "contain" : ""}" style="background-image:url('${esc(i.img)}')">`
+    : `<div class="dish-img emoji"><span>${esc(i.emoji || "🍽️")}</span>`;
+  const priceTxt = money(i.price, cur()).replace(` ${cur()}`, "");
+  return `
+  <article class="dish ${stop ? "stopped" : ""} ${inCart ? "in-cart" : ""}" data-item="${esc(i.id)}">
+    ${img}
+      ${i.popular ? `<span class="dish-pop">★ Mashhur</span>` : ""}
+      ${inCart ? `<span class="dish-qty">${inCart}</span>` : ""}
+    </div>
+    <div class="dish-body">
+      <h3>${esc(i.name)}</h3>
+      <p>${esc(i.desc || "")}</p>
+      <div class="dish-foot">
+        <span class="dish-price">${stop ? "Tugagan" : `${esc(priceTxt)}<small>${esc(cur())}</small>`}</span>
+        ${i.weight && !stop ? `<span class="dish-weight">${esc(i.weight)}</span>` : ""}
+        ${stop ? "" : `<button class="dish-add" data-add="${esc(i.id)}" aria-label="Qo'shish">+</button>`}
+      </div>
+    </div>
+  </article>`;
+}
+
+function heroHtml(c, count) {
+  if (!c) return "";
+  const pic = c.hero || c.bg;
+  return `
+  <header class="cat-hero ${pic ? "" : "plain"}" ${pic ? `style="--hero:url('${esc(absUrl(pic))}')"` : ""}>
+    ${c.adult ? `<span class="adult">18+</span>` : ""}
+    <div>${c.tagline ? `<small>${esc(c.tagline)}</small>` : ""}<h2>${esc(c.name)}</h2><span>${count} ta taom</span></div>
+  </header>`;
+}
+
+let moodObserver = null;
 function renderGrid() {
   const el = app.querySelector("#grid");
   if (!el) return;
   const cart = getCart(ui.tableId);
   const items = visibleItems();
-  const byCat = ui.cat === "all" && !ui.q.trim();
-  const card = (i) => {
-    const inCart = cart.filter((c) => c.itemId === i.id).reduce((s, c) => s + c.qty, 0);
-    const stop = !!S.stop[i.id];
-    return `
-    <div class="item-card ${stop ? "stopped" : ""} ${inCart ? "in-cart" : ""}" data-item="${esc(i.id)}">
-      ${itemVisual(i, "thumb ic-img")}
-      ${i.popular ? `<span class="ic-pop">⭐ Mashhur</span>` : ""}
-      ${inCart ? `<span class="ic-qty">${inCart}</span>` : ""}
-      <div class="ic-body">
-        <b class="ic-name">${esc(i.name)}</b>
-        <p class="ic-desc">${esc(i.desc || "")}</p>
-        <div class="ic-foot">
-          <span class="ic-price">${stop ? "Tugagan" : money(i.price, cur())}</span>
-          ${stop ? "" : `<button class="ic-add" data-add="${esc(i.id)}" aria-label="Qo'shish">+</button>`}
-        </div>
-      </div>
-    </div>`;
-  };
-  if (!items.length) { el.innerHTML = `<div class="empty"><span class="big">🔍</span>Hech narsa topilmadi</div>`; return; }
-  if (byCat) {
-    el.innerHTML = cfg().categories.map((c) => {
-      const list = items.filter((i) => i.cat === c.id);
-      return list.length ? `<h3 class="grid-cat">${esc(c.emoji || "")} ${esc(c.name)}</h3><div class="grid-row">${list.map(card).join("")}</div>` : "";
-    }).join("");
+  const q = ui.q.trim();
+  let sections = [];
+  if (q) {
+    sections = [{ c: { id: "q", name: `“${q}”`, tagline: "qidiruv natijalari" }, list: items }];
+  } else if (ui.cat === "all") {
+    sections = cfg().categories.map((c) => ({ c, list: items.filter((i) => i.cat === c.id) })).filter((s) => s.list.length);
+  } else if (ui.cat === "popular") {
+    const top = cfg().items.find((i) => i.popular && i.img);
+    sections = [{ c: { id: "popular", name: "Mashhur taomlar", tagline: "mehmonlarimiz tanlovi", hero: top?.img, bg: catById(top?.cat)?.bg }, list: items }];
   } else {
-    el.innerHTML = `<div class="grid-row">${items.map(card).join("")}</div>`;
+    const c = catById(ui.cat);
+    sections = [{ c, list: items }];
   }
+  if (!items.length) {
+    el.innerHTML = `<div class="empty"><span class="big">🔍</span>Hech narsa topilmadi</div>`;
+    setMood(null);
+    return;
+  }
+  el.innerHTML = sections.map(({ c, list }) => `
+    <section class="cat-sec" data-bg="${esc(c.bg || c.hero || "")}">
+      ${heroHtml(c, list.length)}
+      <div class="grid-row">${list.map((i) => dishCard(i, cart)).join("")}</div>
+    </section>`).join("");
+
+  setMood(sections[0].c.bg || sections[0].c.hero || null);
+  moodObserver?.disconnect();
+  if (sections.length > 1 && "IntersectionObserver" in window) {
+    moodObserver = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) setMood(e.target.dataset.bg || null); });
+    }, { rootMargin: "-35% 0px -60% 0px" });
+    el.querySelectorAll(".cat-sec").forEach((s) => moodObserver.observe(s));
+  }
+
   el.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", (e) => {
     e.stopPropagation();
     const item = cfg().items.find((i) => i.id === b.dataset.add);
     addToCart(ui.tableId, item);
-    b.closest(".item-card").classList.add("bump");
-    renderGrid(); renderCart();
+    refreshCard(item.id, true);
+    renderCart();
   }));
   el.querySelectorAll("[data-item]").forEach((c) => c.addEventListener("click", () => {
     const item = cfg().items.find((i) => i.id === c.dataset.item);
@@ -308,23 +381,47 @@ function renderGrid() {
   }));
 }
 
+// Bitta kartani qayta chizish (butun menyuni emas, scroll joyida qoladi)
+function refreshCard(itemId, bump = false) {
+  const old = app.querySelector(`.dish[data-item="${CSS.escape(itemId)}"]`);
+  const item = cfg().items.find((i) => i.id === itemId);
+  if (!old || !item) return;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = dishCard(item, getCart(ui.tableId)).trim();
+  const card = tmp.firstElementChild;
+  old.replaceWith(card);
+  if (bump) card.classList.add("bump");
+  card.querySelector("[data-add]")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    addToCart(ui.tableId, item);
+    refreshCard(item.id, true);
+    renderCart();
+  });
+  card.addEventListener("click", () => { if (!S.stop[item.id]) itemModal(item); });
+}
+
 function itemModal(item) {
   let qty = 1;
   const notes = new Set();
+  const visual = item.img
+    ? `<div class="dm-img ${item.fit === "contain" ? "contain" : ""}" style="background-image:url('${esc(item.img)}')">`
+    : `<div class="dm-img emoji"><span>${esc(item.emoji || "🍽️")}</span>`;
   modal(`
-    ${itemVisual(item, "thumb im-img")}
+    ${visual}<button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       <div class="im-title"><h3>${esc(item.name)}</h3><b>${money(item.price, cur())}</b></div>
-      <p class="muted">${esc(item.desc || "")}${item.time ? ` · ⏱ ~${item.time} daq` : ""}</p>
-      <div class="label">Izoh (oshpaz uchun)</div>
+      <div class="im-meta">${item.weight ? `<span>${esc(item.weight)}</span>` : ""}${item.time ? `<span>⏱ ~${item.time} daq</span>` : ""}${item.popular ? `<span>★ Mashhur</span>` : ""}</div>
+      <p class="muted">${esc(item.desc || "")}</p>
+      <div class="label">Izoh oshpaz uchun</div>
       <div class="chips">${QUICK_NOTES.map((n) => `<button class="chip" data-n="${esc(n)}">${esc(n)}</button>`).join("")}</div>
       <input type="text" id="note" placeholder="Boshqa izoh…">
     </div>
     <div class="modal-actions">
       <div class="stepper"><button data-d="-1">−</button><b id="qty">1</b><button data-d="1">+</button></div>
-      <button class="btn btn-primary" id="add">Savatga · <span id="sum">${money(item.price, cur())}</span></button>
+      <button class="btn btn-primary btn-lg" id="add">Savatga · <span id="sum">${money(item.price, cur())}</span></button>
     </div>`, {
     onMount(m, close) {
+      m.classList.add("dish-modal");
       m.querySelectorAll("[data-n]").forEach((b) => b.addEventListener("click", () => {
         const n = b.dataset.n; notes.has(n) ? notes.delete(n) : notes.add(n); b.classList.toggle("on");
       }));
@@ -336,7 +433,7 @@ function itemModal(item) {
       m.querySelector("#add").addEventListener("click", () => {
         const note = [...notes, m.querySelector("#note").value.trim()].filter(Boolean).join(", ");
         addToCart(ui.tableId, item, qty, note);
-        close(); renderGrid(); renderCart();
+        close(); refreshCard(item.id, true); renderCart();
       });
     }
   });
@@ -362,7 +459,7 @@ function renderCart() {
       ${cart.length ? `<ul class="cart-list">
         ${cart.map((c) => `
           <li>
-            <span class="cl-emoji">${esc(c.emoji || "🍽️")}</span>
+            ${cartThumb(c)}
             <div class="cl-main"><b>${esc(c.name)}</b>${c.note ? `<small class="cl-note">📝 ${esc(c.note)}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
             <div class="stepper sm"><button data-q="${esc(c.key)}" data-d="-1">−</button><b>${c.qty}</b><button data-q="${esc(c.key)}" data-d="1">+</button></div>
           </li>`).join("")}
@@ -397,7 +494,7 @@ function renderCart() {
     const c = list.find((x) => x.key === b.dataset.q);
     c.qty += Number(b.dataset.d);
     setCart(t.id, list.filter((x) => x.qty > 0));
-    renderCart(); renderGrid();
+    renderCart(); refreshCard(c.itemId);
   }));
   pane.querySelector("[data-act=close-cart]").addEventListener("click", () => { ui.cartOpen = false; pane.classList.remove("open"); });
   pane.querySelector("[data-act=confirm]")?.addEventListener("click", () => confirmOrder(t));
@@ -408,6 +505,11 @@ function renderCart() {
     if (o?.status !== "new") { toast("Oshpaz allaqachon boshlagan, bekor qilib bo'lmaydi", { kind: "error" }); return; }
     if (await confirmBox(`#${esc(shortNo(o))} buyurtmani bekor qilasizmi?`, "Bekor qilish", { danger: true })) store.removeOrder(o.id);
   }));
+}
+
+function cartThumb(c) {
+  const item = cfg().items.find((i) => i.id === c.itemId);
+  return item?.img ? `<span class="cl-img" style="background-image:url('${esc(item.img)}')"></span>` : `<span class="cl-img">${esc(c.emoji || "🍽️")}</span>`;
 }
 
 function statusLabel(s) {
@@ -586,6 +688,7 @@ store.on((evt) => {
       flashTitle(`✓ Stol ${o.tableNo} tayyor`);
     }
   }
+  if (evt.type === "config" || evt.type === "stop") ui.menuDirty = true;
   if (evt.type !== "render") return;
   const active = document.activeElement;
   const typing = active && (active.id === "q" || active.closest?.(".modal"));
@@ -596,7 +699,7 @@ store.on((evt) => {
     const conn = app.querySelector(".conn");
     if (conn) conn.outerHTML = connBadge(S.online);
     renderCart();
-    renderGrid();
+    if (ui.menuDirty) { ui.menuDirty = false; renderCats(); renderGrid(); }
     return;
   }
   if (!typing) render();

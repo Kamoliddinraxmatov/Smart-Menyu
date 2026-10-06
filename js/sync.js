@@ -17,6 +17,19 @@ function brokerUrl() {
   try { return localStorage.getItem("menyu.broker") || DEFAULT_BROKER; } catch { return DEFAULT_BROKER; }
 }
 
+// Eski (v1) demo menyuni yangi dizayndagi menyuga almashtirish.
+// Restoran o'z taomlarini qo'shgan bo'lsa, menyusiga tegilmaydi.
+const V1_IDS = new Set(Array.from({ length: 19 }, (_, i) => `i${i + 1}`));
+function migrate(c) {
+  if (!c || (c.v || 1) >= DEFAULT_CONFIG.v) return c;
+  const out = { ...c, v: DEFAULT_CONFIG.v };
+  if ((c.items || []).every((i) => V1_IDS.has(i.id))) {
+    out.categories = structuredClone(DEFAULT_CONFIG.categories);
+    out.items = structuredClone(DEFAULT_CONFIG.items);
+  }
+  return out;
+}
+
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
 }
@@ -32,7 +45,7 @@ export function createStore(rid) {
   const state = {
     rid,
     online: false,
-    config: cached?.config || structuredClone(DEFAULT_CONFIG),
+    config: migrate(cached?.config) || structuredClone(DEFAULT_CONFIG),
     stop: cached?.stop || {},
     orders: cached?.orders || {},
     configLoaded: !!cached?.config
@@ -95,7 +108,7 @@ export function createStore(rid) {
 
     if (topic === `${base}/config`) {
       if (data && (data.updatedAt || 0) >= (state.config.updatedAt || 0)) {
-        state.config = { ...structuredClone(DEFAULT_CONFIG), ...data };
+        state.config = migrate({ ...structuredClone(DEFAULT_CONFIG), v: 1, ...data });
         state.configLoaded = true;
         changed({ type: "config" });
       }

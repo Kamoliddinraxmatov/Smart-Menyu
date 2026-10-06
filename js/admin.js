@@ -135,7 +135,7 @@ function tabMenu(c) {
   c.innerHTML = `
   <div class="page-head row-between">
     <div><h1>Menyu</h1><p>${cfg().items.length} ta taom, ${cats.length} ta kategoriya</p></div>
-    <div class="head-actions"><button class="btn btn-ghost" id="cats">🗂 Kategoriyalar</button><button class="btn btn-primary" id="add">+ Taom qo'shish</button></div>
+    <div class="head-actions"><button class="btn btn-ghost" id="cats">🗂 Bo'limlar va fonlar</button><button class="btn btn-primary" id="add">+ Taom qo'shish</button></div>
   </div>
   <div class="chips-row">
     <button class="chip ${ui.catFilter === "all" ? "on" : ""}" data-f="all">Hammasi</button>
@@ -177,10 +177,14 @@ function itemEditor(item) {
         <label class="field"><span>Kategoriya</span><select id="cat">${cfg().categories.map((x) => `<option value="${esc(x.id)}" ${x.id === it.cat ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>
       </div>
       <div class="row2">
-        <label class="field"><span>Tayyorlash vaqti, daqiqa</span><input type="number" id="time" min="0" value="${esc(it.time || 0)}"></label>
+        <div>
+          <label class="field"><span>Tayyorlash vaqti, daqiqa</span><input type="number" id="time" min="0" value="${esc(it.time || 0)}"></label>
+          <label class="field"><span>Hajmi / og'irligi</span><input type="text" id="weight" value="${esc(it.weight || "")}" placeholder="300 g, 0,75 l, 8 dona"></label>
+        </div>
         <div class="field checks">
           <label><input type="checkbox" id="popular" ${it.popular ? "checked" : ""}> ⭐ Mashhur</label>
           <label><input type="checkbox" id="hidden" ${it.hidden ? "checked" : ""}> Menyuda yashirish</label>
+          <label><input type="checkbox" id="fit" ${it.fit === "contain" ? "checked" : ""}> Rasmni qirqmasdan ko'rsatish (butilka)</label>
         </div>
       </div>
     </div>
@@ -193,15 +197,15 @@ function itemEditor(item) {
       const $ = (s) => m.querySelector(s);
       $("#img").addEventListener("change", async (e) => {
         const f = e.target.files[0]; if (!f) return;
-        it.img = await fileToDataUrl(f, 480, 0.75);
+        it.img = await fileToDataUrl(f, 560, 0.72);
         $("#vis").innerHTML = itemVisual(it, "thumb ie-img"); $("#rmImg").hidden = false;
       });
       $("#rmImg").addEventListener("click", () => { it.img = ""; $("#vis").innerHTML = itemVisual(it, "thumb ie-img"); $("#rmImg").hidden = true; });
       $("#ok").addEventListener("click", () => {
         Object.assign(it, {
           name: $("#name").value.trim(), desc: $("#desc").value.trim(), price: Number($("#price").value) || 0,
-          cat: $("#cat").value, time: Number($("#time").value) || 0, emoji: $("#emoji").value.trim(),
-          popular: $("#popular").checked, hidden: $("#hidden").checked
+          cat: $("#cat").value, time: Number($("#time").value) || 0, weight: $("#weight").value.trim(), emoji: $("#emoji").value.trim(),
+          popular: $("#popular").checked, hidden: $("#hidden").checked, fit: $("#fit").checked ? "contain" : ""
         });
         if (!it.name) { toast("Taom nomini kiriting", { kind: "error" }); return; }
         mutate((x) => {
@@ -219,17 +223,53 @@ function itemEditor(item) {
   });
 }
 
+// Menyu foni uchun xiralashtirilgan kichik nusxa
+function blurredDataUrl(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = 420, h = Math.round(img.height * w / img.width);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const ctx = c.getContext("2d");
+      ctx.filter = "blur(14px)";
+      ctx.drawImage(img, -20, -20, w + 40, h + 40);
+      resolve(c.toDataURL("image/jpeg", 0.6));
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
+}
+
 function catEditor() {
   let cats = structuredClone(cfg().categories);
   const draw = (m) => {
     m.querySelector("#cl").innerHTML = cats.map((x, i) => `
-      <div class="cat-row">
-        <input type="text" class="cat-emoji" data-i="${i}" data-k="emoji" value="${esc(x.emoji || "")}" maxlength="4">
-        <input type="text" data-i="${i}" data-k="name" value="${esc(x.name)}">
-        <button class="icon-btn" data-up="${i}" ${i ? "" : "disabled"}>↑</button>
-        <button class="icon-btn" data-del="${i}">🗑</button>
+      <div class="cat-card">
+        <label class="cat-pic" title="Bo'lim rasmi" style="${x.hero || x.bg ? `background-image:url('${esc(x.hero || x.bg)}')` : ""}">
+          ${x.hero || x.bg ? "" : "📷"}<input type="file" accept="image/*" data-pic="${i}" hidden>
+        </label>
+        <div class="cat-fields">
+          <div class="cat-row">
+            <input type="text" class="cat-emoji" data-i="${i}" data-k="emoji" value="${esc(x.emoji || "")}" maxlength="4">
+            <input type="text" data-i="${i}" data-k="name" value="${esc(x.name)}" placeholder="Nomi">
+          </div>
+          <input type="text" data-i="${i}" data-k="tagline" value="${esc(x.tagline || "")}" placeholder="Shior, masalan: kechki kayfiyat uchun">
+          <label class="adult-chk"><input type="checkbox" data-adult="${i}" ${x.adult ? "checked" : ""}> 18+ (spirtli ichimliklar)</label>
+        </div>
+        <div class="cat-btns">
+          <button class="icon-btn" data-up="${i}" ${i ? "" : "disabled"}>↑</button>
+          <button class="icon-btn" data-del="${i}">🗑</button>
+        </div>
       </div>`).join("");
     m.querySelectorAll("[data-k]").forEach((inp) => inp.addEventListener("input", () => { cats[inp.dataset.i][inp.dataset.k] = inp.value; }));
+    m.querySelectorAll("[data-adult]").forEach((cb) => cb.addEventListener("change", () => { cats[cb.dataset.adult].adult = cb.checked; }));
+    m.querySelectorAll("[data-pic]").forEach((inp) => inp.addEventListener("change", async () => {
+      const f = inp.files[0]; if (!f) return;
+      const x = cats[inp.dataset.pic];
+      x.hero = await fileToDataUrl(f, 720, 0.72);
+      x.bg = await blurredDataUrl(x.hero);
+      draw(m);
+    }));
     m.querySelectorAll("[data-up]").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.up; [cats[i - 1], cats[i]] = [cats[i], cats[i - 1]]; draw(m); }));
     m.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
       const x = cats[+b.dataset.del];
@@ -238,9 +278,9 @@ function catEditor() {
     }));
   };
   modal(`
-    <div class="modal-head"><h3>Kategoriyalar</h3><button class="icon-btn" data-close>✕</button></div>
-    <div class="modal-body"><div id="cl"></div><button class="btn btn-ghost btn-block" id="addc">+ Kategoriya qo'shish</button></div>
-    <div class="modal-actions"><button class="btn btn-primary" id="ok">Saqlash</button></div>`, {
+    <div class="modal-head"><h3>Bo'limlar</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body"><p class="muted small">Rasm bo'lim sarlavhasida va menyu fonida (xira holda) ko'rinadi.</p><div id="cl"></div><button class="btn btn-ghost btn-block" id="addc">+ Bo'lim qo'shish</button></div>
+    <div class="modal-actions"><button class="btn btn-primary" id="ok">Saqlash</button></div>`, { wide: true,
     onMount(m, close) {
       draw(m);
       m.querySelector("#addc").addEventListener("click", () => { cats.push({ id: "c" + newId(), name: "Yangi kategoriya", emoji: "🍽️" }); draw(m); });

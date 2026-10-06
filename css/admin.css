@@ -105,3 +105,13 @@
   .tbl { font-size: 13px; display: block; overflow-x: auto; }
   .bar { grid-template-columns: 110px 1fr 30px; }
 }
+
+/* Bo'limlar muharriri */
+.cat-card { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; }
+.cat-pic { width: 96px; height: 96px; flex: none; border-radius: 12px; background: var(--surface-2) center/cover; display: grid; place-items: center; font-size: 26px; cursor: pointer; border: 1px dashed var(--line); }
+.cat-fields { flex: 1; display: grid; gap: 8px; min-width: 0; }
+.cat-fields .cat-row { margin: 0; }
+.cat-btns { display: grid; gap: 6px; }
+.adult-chk { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; color: var(--muted); }
+.adult-chk input { width: 18px; height: 18px; accent-color: var(--brand); }
+.li-img.contain, .ie-img.contain { background-size: contain; background-color: #060505; }
