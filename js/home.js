@@ -13,7 +13,7 @@ function render() {
   app.innerHTML = `
   <div class="home">
     <header class="h-top">
-      <div class="h-logo"><img src="img/icon.svg" alt=""><b>Menyu</b></div>
+      <div class="h-logo"><img src="img/icon.svg" alt=""><b>Smart Menyu</b></div>
       ${connBadge(S.online)}
     </header>
     <section class="h-rest">
@@ -45,7 +45,7 @@ function render() {
       </ol>
       <button class="btn btn-primary" id="new">+ Yangi restoran ochish</button>
     </section>
-    <footer class="h-foot">Menyu © ${new Date().getFullYear()} · Restoranlar uchun elektron menyu</footer>
+    <footer class="h-foot">Smart Menyu © ${new Date().getFullYear()} · Restoranlar uchun elektron menyu</footer>
   </div>`;
   app.querySelector("#switch").addEventListener("click", switchRest);
   app.querySelector("#new").addEventListener("click", newRest);

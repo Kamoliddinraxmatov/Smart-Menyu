@@ -1,4 +1,4 @@
-# Menyu — restoranlar uchun elektron menyu va oshxona tizimi
+# Smart Menyu — restoranlar uchun elektron menyu va oshxona tizimi
 
 Restoran brendidagi (logo, rang) menyu planshetda ochiladi, ofitsiant mijoz bilan taom tanlaydi va buyurtmani tasdiqlaydi.
 Buyurtma bir zumda oshxona ekraniga tushadi, oshpaz "Tayyor" tugmasini bosgach stolga biriktirilgan ofitsiantning planshetiga
