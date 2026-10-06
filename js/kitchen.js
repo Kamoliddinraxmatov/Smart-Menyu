@@ -118,7 +118,7 @@ function ticket(o) {
       <div class="kt-table"><small>STOL</small><b>${esc(o.tableNo)}</b></div>
       <div class="kt-info">
         <span class="kt-no">#${esc(shortNo(o))} · ${clock(o.createdAt)}${o.guests ? ` · 👤${o.guests}` : ""}</span>
-        <span class="kt-waiter">🧑‍💼 ${esc(o.waiterName || "")}</span>
+        <span class="kt-waiter">🧑‍💼 ${esc(o.waiterName || "")}${o.byGuest ? " · 📱 Mijoz o'zi" : ""}</span>
       </div>
       <div class="kt-timer" data-timer="${o.createdAt}">${mmss(Date.now() - o.createdAt)}</div>
     </header>

@@ -6,6 +6,7 @@
 //   <base>/config          restoran sozlamalari, menyu, stollar, ofitsiantlar
 //   <base>/stop            stop-list (tugagan taomlar): { itemId: true }
 //   <base>/orders/<id>     har bir buyurtma (chek)
+//   <base>/calls/<tableId> stoldan signal: ofitsiantni chaqirish yoki hisobni so'rash
 import { DEFAULT_CONFIG } from "./defaults.js";
 
 const PREFIX = "menyuuz/v1";
@@ -48,6 +49,7 @@ export function createStore(rid) {
     config: migrate(cached?.config) || structuredClone(DEFAULT_CONFIG),
     stop: cached?.stop || {},
     orders: cached?.orders || {},
+    calls: {},
     configLoaded: !!cached?.config
   };
 
@@ -82,7 +84,7 @@ export function createStore(rid) {
   client.on("connect", () => {
     state.online = true;
     seen = new Set();
-    client.subscribe([`${base}/config`, `${base}/stop`, `${base}/orders/+`], { qos: 1 }, (err) => {
+    client.subscribe([`${base}/config`, `${base}/stop`, `${base}/orders/+`, `${base}/calls/+`], { qos: 1 }, (err) => {
       if (err) return;
       setTimeout(() => {
         if (!seen || !state.online) return;
@@ -117,6 +119,16 @@ export function createStore(rid) {
     if (topic === `${base}/stop`) {
       state.stop = data || {};
       changed({ type: "stop" });
+      return;
+    }
+    const cm = topic.match(/\/calls\/([^/]+)$/);
+    if (cm) {
+      const tid = cm[1];
+      const prev = state.calls[tid];
+      // 3 soatdan eski signallar e'tiborga olinmaydi
+      if (data && Date.now() - (data.at || 0) < 3 * 3600 * 1000) state.calls[tid] = data;
+      else delete state.calls[tid];
+      changed({ type: "call", tableId: tid, call: state.calls[tid] || null, prev });
       return;
     }
     const m = topic.match(/\/orders\/([^/]+)$/);
@@ -174,6 +186,14 @@ export function createStore(rid) {
       if (!cur) return null;
       const next = { ...structuredClone(cur), ...(typeof patch === "function" ? patch(structuredClone(cur)) : patch) };
       return api.putOrder(next);
+    },
+
+    // Stol signali: { type: "waiter" | "bill", at, tableNo, waiterId } yoki null (bajarildi)
+    setCall(tableId, call) {
+      const prev = state.calls[tableId];
+      if (call) state.calls[tableId] = call; else delete state.calls[tableId];
+      publish(`${base}/calls/${tableId}`, call);
+      changed({ type: "call", tableId, call, prev, local: true });
     },
 
     removeOrder(id) {

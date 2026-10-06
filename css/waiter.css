@@ -362,3 +362,21 @@ body.lux {
   .grid-row { grid-template-columns: 1fr 1fr; }
   .dish-img { aspect-ratio: 4 / 3; }
 }
+
+/* Mijoz rejimi va stol chaqiruvlari */
+.guest-bar .top-right { gap: 8px; }
+.g-btn { padding: 11px 16px; border-radius: 99px; font-weight: 700; font-size: 14px; background: rgba(214,179,112,.14); color: var(--gold); border: 1px solid rgba(214,179,112,.35); white-space: nowrap; }
+.g-btn:active { transform: scale(.97); }
+.g-btn.sent { background: rgba(74,222,128,.14); color: #4ADE80; border-color: rgba(74,222,128,.4); }
+.g-lock { opacity: .55; }
+.guest-start { white-space: nowrap; border-color: rgba(214,179,112,.4) !important; color: var(--gold) !important; }
+.call-strip { display: grid; gap: 10px; margin-bottom: 14px; }
+.call-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 16px; background: rgba(214,179,112,.12); border: 1px solid rgba(214,179,112,.45); animation: callpulse 1.6s infinite; }
+.call-item small { color: var(--muted); margin-left: 6px; }
+@keyframes callpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(214,179,112,.4); } 50% { box-shadow: 0 0 0 8px rgba(214,179,112,0); } }
+.tc-call { position: absolute; top: -8px; left: 12px; background: #E8B04B; color: #1a1208; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 99px; animation: callpulse 1.6s infinite; }
+@media (max-width: 700px) {
+  .guest-bar { flex-wrap: wrap; }
+  .guest-bar .top-right { width: 100%; justify-content: stretch; }
+  .guest-bar .g-btn { flex: 1; padding: 10px 8px; font-size: 13px; white-space: normal; }
+}
