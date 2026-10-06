@@ -344,7 +344,9 @@ function renderTables() {
 
   app.innerHTML = `
   ${topbar()}
+  <div class="tv-bg" style="--tv-bg:url('${esc(absUrl(cfg().categories.find((c) => c.hero)?.hero || ""))}')"></div>
   <main class="tables-view">
+    ${helloHtml()}
     ${ready.length ? `
       <section class="ready-strip">
         ${ready.map((o) => `
@@ -383,6 +385,28 @@ function renderTables() {
   app.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { ui.filter = b.dataset.filter; render(); }));
   app.querySelectorAll("[data-table]").forEach((b) => b.addEventListener("click", () => openTable(b.dataset.table)));
   app.querySelectorAll("[data-callok]").forEach((b) => b.addEventListener("click", () => { store.setCall(b.dataset.callok, null); render(); }));
+}
+
+function helloHtml() {
+  const me = meW();
+  const h = new Date().getHours();
+  const greet = h < 5 ? "Xayrli tun" : h < 12 ? "Xayrli tong" : h < 18 ? "Xayrli kun" : "Xayrli kech";
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const mine = Object.values(S.orders).filter((o) => o.waiterId === me.id);
+  const closedToday = mine.filter((o) => o.status === "closed" && (o.closedAt || 0) >= start.getTime());
+  const sales = closedToday.reduce((s, o) => s + orderTotal(o) * (1 + (o.serviceRate || 0) / 100), 0);
+  const tips = closedToday.reduce((s, o) => s + orderTotal(o) * (o.serviceRate || 0) / 100, 0);
+  const busy = new Set(mine.filter((o) => o.status !== "closed").map((o) => o.tableId)).size;
+  return `
+    <section class="tv-hello">
+      <div><small>${clock()} · ${new Date().toLocaleDateString("ru-RU")}</small><h1>${greet}, ${esc(me.first)}!</h1></div>
+      <div class="tv-stats">
+        <span><b>${busy}</b><small>band stolim</small></span>
+        <span><b>${closedToday.length}</b><small>bugun yopilgan chek</small></span>
+        <span><b>${money(sales, cur())}</b><small>bugungi savdom</small></span>
+        <span><b>${money(tips, cur())}</b><small>xizmat haqi</small></span>
+      </div>
+    </section>`;
 }
 
 function tableCard(t) {

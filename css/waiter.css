@@ -424,3 +424,15 @@ body.lux {
 .pick-list li span small { display: block; color: var(--muted); font-size: 12px; }
 .pick-list .stepper b { min-width: 42px; text-align: center; font-size: 13px; }
 .bill li small { color: var(--muted); font-size: 12px; }
+/* Stollar ekrani: salomlashish va fon */
+.tv-bg { position: fixed; inset: 0; z-index: -1; background: var(--tv-bg) center/cover; filter: blur(26px) brightness(.22) saturate(1.2); transform: scale(1.1); pointer-events: none; }
+.tables-view { position: relative; }
+.tv-hello { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
+.tv-hello small { color: var(--muted); letter-spacing: .04em; }
+.tv-hello h1 { margin: 2px 0 0; font-family: var(--serif); font-weight: 600; font-size: 34px; }
+.tv-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.tv-stats span { padding: 10px 16px; border-radius: 16px; background: rgba(23,20,18,.7); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); min-width: 120px; }
+.tv-stats b { display: block; font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--gold); white-space: nowrap; }
+.tv-stats small { font-size: 12px; }
+.table-card.st-free { background: rgba(23,20,18,.45); }
+@media (max-width: 700px) { .tv-hello h1 { font-size: 26px; } .tv-stats { display: grid; grid-template-columns: 1fr 1fr; width: 100%; } .tv-stats span { min-width: 0; } }
