@@ -1,0 +1,10 @@
+{
+  "appId": "uz.smartmenyu.app",
+  "appName": "Smart Menyu",
+  "webDir": "www",
+  "backgroundColor": "#0D0B0A",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0D0B0A"
+  }
+}

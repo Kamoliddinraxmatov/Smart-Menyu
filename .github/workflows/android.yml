@@ -1,0 +1,72 @@
+# Har safar main'ga yangi kod tushganda Smart Menyu Android ilovasini (APK) yig'adi
+# va uni Releases bo'limiga qo'yadi. Doimiy yuklab olish havolasi:
+# https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyu.apk
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Veb fayllarni ilovaga ko'chirish
+        run: |
+          mkdir -p app/www
+          cp -r index.html waiter.html kitchen.html admin.html manifest.webmanifest css js img vendor app/www/
+
+      - name: Capacitor o'rnatish
+        working-directory: app
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+
+      - name: Ikonka va splash
+        working-directory: app
+        continue-on-error: true
+        run: npx capacitor-assets generate --android --iconBackgroundColor '#0D0B0A' --iconBackgroundColorDark '#0D0B0A' --splashBackgroundColor '#0D0B0A' --splashBackgroundColorDark '#0D0B0A'
+
+      - name: Sinxronlash
+        working-directory: app
+        run: npx cap sync android
+
+      - name: APK yig'ish
+        working-directory: app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../../SmartMenyu.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SmartMenyu-apk
+          path: SmartMenyu.apk
+
+      - name: Release'ga qo'yish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Smart Menyu 1.0.${{ github.run_number }}
+          body: "Android ilova. Telefonda yuklab oling va o'rnating (noma'lum manbalardan o'rnatishga ruxsat bering)."
+          files: SmartMenyu.apk
+          make_latest: true
