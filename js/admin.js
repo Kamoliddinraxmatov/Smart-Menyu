@@ -4,6 +4,7 @@ import {
   getRid, esc, money, fullName, initials, clock, orderTotal, applyBrand, logoHtml, itemVisual,
   toast, modal, confirmBox, connBadge, fileToDataUrl, link, registerSW
 } from "./common.js";
+import { itemTr, catTr } from "./i18n.js";
 
 const rid = getRid();
 const store = createStore(rid);
@@ -172,6 +173,16 @@ function itemEditor(item) {
       </div>
       <label class="field"><span>Nomi</span><input type="text" id="name" value="${esc(it.name)}" placeholder="Masalan: To'y oshi"></label>
       <label class="field"><span>Tavsif</span><input type="text" id="desc" value="${esc(it.desc || "")}"></label>
+      <details class="tr-box" ${isNew ? "" : "open"}>
+        <summary>🌐 Tarjimalar (mijoz menyuda tilni almashtirsa ko'rinadi)</summary>
+        ${[["ru", "Русский"], ["en", "English"]].map(([l, label]) => {
+          const tr = itemTr(it, l);
+          return `<div class="tr-row"><b>${l.toUpperCase()}</b>
+            <input type="text" id="tr-${l}-name" value="${esc(tr.name)}" placeholder="${label}: nomi">
+            <input type="text" id="tr-${l}-desc" value="${esc(tr.desc)}" placeholder="${label}: tavsif"></div>`;
+        }).join("")}
+        <p class="hint">Bo'sh qoldirilsa, o'zbekcha nomi ko'rinadi.</p>
+      </details>
       <div class="row2">
         <label class="field"><span>Narxi (${esc(cur())})</span><input type="number" id="price" min="0" step="500" value="${esc(it.price)}"></label>
         <label class="field"><span>Kategoriya</span><select id="cat">${cfg().categories.map((x) => `<option value="${esc(x.id)}" ${x.id === it.cat ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>
@@ -207,6 +218,11 @@ function itemEditor(item) {
           cat: $("#cat").value, time: Number($("#time").value) || 0, weight: $("#weight").value.trim(), emoji: $("#emoji").value.trim(),
           popular: $("#popular").checked, hidden: $("#hidden").checked, fit: $("#fit").checked ? "contain" : ""
         });
+        it.tr = {};
+        for (const l of ["ru", "en"]) {
+          const name = $(`#tr-${l}-name`).value.trim(), desc = $(`#tr-${l}-desc`).value.trim();
+          if (name || desc) it.tr[l] = { name, desc };
+        }
         if (!it.name) { toast("Taom nomini kiriting", { kind: "error" }); return; }
         mutate((x) => {
           const i = x.items.findIndex((y) => y.id === it.id);
@@ -254,6 +270,9 @@ function catEditor() {
             <input type="text" data-i="${i}" data-k="name" value="${esc(x.name)}" placeholder="Nomi">
           </div>
           <input type="text" data-i="${i}" data-k="tagline" value="${esc(x.tagline || "")}" placeholder="Shior, masalan: kechki kayfiyat uchun">
+          ${["ru", "en"].map((l) => { const tr = x.tr?.[l] || catTr(x, l); return `<div class="cat-row tr-mini"><b>${l.toUpperCase()}</b>
+            <input type="text" data-tr="${i}" data-l="${l}" data-k="name" value="${esc(tr.name || "")}" placeholder="Nomi">
+            <input type="text" data-tr="${i}" data-l="${l}" data-k="tagline" value="${esc(tr.tagline || "")}" placeholder="Shior"></div>`; }).join("")}
           <label class="adult-chk"><input type="checkbox" data-adult="${i}" ${x.adult ? "checked" : ""}> 18+ (spirtli ichimliklar)</label>
         </div>
         <div class="cat-btns">
@@ -261,7 +280,12 @@ function catEditor() {
           <button class="icon-btn" data-del="${i}">🗑</button>
         </div>
       </div>`).join("");
-    m.querySelectorAll("[data-k]").forEach((inp) => inp.addEventListener("input", () => { cats[inp.dataset.i][inp.dataset.k] = inp.value; }));
+    m.querySelectorAll("[data-i][data-k]").forEach((inp) => inp.addEventListener("input", () => { cats[inp.dataset.i][inp.dataset.k] = inp.value; }));
+    m.querySelectorAll("[data-tr]").forEach((inp) => inp.addEventListener("input", () => {
+      const x = cats[inp.dataset.tr];
+      x.tr = x.tr || { ru: catTr(x, "ru"), en: catTr(x, "en") };
+      x.tr[inp.dataset.l] = { ...(x.tr[inp.dataset.l] || {}), [inp.dataset.k]: inp.value.trim() };
+    }));
     m.querySelectorAll("[data-adult]").forEach((cb) => cb.addEventListener("change", () => { cats[cb.dataset.adult].adult = cb.checked; }));
     m.querySelectorAll("[data-pic]").forEach((inp) => inp.addEventListener("change", async () => {
       const f = inp.files[0]; if (!f) return;

@@ -4,8 +4,10 @@ import {
   getRid, esc, money, fullName, initials, ago, clock, shortNo, orderTotal, applyBrand, logoHtml, itemVisual,
   unlockAudio, chime, vibrate, keepAwake, toast, modal, confirmBox, connBadge, registerSW, link
 } from "./common.js";
+import { LANGS, t as T, setLang, getLang, itemName, itemDesc, catName, catTagline, weightText, noteLabel } from "./i18n.js";
 
 const rid = getRid();
+try { setLang(localStorage.getItem("menyu.lang") || "uz"); } catch { setLang("uz"); }
 const store = createStore(rid);
 const S = store.state;
 const app = document.getElementById("app");
@@ -42,7 +44,10 @@ const cfg = () => S.config;
 const meW = () => cfg().waiters.find((w) => w.id === ui.me?.id);
 const waiterById = (id) => cfg().waiters.find((w) => w.id === id);
 const tableById = (id) => cfg().tables.find((t) => t.id === id);
-const cur = () => cfg().restaurant.currency || "so'm";
+const cur = () => {
+  const c = cfg().restaurant.currency || "so'm";
+  return c === "so'm" && getLang() !== "uz" ? T("cur") : c;
+};
 
 // ---------- Savat (har stol uchun alohida, qurilmada saqlanadi) ----------
 function cartKey(tid) { return `menyu.cart.${rid}.${tid}`; }
@@ -116,7 +121,7 @@ function guestBar() {
   const t = tableById(ui.guest);
   return `
   <header class="topbar guest-bar">
-    <div class="brand">${logoHtml(r)}<div><b>${esc(r.name)}</b><small>Stol ${esc(t.no)} · Xush kelibsiz!</small></div></div>
+    <div class="brand">${logoHtml(r)}<div><b>${esc(r.name)}</b><small>${T("table")} ${esc(t.no)} · ${T("welcome")}</small></div></div>
     <div class="top-right" id="guestActs">${guestActs()}</div>
   </header>`;
 }
@@ -125,8 +130,8 @@ function guestActs() {
   const call = S.calls[ui.guest];
   const w = call?.type === "waiter", b = call?.type === "bill";
   return `
-    <button class="g-btn ${w ? "sent" : ""}" data-call="waiter">${w ? "✓ Ofitsiant kelmoqda" : "🙋 Ofitsiantni chaqirish"}</button>
-    <button class="g-btn ${b ? "sent" : ""}" data-call="bill">${b ? "✓ Hisob olib kelinmoqda" : "🧾 Hisobni so'rash"}</button>
+    <button class="g-btn ${w ? "sent" : ""}" data-call="waiter">${w ? T("waiterComing") : T("callWaiter")}</button>
+    <button class="g-btn ${b ? "sent" : ""}" data-call="bill">${b ? T("billComing") : T("askBill")}</button>
     <button class="icon-btn g-lock" data-act="guest-exit" title="Ofitsiant uchun">🔒</button>`;
 }
 
@@ -137,10 +142,10 @@ function bindGuestActs() {
     unlockAudio();
     const type = b.dataset.call;
     const t = tableById(ui.guest);
-    if (S.calls[t.id]?.type === type) { store.setCall(t.id, null); toast("Chaqiruv bekor qilindi"); }
+    if (S.calls[t.id]?.type === type) { store.setCall(t.id, null); toast(T("callCancelled")); }
     else {
       store.setCall(t.id, { type, at: Date.now(), tableNo: t.no, waiterId: tableWaiterId(t) || "" });
-      toast(type === "bill" ? "✓ Hisob so'raldi. Ofitsiant hozir olib keladi." : "✓ Ofitsiant chaqirildi. Hozir keladi.", { kind: "ok" });
+      toast(type === "bill" ? T("billAsked") : T("called"), { kind: "ok" });
     }
     box.innerHTML = guestActs();
     bindGuestActs();
@@ -169,15 +174,16 @@ function guestExit() {
     close();
     const t = tableById(ui.guest);
     saveGuest(null);
+    changeLang("uz", false);
     try { if (document.fullscreenElement) document.exitFullscreen(); } catch {}
     ui.view = t ? "table" : "tables";
     ui.tableId = t?.id || null;
     render();
   };
   modal(`
-    <div class="modal-head"><h3>🔒 Ofitsiant rejimi</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-head"><h3>${T("waiterMode")}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
-      <p class="muted center">Bu tugma ofitsiant uchun. PIN-kodni kiriting.</p>
+      <p class="muted center">${T("waiterPin")}</p>
       <div class="pin-dots">${"<i></i>".repeat(4)}</div>
       <div class="pinpad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, "", 0, "⌫"].map((k) => `<button ${k === "" ? "disabled" : ""} data-k="${k}">${k}</button>`).join("")}</div>
     </div>`, {
@@ -206,17 +212,17 @@ function guestConfirm(t) {
   const w = waiterById(tableWaiterId(t));
   const sum = cart.reduce((s, c) => s + c.price * c.qty, 0);
   modal(`
-    <div class="modal-head"><h3>Buyurtmangiz</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-head"><h3>${T("confirmTitle")}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       <ul class="confirm-list">
-        ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(c.name)}${c.note ? `<small>📝 ${esc(c.note)}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
+        ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(cartName(c))}${c.note ? `<small>📝 ${esc(noteText(c.note))}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
       </ul>
-      <label class="field"><span>Istaklaringiz (ixtiyoriy)</span><input type="text" id="comment" placeholder="Masalan: taomlarni birga olib keling"></label>
-      <div class="sum-row big"><span>Jami</span><b>${money(sum, cur())}</b></div>
+      <label class="field"><span>${T("wishes")}</span><input type="text" id="comment" placeholder="${esc(T("wishesPh"))}"></label>
+      <div class="sum-row big"><span>${T("total")}</span><b>${money(sum, cur())}</b></div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" data-close>Yana tanlash</button>
-      <button class="btn btn-primary btn-lg" id="send">Buyurtma berish ✓</button>
+      <button class="btn btn-ghost" data-close>${T("moreChoose")}</button>
+      <button class="btn btn-primary btn-lg" id="send">${T("send")}</button>
     </div>`, {
     onMount(m, close) {
       m.querySelector("#send").addEventListener("click", () => {
@@ -241,7 +247,7 @@ function guestConfirm(t) {
         ui.cartOpen = false;
         renderCart();
         app.querySelectorAll(".dish[data-item]").forEach((d) => refreshCard(d.dataset.item));
-        toast("✓ Buyurtmangiz oshxonaga yuborildi. Yoqimli ishtaha!", { kind: "ok", timeout: 5000 });
+        toast(T("sent"), { kind: "ok", timeout: 5000 });
       });
     }
   });
@@ -395,15 +401,18 @@ function renderTable() {
   <div class="table-view">
     <div class="mood" id="mood"><i></i><i></i></div>
     <section class="menu-pane" id="menuPane">
+      <div class="menu-top">
       <div class="menu-head">
         ${ui.guest ? "" : `<button class="icon-btn" data-act="back" title="Orqaga">←</button>`}
         <div class="mh-title">${ui.guest
-          ? `<h2>Menyu</h2><small>Ofitsiantingiz: <b>${esc(fullName(w) || "—")}</b></small>`
+          ? `<h2>${T("menu")}</h2><small>${T("yourWaiter")}: <b>${esc(fullName(w) || "—")}</b></small>`
           : `<h2>Stol ${esc(t.no)}</h2><small>${esc(t.zone || "")} · Ofitsiant: <b>${esc(fullName(w) || "—")}</b></small>`}</div>
         ${ui.guest ? "" : `<button class="btn btn-ghost guest-start" data-act="guest" title="Planshetni mijozga berish">📱 Mijozga berish</button>`}
-        <div class="search"><input type="search" id="q" placeholder="Taom qidirish…" value="${esc(ui.q)}"></div>
+        <div class="langs" id="langs">${LANGS.map((l) => `<button class="${getLang() === l.id ? "on" : ""}" data-lang="${l.id}" title="${l.label}">${l.short}</button>`).join("")}</div>
+        <div class="search"><input type="search" id="q" placeholder="${esc(T("search"))}" value="${esc(ui.q)}"></div>
       </div>
       <nav class="cats" id="cats"></nav>
+      </div>
       <div id="grid"></div>
     </section>
     <aside class="cart-pane ${ui.cartOpen ? "open" : ""}" id="cartPane"></aside>
@@ -414,13 +423,22 @@ function renderTable() {
   app.querySelector("[data-act=back]")?.addEventListener("click", () => { ui.view = "tables"; render(); });
   app.querySelector("[data-act=guest]")?.addEventListener("click", () => startGuest(t));
   app.querySelector(".table-view").classList.toggle("guest", !!ui.guest);
+  app.querySelectorAll("[data-lang]").forEach((b) => b.addEventListener("click", () => changeLang(b.dataset.lang)));
   const q = app.querySelector("#q");
   q.addEventListener("input", () => { ui.q = q.value; renderGrid(); });
   app.querySelector("#cartFab").addEventListener("click", () => { ui.cartOpen = true; app.querySelector("#cartPane").classList.add("open"); });
   renderCats();
   renderGrid();
   renderCart();
+  syncTopbarHeight();
 }
+
+// Yopishqoq menyu sarlavhasi topbar ostida turishi uchun uning balandligini CSS'ga beramiz
+function syncTopbarHeight() {
+  const tb = app.querySelector(".topbar");
+  if (tb) document.documentElement.style.setProperty("--tb", tb.offsetHeight + "px");
+}
+window.addEventListener("resize", syncTopbarHeight);
 
 // ---------- Kayfiyat foni ----------
 let moodUrl = null;
@@ -445,11 +463,11 @@ function renderCats() {
   const el = app.querySelector("#cats");
   if (!el) return;
   const hasPopular = cfg().items.some((i) => i.popular && !i.hidden);
-  const cats = [{ id: "all", name: "Hammasi", emoji: "🍽️" }, ...(hasPopular ? [{ id: "popular", name: "Mashhur", emoji: "⭐" }] : []), ...cfg().categories];
+  const cats = [{ id: "all", name: T("all"), emoji: "🍽️" }, ...(hasPopular ? [{ id: "popular", name: T("popular"), emoji: "⭐" }] : []), ...cfg().categories];
   el.innerHTML = cats.map((c) => {
     const pic = c.hero || c.bg;
     return `<button class="cat ${ui.cat === c.id ? "on" : ""}" data-cat="${esc(c.id)}">
-      <span class="cat-thumb" ${pic ? `style="background-image:url('${esc(pic)}')"` : ""}>${pic ? "" : esc(c.emoji || "")}</span>${esc(c.name)}${c.adult ? "<sup>18+</sup>" : ""}
+      <span class="cat-thumb" ${pic ? `style="background-image:url('${esc(pic)}')"` : ""}>${pic ? "" : esc(c.emoji || "")}</span>${esc(catName(c))}${c.adult ? "<sup>18+</sup>" : ""}
     </button>`;
   }).join("");
   el.querySelectorAll("[data-cat]").forEach((b) => b.addEventListener("click", () => {
@@ -465,7 +483,7 @@ function visibleItems() {
   const q = ui.q.trim().toLowerCase();
   return cfg().items.filter((i) => {
     if (i.hidden) return false;
-    if (q) return (i.name + " " + (i.desc || "")).toLowerCase().includes(q);
+    if (q) return [i.name, i.desc, itemName(i), itemDesc(i)].join(" ").toLowerCase().includes(q);
     if (ui.cat === "all") return true;
     if (ui.cat === "popular") return i.popular;
     return i.cat === ui.cat;
@@ -482,15 +500,15 @@ function dishCard(i, cart) {
   return `
   <article class="dish ${stop ? "stopped" : ""} ${inCart ? "in-cart" : ""}" data-item="${esc(i.id)}">
     ${img}
-      ${i.popular ? `<span class="dish-pop">★ Mashhur</span>` : ""}
+      ${i.popular ? `<span class="dish-pop">★ ${T("popular")}</span>` : ""}
       ${inCart ? `<span class="dish-qty">${inCart}</span>` : ""}
     </div>
     <div class="dish-body">
-      <h3>${esc(i.name)}</h3>
-      <p>${esc(i.desc || "")}</p>
+      <h3>${esc(itemName(i))}</h3>
+      <p>${esc(itemDesc(i))}</p>
       <div class="dish-foot">
-        <span class="dish-price">${stop ? "Tugagan" : `${esc(priceTxt)}<small>${esc(cur())}</small>`}</span>
-        ${i.weight && !stop ? `<span class="dish-weight">${esc(i.weight)}</span>` : ""}
+        <span class="dish-price">${stop ? T("soldOut") : `${esc(priceTxt)}<small>${esc(cur())}</small>`}</span>
+        ${i.weight && !stop ? `<span class="dish-weight">${esc(weightText(i.weight))}</span>` : ""}
         ${stop ? "" : `<button class="dish-add" data-add="${esc(i.id)}" aria-label="Qo'shish">+</button>`}
       </div>
     </div>
@@ -503,7 +521,7 @@ function heroHtml(c, count) {
   return `
   <header class="cat-hero ${pic ? "" : "plain"}" ${pic ? `style="--hero:url('${esc(absUrl(pic))}')"` : ""}>
     ${c.adult ? `<span class="adult">18+</span>` : ""}
-    <div>${c.tagline ? `<small>${esc(c.tagline)}</small>` : ""}<h2>${esc(c.name)}</h2><span>${count} ta taom</span></div>
+    <div>${catTagline(c) ? `<small>${esc(catTagline(c))}</small>` : ""}<h2>${esc(catName(c))}</h2><span>${count} ${T("dishes")}</span></div>
   </header>`;
 }
 
@@ -516,18 +534,18 @@ function renderGrid() {
   const q = ui.q.trim();
   let sections = [];
   if (q) {
-    sections = [{ c: { id: "q", name: `“${q}”`, tagline: "qidiruv natijalari" }, list: items }];
+    sections = [{ c: { id: "q", name: `“${q}”`, tagline: T("searchRes") }, list: items }];
   } else if (ui.cat === "all") {
     sections = cfg().categories.map((c) => ({ c, list: items.filter((i) => i.cat === c.id) })).filter((s) => s.list.length);
   } else if (ui.cat === "popular") {
     const top = cfg().items.find((i) => i.popular && i.img);
-    sections = [{ c: { id: "popular", name: "Mashhur taomlar", tagline: "mehmonlarimiz tanlovi", hero: top?.img, bg: catById(top?.cat)?.bg }, list: items }];
+    sections = [{ c: { id: "popular", name: T("popularTitle"), tagline: T("popularTag"), hero: top?.img, bg: catById(top?.cat)?.bg }, list: items }];
   } else {
     const c = catById(ui.cat);
     sections = [{ c, list: items }];
   }
   if (!items.length) {
-    el.innerHTML = `<div class="empty"><span class="big">🔍</span>Hech narsa topilmadi</div>`;
+    el.innerHTML = `<div class="empty"><span class="big">🔍</span>${T("notFound")}</div>`;
     setMood(null);
     return;
   }
@@ -555,7 +573,7 @@ function renderGrid() {
   }));
   el.querySelectorAll("[data-item]").forEach((c) => c.addEventListener("click", () => {
     const item = cfg().items.find((i) => i.id === c.dataset.item);
-    if (S.stop[item.id]) { toast(`${esc(item.name)} hozircha tugagan`, { kind: "error" }); return; }
+    if (S.stop[item.id]) { toast(`${esc(itemName(item))} ${T("soldOutMsg")}`, { kind: "error" }); return; }
     itemModal(item);
   }));
 }
@@ -588,16 +606,16 @@ function itemModal(item) {
   modal(`
     ${visual}<button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
-      <div class="im-title"><h3>${esc(item.name)}</h3><b>${money(item.price, cur())}</b></div>
-      <div class="im-meta">${item.weight ? `<span>${esc(item.weight)}</span>` : ""}${item.time ? `<span>⏱ ~${item.time} daq</span>` : ""}${item.popular ? `<span>★ Mashhur</span>` : ""}</div>
-      <p class="muted">${esc(item.desc || "")}</p>
-      <div class="label">Izoh oshpaz uchun</div>
-      <div class="chips">${QUICK_NOTES.map((n) => `<button class="chip" data-n="${esc(n)}">${esc(n)}</button>`).join("")}</div>
-      <input type="text" id="note" placeholder="Boshqa izoh…">
+      <div class="im-title"><h3>${esc(itemName(item))}</h3><b>${money(item.price, cur())}</b></div>
+      <div class="im-meta">${item.weight ? `<span>${esc(weightText(item.weight))}</span>` : ""}${item.time ? `<span>⏱ ~${item.time} ${T("min")}</span>` : ""}${item.popular ? `<span>★ ${T("popular")}</span>` : ""}</div>
+      <p class="muted">${esc(itemDesc(item))}</p>
+      <div class="label">${T("noteForChef")}</div>
+      <div class="chips">${QUICK_NOTES.map((n) => `<button class="chip" data-n="${esc(n)}">${esc(noteLabel(n))}</button>`).join("")}</div>
+      <input type="text" id="note" placeholder="${esc(T("otherNote"))}">
     </div>
     <div class="modal-actions">
       <div class="stepper"><button data-d="-1">−</button><b id="qty">1</b><button data-d="1">+</button></div>
-      <button class="btn btn-primary btn-lg" id="add">Savatga · <span id="sum">${money(item.price, cur())}</span></button>
+      <button class="btn btn-primary btn-lg" id="add">${T("toCart")} · <span id="sum">${money(item.price, cur())}</span></button>
     </div>`, {
     onMount(m, close) {
       m.classList.add("dish-modal");
@@ -631,7 +649,7 @@ function renderCart() {
 
   pane.innerHTML = `
     <div class="cart-head">
-      <h3>${ui.guest ? "Savatingiz" : "Yangi buyurtma"} <small>Stol ${esc(t.no)}</small></h3>
+      <h3>${ui.guest ? T("cart") : "Yangi buyurtma"} <small>${ui.guest ? T("table") : "Stol"} ${esc(t.no)}</small></h3>
       <button class="icon-btn cart-close" data-act="close-cart">✕</button>
     </div>
     <div class="cart-scroll">
@@ -639,18 +657,18 @@ function renderCart() {
         ${cart.map((c) => `
           <li>
             ${cartThumb(c)}
-            <div class="cl-main"><b>${esc(c.name)}</b>${c.note ? `<small class="cl-note">📝 ${esc(c.note)}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
+            <div class="cl-main"><b>${esc(cartName(c))}</b>${c.note ? `<small class="cl-note">📝 ${esc(noteText(c.note))}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
             <div class="stepper sm"><button data-q="${esc(c.key)}" data-d="-1">−</button><b>${c.qty}</b><button data-q="${esc(c.key)}" data-d="1">+</button></div>
           </li>`).join("")}
-      </ul>` : `<div class="empty small"><span class="big">🧺</span>Menyudan taom tanlang</div>`}
+      </ul>` : `<div class="empty small"><span class="big">🧺</span>${ui.guest ? T("emptyCart") : "Menyudan taom tanlang"}</div>`}
 
       ${orders.length ? `
         <div class="tickets">
-          <h4>${ui.guest ? "Buyurtmalaringiz" : "Stol cheklari"}</h4>
+          <h4>${ui.guest ? T("yourOrders") : "Stol cheklari"}</h4>
           ${orders.map((o) => `
             <div class="ticket">
-              <div class="tk-head"><b>#${esc(shortNo(o))}</b><span class="badge b-${o.status}">${statusLabel(o.status)}</span><small>${clock(o.createdAt)}</small></div>
-              <ul>${o.items.map((it) => `<li class="${it.done ? "done" : ""}"><span>${it.qty} × ${esc(it.name)}</span><span>${money(it.qty * it.price, cur())}</span></li>`).join("")}</ul>
+              <div class="tk-head"><b>#${esc(shortNo(o))}</b><span class="badge b-${o.status}">${ui.guest ? T("st_" + o.status) : statusLabel(o.status)}</span><small>${clock(o.createdAt)}</small></div>
+              <ul>${o.items.map((it) => `<li class="${it.done ? "done" : ""}"><span>${it.qty} × ${esc(ui.guest ? cartName(it) : it.name)}</span><span>${money(it.qty * it.price, cur())}</span></li>`).join("")}</ul>
               ${ui.guest ? "" : o.status === "ready" ? `<button class="btn btn-ok btn-block" data-served="${esc(o.id)}">✓ Olib chiqdim</button>` : ""}
               ${!ui.guest && o.status === "new" ? `<button class="link-btn" data-cancel="${esc(o.id)}">Bekor qilish</button>` : ""}
             </div>`).join("")}
@@ -658,14 +676,16 @@ function renderCart() {
     </div>
     <div class="cart-foot">
       ${cart.length ? `
-        <div class="sum-row"><span>Yangi buyurtma</span><b>${money(cartSum, cur())}</b></div>
-        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? "Buyurtma berish →" : "Buyurtmani tasdiqlash →"}</button>` : ""}
+        <div class="sum-row"><span>${ui.guest ? T("newOrder") : "Yangi buyurtma"}</span><b>${money(cartSum, cur())}</b></div>
+        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : "Buyurtmani tasdiqlash →"}</button>` : ""}
       ${orders.length ? `
-        <div class="sum-row muted"><span>Stol hisobi</span><b>${money(billSum, cur())}</b></div>
+        <div class="sum-row muted"><span>${ui.guest ? T("tableBill") : "Stol hisobi"}</span><b>${money(billSum, cur())}</b></div>
         ${ui.guest ? "" : `<button class="btn btn-ghost btn-block" data-act="bill">🧾 Hisob va stolni yopish</button>`}` : ""}
     </div>`;
 
-  fab.innerHTML = cartCount ? `🧺 <b>${cartCount} ta</b> · ${money(cartSum, cur())} <span>Ko'rish →</span>` : orders.length ? `🧾 Stol hisobi · ${money(billSum, cur())} <span>Ko'rish →</span>` : "";
+  fab.innerHTML = ui.guest
+    ? (cartCount ? `🧺 <b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🧾 ${T("tableBill")} · ${money(billSum, cur())} <span>${T("view")}</span>` : "")
+    : (cartCount ? `🧺 <b>${cartCount} ta</b> · ${money(cartSum, cur())} <span>Ko'rish →</span>` : orders.length ? `🧾 Stol hisobi · ${money(billSum, cur())} <span>Ko'rish →</span>` : "");
   fab.hidden = !cartCount && !orders.length;
 
   pane.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => {
@@ -684,6 +704,27 @@ function renderCart() {
     if (o?.status !== "new") { toast("Oshpaz allaqachon boshlagan, bekor qilib bo'lmaydi", { kind: "error" }); return; }
     if (await confirmBox(`#${esc(shortNo(o))} buyurtmani bekor qilasizmi?`, "Bekor qilish", { danger: true })) store.removeOrder(o.id);
   }));
+}
+
+// Savat qatori: nom mijoz tilida, oshxonaga esa o'zbekcha nom boradi
+function cartName(c) {
+  const item = cfg().items.find((i) => i.id === c.itemId);
+  return item && getLang() !== "uz" ? itemName(item) : c.name;
+}
+function noteText(n) {
+  return n.split(", ").map(noteLabel).join(", ");
+}
+
+function changeLang(l, rerender = true) {
+  setLang(l);
+  try { localStorage.setItem("menyu.lang", getLang()); } catch {}
+  if (!rerender || ui.view !== "table") return;
+  const y = window.scrollY;
+  const pane = app.querySelector("#menuPane");
+  const py = pane?.scrollTop || 0;
+  render();
+  window.scrollTo(0, y);
+  const p2 = app.querySelector("#menuPane"); if (p2) p2.scrollTop = py;
 }
 
 function cartThumb(c) {
@@ -899,7 +940,7 @@ store.on((evt) => {
 function guestEvent(evt) {
   if (evt.type === "order" && !evt.local && evt.order.tableId === ui.guest && evt.order.status === "ready" && evt.prev?.status !== "ready") {
     chime("ready");
-    toast("✓ Buyurtmangiz tayyor, hozir olib kelinadi!", { kind: "ready", timeout: 7000 });
+    toast(T("ready"), { kind: "ready", timeout: 7000 });
   }
   if (evt.type === "config" || evt.type === "stop") ui.menuDirty = true;
   if (evt.type !== "render") return;

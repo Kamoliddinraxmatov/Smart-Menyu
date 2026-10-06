@@ -115,3 +115,9 @@
 .adult-chk { display: flex; gap: 8px; align-items: center; font-size: 13px; font-weight: 600; color: var(--muted); }
 .adult-chk input { width: 18px; height: 18px; accent-color: var(--brand); }
 .li-img.contain, .ie-img.contain { background-size: contain; background-color: #060505; }
+.tr-box { border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin: 4px 0 14px; }
+.tr-box summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+.tr-row { display: grid; grid-template-columns: 34px 1fr 2fr; gap: 8px; align-items: center; margin-top: 10px; }
+.tr-row b, .tr-mini b { font-size: 12px; color: var(--muted); letter-spacing: .06em; width: 26px; flex: none; }
+.tr-mini input { font-size: 13px; padding: 8px 10px; }
+@media (max-width: 700px) { .tr-row { grid-template-columns: 1fr; } }
