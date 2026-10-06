@@ -4,7 +4,7 @@ import {
   getRid, esc, money, fullName, initials, ago, clock, shortNo, orderTotal, applyBrand, logoHtml, itemVisual,
   unlockAudio, chime, vibrate, keepAwake, toast, modal, confirmBox, connBadge, registerSW, link
 } from "./common.js";
-import { LANGS, t as T, setLang, getLang, itemName, itemDesc, catName, catTagline, weightText, noteLabel } from "./i18n.js";
+import { LANGS, t as T, setLang, getLang, itemName, itemDesc, catName, catTagline, weightText, noteLabel, optName } from "./i18n.js";
 
 const rid = getRid();
 try { setLang(localStorage.getItem("menyu.lang") || "uz"); } catch { setLang("uz"); }
@@ -53,13 +53,33 @@ const cur = () => {
 function cartKey(tid) { return `menyu.cart.${rid}.${tid}`; }
 function getCart(tid) { try { return JSON.parse(localStorage.getItem(cartKey(tid)) || "[]"); } catch { return []; } }
 function setCart(tid, items) { try { items.length ? localStorage.setItem(cartKey(tid), JSON.stringify(items)) : localStorage.removeItem(cartKey(tid)); } catch {} }
-function addToCart(tid, item, qty = 1, note = "") {
+// sel: { variant, extras } — porsiya (bittasi) va pullik qo'shimchalar (bir nechta)
+function unitPrice(item, sel) {
+  return (sel?.variant ? sel.variant.price : item.price) + (sel?.extras || []).reduce((s, e) => s + (Number(e.price) || 0), 0);
+}
+function addToCart(tid, item, qty = 1, note = "", sel = null) {
+  const v = sel?.variant || null;
+  const exs = sel?.extras || [];
+  const opts = [v?.name, ...exs.map((e) => "+ " + e.name)].filter(Boolean).join(", ");
+  const sig = (v?.id || "") + "|" + exs.map((e) => e.id).sort().join(",");
   const cart = getCart(tid);
-  const ex = cart.find((c) => c.itemId === item.id && (c.note || "") === note);
+  const ex = cart.find((c) => c.itemId === item.id && (c.note || "") === note && (c.sig || "|") === sig);
   if (ex) ex.qty += qty;
-  else cart.push({ key: newId(), itemId: item.id, name: item.name, price: item.price, emoji: item.emoji, qty, note });
+  else cart.push({ key: newId(), itemId: item.id, name: item.name, price: unitPrice(item, sel), emoji: item.emoji, qty, note, opts, sig, vId: v?.id || "", exIds: exs.map((e) => e.id) });
   setCart(tid, cart);
 }
+const hasOpts = (i) => !!(i.variants?.length || i.extras?.length);
+// Tanlangan variantlar matni (mijoz tilida); oshxonaga o'zbekcha "opts" boradi
+function optsText(c) {
+  if (!c.opts) return "";
+  const item = cfg().items.find((i) => i.id === c.itemId);
+  if (getLang() === "uz" || !item) return c.opts;
+  const v = item.variants?.find((x) => x.id === c.vId);
+  const exs = (c.exIds || []).map((id) => item.extras?.find((x) => x.id === id)).filter(Boolean);
+  return [v && optName(v), ...exs.map((e) => "+ " + optName(e))].filter(Boolean).join(", ") || c.opts;
+}
+const optsHtml = (c) => (c.opts ? `<small class="cl-opts">${esc(optsText(c))}</small>` : "");
+const orderLine = (c) => ({ key: c.key, itemId: c.itemId, name: c.name, price: c.price, qty: c.qty, note: c.note || "", opts: c.opts || "", vId: c.vId || "", exIds: c.exIds || [], emoji: c.emoji || "", done: false });
 
 // ---------- Stol holati ----------
 function activeOrders(tid) {
@@ -215,7 +235,7 @@ function guestConfirm(t) {
     <div class="modal-head"><h3>${T("confirmTitle")}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       <ul class="confirm-list">
-        ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(cartName(c))}${c.note ? `<small>📝 ${esc(noteText(c.note))}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
+        ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(cartName(c))}${optsHtml(c)}${c.note ? `<small>📝 ${esc(noteText(c.note))}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
       </ul>
       <label class="field"><span>${T("wishes")}</span><input type="text" id="comment" placeholder="${esc(T("wishesPh"))}"></label>
       <div class="sum-row big"><span>${T("total")}</span><b>${money(sum, cur())}</b></div>
@@ -238,7 +258,7 @@ function guestConfirm(t) {
           byGuest: true,
           guests: activeOrders(t.id)[0]?.guests || Math.min(t.seats || 2, 2),
           comment: m.querySelector("#comment").value.trim(),
-          items: cart.map((c) => ({ key: c.key, itemId: c.itemId, name: c.name, price: c.price, qty: c.qty, note: c.note || "", emoji: c.emoji || "", done: false })),
+          items: cart.map(orderLine),
           status: "new",
           createdAt: Date.now()
         });
@@ -496,7 +516,9 @@ function dishCard(i, cart) {
   const img = i.img
     ? `<div class="dish-img ${i.fit === "contain" ? "contain" : ""}" style="background-image:url('${esc(i.img)}')">`
     : `<div class="dish-img emoji"><span>${esc(i.emoji || "🍽️")}</span>`;
-  const priceTxt = money(i.price, cur()).replace(` ${cur()}`, "");
+  const minPrice = i.variants?.length ? Math.min(...i.variants.map((v) => Number(v.price) || 0)) : i.price;
+  const priceTxt = (i.variants?.length > 1 && new Set(i.variants.map((v) => v.price)).size > 1 ? (getLang() === "uz" ? "" : T("from") + " ") : "") + money(minPrice, cur()).replace(` ${cur()}`, "");
+  const fromSuffix = i.variants?.length > 1 && new Set(i.variants.map((v) => v.price)).size > 1 && getLang() === "uz" ? " dan" : "";
   return `
   <article class="dish ${stop ? "stopped" : ""} ${inCart ? "in-cart" : ""}" data-item="${esc(i.id)}">
     ${img}
@@ -507,7 +529,7 @@ function dishCard(i, cart) {
       <h3>${esc(itemName(i))}</h3>
       <p>${esc(itemDesc(i))}</p>
       <div class="dish-foot">
-        <span class="dish-price">${stop ? T("soldOut") : `${esc(priceTxt)}<small>${esc(cur())}</small>`}</span>
+        <span class="dish-price">${stop ? T("soldOut") : `${esc(priceTxt)}<small>${esc(cur() + fromSuffix)}</small>`}</span>
         ${i.weight && !stop ? `<span class="dish-weight">${esc(weightText(i.weight))}</span>` : ""}
         ${stop ? "" : `<button class="dish-add" data-add="${esc(i.id)}" aria-label="Qo'shish">+</button>`}
       </div>
@@ -567,6 +589,7 @@ function renderGrid() {
   el.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", (e) => {
     e.stopPropagation();
     const item = cfg().items.find((i) => i.id === b.dataset.add);
+    if (hasOpts(item)) return itemModal(item);
     addToCart(ui.tableId, item);
     refreshCard(item.id, true);
     renderCart();
@@ -590,6 +613,7 @@ function refreshCard(itemId, bump = false) {
   if (bump) card.classList.add("bump");
   card.querySelector("[data-add]")?.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (hasOpts(item)) return itemModal(item);
     addToCart(ui.tableId, item);
     refreshCard(item.id, true);
     renderCart();
@@ -600,36 +624,68 @@ function refreshCard(itemId, bump = false) {
 function itemModal(item) {
   let qty = 1;
   const notes = new Set();
+  const variants = item.variants || [];
+  const extras = item.extras || [];
+  let variant = variants.length === 1 ? variants[0] : null;
+  const chosen = new Set();
   const visual = item.img
     ? `<div class="dm-img ${item.fit === "contain" ? "contain" : ""}" style="background-image:url('${esc(item.img)}')">`
     : `<div class="dm-img emoji"><span>${esc(item.emoji || "🍽️")}</span>`;
+  const sel = () => ({ variant, extras: extras.filter((e) => chosen.has(e.id)) });
+  const plus = (p) => (Number(p) ? `+${money(p, cur())}` : "");
   modal(`
     ${visual}<button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
-      <div class="im-title"><h3>${esc(itemName(item))}</h3><b>${money(item.price, cur())}</b></div>
+      <div class="im-title"><h3>${esc(itemName(item))}</h3><b id="unit">${money(unitPrice(item, sel()), cur())}</b></div>
       <div class="im-meta">${item.weight ? `<span>${esc(weightText(item.weight))}</span>` : ""}${item.time ? `<span>⏱ ~${item.time} ${T("min")}</span>` : ""}${item.popular ? `<span>★ ${T("popular")}</span>` : ""}</div>
       <p class="muted">${esc(itemDesc(item))}</p>
+      ${variants.length ? `
+        <div class="label">${T("options")}</div>
+        <div class="opt-vars">${variants.map((v) => `<button class="opt-var ${variant === v ? "on" : ""}" data-v="${esc(v.id)}"><b>${esc(optName(v))}</b><span>${money(v.price, cur())}</span></button>`).join("")}</div>` : ""}
+      ${extras.length ? `
+        <div class="label">${T("extras")}</div>
+        <div class="opt-extras">${extras.map((e) => `<button class="opt-ex" data-e="${esc(e.id)}"><i></i><b>${esc(optName(e))}</b><span>${plus(e.price)}</span></button>`).join("")}</div>` : ""}
       <div class="label">${T("noteForChef")}</div>
       <div class="chips">${QUICK_NOTES.map((n) => `<button class="chip" data-n="${esc(n)}">${esc(noteLabel(n))}</button>`).join("")}</div>
       <input type="text" id="note" placeholder="${esc(T("otherNote"))}">
     </div>
     <div class="modal-actions">
       <div class="stepper"><button data-d="-1">−</button><b id="qty">1</b><button data-d="1">+</button></div>
-      <button class="btn btn-primary btn-lg" id="add">${T("toCart")} · <span id="sum">${money(item.price, cur())}</span></button>
+      <button class="btn btn-primary btn-lg" id="add">${T("toCart")} · <span id="sum">${money(unitPrice(item, sel()), cur())}</span></button>
     </div>`, {
     onMount(m, close) {
       m.classList.add("dish-modal");
+      const paint = () => {
+        const u = unitPrice(item, sel());
+        m.querySelector("#unit").textContent = money(u, cur());
+        m.querySelector("#sum").textContent = money(u * qty, cur());
+      };
+      m.querySelectorAll("[data-v]").forEach((b) => b.addEventListener("click", () => {
+        variant = variants.find((v) => v.id === b.dataset.v);
+        m.querySelectorAll("[data-v]").forEach((x) => x.classList.toggle("on", x === b));
+        m.querySelector(".opt-vars").classList.remove("need");
+        paint();
+      }));
+      m.querySelectorAll("[data-e]").forEach((b) => b.addEventListener("click", () => {
+        const id = b.dataset.e; chosen.has(id) ? chosen.delete(id) : chosen.add(id); b.classList.toggle("on"); paint();
+      }));
       m.querySelectorAll("[data-n]").forEach((b) => b.addEventListener("click", () => {
         const n = b.dataset.n; notes.has(n) ? notes.delete(n) : notes.add(n); b.classList.toggle("on");
       }));
       m.querySelectorAll("[data-d]").forEach((b) => b.addEventListener("click", () => {
         qty = Math.max(1, qty + Number(b.dataset.d));
         m.querySelector("#qty").textContent = qty;
-        m.querySelector("#sum").textContent = money(item.price * qty, cur());
+        paint();
       }));
       m.querySelector("#add").addEventListener("click", () => {
+        if (variants.length && !variant) {
+          const box = m.querySelector(".opt-vars");
+          box.classList.add("need"); box.scrollIntoView({ block: "center", behavior: "smooth" });
+          toast(T("chooseFirst"), { kind: "error" });
+          return;
+        }
         const note = [...notes, m.querySelector("#note").value.trim()].filter(Boolean).join(", ");
-        addToCart(ui.tableId, item, qty, note);
+        addToCart(ui.tableId, item, qty, note, sel());
         close(); refreshCard(item.id, true); renderCart();
       });
     }
@@ -657,7 +713,7 @@ function renderCart() {
         ${cart.map((c) => `
           <li>
             ${cartThumb(c)}
-            <div class="cl-main"><b>${esc(cartName(c))}</b>${c.note ? `<small class="cl-note">📝 ${esc(noteText(c.note))}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
+            <div class="cl-main"><b>${esc(cartName(c))}</b>${optsHtml(c)}${c.note ? `<small class="cl-note">📝 ${esc(noteText(c.note))}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
             <div class="stepper sm"><button data-q="${esc(c.key)}" data-d="-1">−</button><b>${c.qty}</b><button data-q="${esc(c.key)}" data-d="1">+</button></div>
           </li>`).join("")}
       </ul>` : `<div class="empty small"><span class="big">🧺</span>${ui.guest ? T("emptyCart") : "Menyudan taom tanlang"}</div>`}
@@ -668,7 +724,7 @@ function renderCart() {
           ${orders.map((o) => `
             <div class="ticket">
               <div class="tk-head"><b>#${esc(shortNo(o))}</b><span class="badge b-${o.status}">${ui.guest ? T("st_" + o.status) : statusLabel(o.status)}</span><small>${clock(o.createdAt)}</small></div>
-              <ul>${o.items.map((it) => `<li class="${it.done ? "done" : ""}"><span>${it.qty} × ${esc(ui.guest ? cartName(it) : it.name)}</span><span>${money(it.qty * it.price, cur())}</span></li>`).join("")}</ul>
+              <ul>${o.items.map((it) => `<li class="${it.done ? "done" : ""}"><span>${it.qty} × ${esc(ui.guest ? cartName(it) : it.name)}${it.opts ? ` <i class="tk-opts">(${esc(optsText(it))})</i>` : ""}</span><span>${money(it.qty * it.price, cur())}</span></li>`).join("")}</ul>
               ${ui.guest ? "" : o.status === "ready" ? `<button class="btn btn-ok btn-block" data-served="${esc(o.id)}">✓ Olib chiqdim</button>` : ""}
               ${!ui.guest && o.status === "new" ? `<button class="link-btn" data-cancel="${esc(o.id)}">Bekor qilish</button>` : ""}
             </div>`).join("")}
@@ -757,7 +813,7 @@ function confirmOrder(t) {
         <div><small>Mehmonlar</small><div class="stepper sm"><button data-g="-1">−</button><b id="guests">${guests}</b><button data-g="1">+</button></div></div>
       </div>
       <ul class="confirm-list">
-        ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(c.name)}${c.note ? `<small>📝 ${esc(c.note)}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
+        ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(c.name)}${optsHtml(c)}${c.note ? `<small>📝 ${esc(c.note)}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
       </ul>
       <label class="field"><span>Oshxona uchun umumiy izoh</span><input type="text" id="comment" placeholder="Masalan: avval salatlarni bering"></label>
       <div class="sum-row big"><span>Jami</span><b>${money(sum, cur())}</b></div>
@@ -783,7 +839,7 @@ function confirmOrder(t) {
           sentBy: fullName(me),
           guests,
           comment: m.querySelector("#comment").value.trim(),
-          items: cart.map((c) => ({ key: c.key, itemId: c.itemId, name: c.name, price: c.price, qty: c.qty, note: c.note || "", emoji: c.emoji || "", done: false })),
+          items: cart.map(orderLine),
           status: "new",
           createdAt: Date.now()
         };
@@ -811,8 +867,8 @@ function billModal(t) {
   const orders = activeOrders(t.id);
   const lines = {};
   orders.forEach((o) => o.items.forEach((it) => {
-    const k = it.itemId + "|" + it.price;
-    lines[k] = lines[k] || { name: it.name, price: it.price, qty: 0 };
+    const k = it.itemId + "|" + it.price + "|" + (it.opts || "");
+    lines[k] = lines[k] || { name: it.name + (it.opts ? ` (${it.opts})` : ""), price: it.price, qty: 0 };
     lines[k].qty += it.qty;
   }));
   const sub = orders.reduce((s, o) => s + orderTotal(o), 0);

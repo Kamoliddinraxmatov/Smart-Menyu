@@ -137,3 +137,4 @@ label.field > span { display: block; font-size: 13px; font-weight: 600; color: v
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 8px; }
+.btn-sm { height: 36px; padding: 0 12px; font-size: 13px; }

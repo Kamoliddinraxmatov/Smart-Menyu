@@ -128,7 +128,7 @@ function ticket(o) {
         <li class="${it.done ? "done" : ""}" data-item="${idx}">
           <span class="kt-qty">${it.qty}</span>
           ${thumb(it)}
-          <span class="kt-name">${esc(it.name)}${it.note ? `<em>📝 ${esc(it.note)}</em>` : ""}</span>
+          <span class="kt-name">${esc(it.name)}${it.opts ? `<em class="kt-opts">${esc(it.opts)}</em>` : ""}${it.note ? `<em>📝 ${esc(it.note)}</em>` : ""}</span>
         </li>`).join("")}
     </ul>
     ${o.comment ? `<div class="kt-comment">💬 ${esc(o.comment)}</div>` : ""}
@@ -153,7 +153,7 @@ function boardReady() {
   return `<div class="kready">${list.map((o) => `
     <div class="kr-row">
       <div class="kr-table">Stol <b>${esc(o.tableNo)}</b></div>
-      <div class="kr-items">${o.items.map((i) => `${i.qty}× ${esc(i.name)}`).join(", ")}<small>#${esc(shortNo(o))} · ${esc(o.waiterName || "")} · tayyorlash ${mmss((o.readyAt || 0) - (o.startedAt || o.createdAt))}</small></div>
+      <div class="kr-items">${o.items.map((i) => `${i.qty}× ${esc(i.name)}${i.opts ? ` (${esc(i.opts)})` : ""}`).join(", ")}<small>#${esc(shortNo(o))} · ${esc(o.waiterName || "")} · tayyorlash ${mmss((o.readyAt || 0) - (o.startedAt || o.createdAt))}</small></div>
       <span class="badge ${o.status === "ready" ? "b-ready" : "b-served"}">${o.status === "ready" ? "Ofitsiant kutilmoqda" : "Olib chiqildi"}</span>
       <div class="kr-time">${clock(o.readyAt)}</div>
       ${o.status === "ready" ? `<button class="btn btn-ghost" data-recall="${esc(o.id)}">↺ Qaytarish</button>` : ""}
@@ -165,8 +165,9 @@ function allDay(list) {
   const imgs = {};
   list.forEach((o) => o.items.forEach((it) => {
     if (it.done) return;
-    agg[it.name] = (agg[it.name] || 0) + it.qty;
-    imgs[it.name] = imgs[it.name] || it;
+    const k = it.name + (it.opts ? ` (${it.opts})` : "");
+    agg[k] = (agg[k] || 0) + it.qty;
+    imgs[k] = imgs[k] || it;
   }));
   const rows = Object.entries(agg).sort((a, b) => b[1] - a[1]);
   return `

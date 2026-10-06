@@ -173,6 +173,18 @@ function itemEditor(item) {
       </div>
       <label class="field"><span>Nomi</span><input type="text" id="name" value="${esc(it.name)}" placeholder="Masalan: To'y oshi"></label>
       <label class="field"><span>Tavsif</span><input type="text" id="desc" value="${esc(it.desc || "")}"></label>
+      <div class="opt-edit">
+        <div>
+          <div class="oe-head"><b>Porsiya / variantlar</b><small>Mijoz bittasini tanlaydi. Narx shu variant narxi bo'ladi.</small></div>
+          <div id="vars"></div>
+          <button class="btn btn-ghost btn-sm" id="addVar">+ Variant</button>
+        </div>
+        <div>
+          <div class="oe-head"><b>Qo'shimchalar</b><small>Mijoz bir nechtasini tanlashi mumkin, narxi qo'shiladi.</small></div>
+          <div id="exs"></div>
+          <button class="btn btn-ghost btn-sm" id="addEx">+ Qo'shimcha</button>
+        </div>
+      </div>
       <details class="tr-box" ${isNew ? "" : "open"}>
         <summary>🌐 Tarjimalar (mijoz menyuda tilni almashtirsa ko'rinadi)</summary>
         ${[["ru", "Русский"], ["en", "English"]].map(([l, label]) => {
@@ -211,6 +223,24 @@ function itemEditor(item) {
         it.img = await fileToDataUrl(f, 560, 0.72);
         $("#vis").innerHTML = itemVisual(it, "thumb ie-img"); $("#rmImg").hidden = false;
       });
+      const vars = structuredClone(it.variants || []);
+      const exs = structuredClone(it.extras || []);
+      const drawOpts = (box, list, ph) => {
+        $(box).innerHTML = list.map((o, i) => `
+          <div class="oe-row">
+            <input type="text" data-o="${i}" data-f="name" value="${esc(o.name)}" placeholder="${ph}">
+            <input type="number" data-o="${i}" data-f="price" value="${esc(o.price ?? "")}" min="0" step="500" placeholder="Narx">
+            <button class="icon-btn" data-rm="${i}">✕</button>
+          </div>`).join("");
+        $(box).querySelectorAll("[data-o]").forEach((inp) => inp.addEventListener("input", () => {
+          const o = list[inp.dataset.o]; o[inp.dataset.f] = inp.dataset.f === "price" ? Number(inp.value) || 0 : inp.value;
+        }));
+        $(box).querySelectorAll("[data-rm]").forEach((b) => b.addEventListener("click", () => { list.splice(+b.dataset.rm, 1); drawOpts(box, list, ph); }));
+      };
+      drawOpts("#vars", vars, "Masalan: 0,5 porsiya");
+      drawOpts("#exs", exs, "Masalan: Pishloq");
+      $("#addVar").addEventListener("click", () => { vars.push({ id: "v" + newId(), name: "", price: Number($("#price").value) || 0 }); drawOpts("#vars", vars, "Masalan: 0,5 porsiya"); });
+      $("#addEx").addEventListener("click", () => { exs.push({ id: "e" + newId(), name: "", price: 0 }); drawOpts("#exs", exs, "Masalan: Pishloq"); });
       $("#rmImg").addEventListener("click", () => { it.img = ""; $("#vis").innerHTML = itemVisual(it, "thumb ie-img"); $("#rmImg").hidden = true; });
       $("#ok").addEventListener("click", () => {
         Object.assign(it, {
@@ -218,6 +248,12 @@ function itemEditor(item) {
           cat: $("#cat").value, time: Number($("#time").value) || 0, weight: $("#weight").value.trim(), emoji: $("#emoji").value.trim(),
           popular: $("#popular").checked, hidden: $("#hidden").checked, fit: $("#fit").checked ? "contain" : ""
         });
+        const clean = (l) => l.filter((o) => String(o.name || "").trim()).map((o) => ({ ...o, name: o.name.trim(), price: Number(o.price) || 0 }));
+        it.variants = clean(vars);
+        it.extras = clean(exs);
+        if (!it.variants.length) delete it.variants;
+        if (!it.extras.length) delete it.extras;
+        if (it.variants) it.price = Math.min(...it.variants.map((v) => v.price));
         it.tr = {};
         for (const l of ["ru", "en"]) {
           const name = $(`#tr-${l}-name`).value.trim(), desc = $(`#tr-${l}-desc`).value.trim();

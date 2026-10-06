@@ -55,6 +55,8 @@ const STR = {
   st_ready: { uz: "Tayyor ✓", ru: "Готов ✓", en: "Ready ✓" },
   st_served: { uz: "Berildi", ru: "Подан", en: "Served" },
   options: { uz: "Tanlang", ru: "Выберите", en: "Choose" },
+  from: { uz: "dan", ru: "от", en: "from" },
+  chooseFirst: { uz: "Avval variantni tanlang", ru: "Сначала выберите вариант", en: "Please choose an option" },
   extras: { uz: "Qo'shimchalar", ru: "Добавки", en: "Extras" },
   waiterMode: { uz: "🔒 Ofitsiant rejimi", ru: "🔒 Режим официанта", en: "🔒 Waiter mode" },
   waiterPin: { uz: "Bu tugma ofitsiant uchun. PIN-kodni kiriting.", ru: "Эта кнопка для официанта. Введите PIN-код.", en: "This button is for staff. Enter the PIN." }
@@ -71,6 +73,29 @@ const NOTES = {
   "Bolalar uchun": { ru: "Для ребёнка", en: "For a child" },
   "Olib ketish": { ru: "С собой", en: "To go" }
 };
+
+// Porsiya va qo'shimcha nomlari (demo)
+const OPT_TR = {
+  "0,5 porsiya": { ru: "0,5 порции", en: "Half portion" },
+  "1 porsiya": { ru: "1 порция", en: "Full portion" },
+  "Bedana tuxum": { ru: "Перепелиные яйца", en: "Quail eggs" },
+  "Qazi": { ru: "Казы", en: "Qazi (horse sausage)" },
+  "Qonli": { ru: "С кровью", en: "Rare" },
+  "O'rtacha": { ru: "Средняя прожарка", en: "Medium" },
+  "To'liq pishgan": { ru: "Полная прожарка", en: "Well done" },
+  "Qo'ziqorin sousi": { ru: "Грибной соус", en: "Mushroom sauce" },
+  "Pishloq sousi": { ru: "Сырный соус", en: "Cheese sauce" },
+  "Fri kartoshka": { ru: "Картофель фри", en: "French fries" },
+  "Qo'shimcha tuxum": { ru: "Доп. яйцо", en: "Extra egg" },
+  "Qo'shimcha lapsha": { ru: "Доп. лапша", en: "Extra noodles" },
+  "Achchiq yog'": { ru: "Острое масло", en: "Chili oil" },
+  "Alkogolli": { ru: "С алкоголем", en: "Classic" },
+  "Alkogolsiz": { ru: "Безалкогольный", en: "Alcohol-free" }
+};
+export function optName(o) {
+  if (!o || lang === "uz") return o?.name || "";
+  return o.tr?.[lang] || OPT_TR[o.name]?.[lang] || o.name;
+}
 
 // Demo menyu tarjimalari (restoran o'zgartirmagan bo'lsa ishlatiladi)
 const CAT_TR = {

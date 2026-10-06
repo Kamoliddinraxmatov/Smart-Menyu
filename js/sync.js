@@ -28,6 +28,13 @@ function migrate(c) {
     out.categories = structuredClone(DEFAULT_CONFIG.categories);
     out.items = structuredClone(DEFAULT_CONFIG.items);
   }
+  // v3: demo taomlarga porsiya va qo'shimchalar (restoran o'zgartirmagan taomlarga)
+  const defs = Object.fromEntries(DEFAULT_CONFIG.items.map((i) => [i.id, i]));
+  out.items = (out.items || []).map((i) => {
+    const d = defs[i.id];
+    if (!d || d.name !== i.name || i.variants || i.extras) return i;
+    return { ...i, ...(d.variants ? { variants: structuredClone(d.variants) } : {}), ...(d.extras ? { extras: structuredClone(d.extras) } : {}) };
+  });
   return out;
 }
 
