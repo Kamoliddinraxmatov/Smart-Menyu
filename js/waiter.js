@@ -98,7 +98,7 @@ function tableState(tid) {
   if (!os.length) return { key: "free", label: L("Bo'sh", "Свободен", "Free"), orders: os };
   if (os.some((o) => o.status === "ready")) return { key: "ready", label: L("Tayyor ✓", "Готово ✓", "Ready ✓"), orders: os };
   if (os.some((o) => o.status === "cooking")) return { key: "cooking", label: L("Tayyorlanmoqda", "Готовится", "Cooking"), orders: os };
-  if (os.some((o) => o.status === "new")) return { key: "new", label: L("Oshxonaga yuborildi", "Отправлено на кухню", "Sent to kitchen"), orders: os };
+  if (os.some((o) => o.status === "new")) return { key: "new", label: L("Oshxonada", "На кухне", "In the kitchen"), orders: os };
   if (os.every((o) => o.status === "served")) return { key: "served", label: L("🍽 Taom stolda", "🍽 Блюда на столе", "🍽 Served"), orders: os };
   return { key: "busy", label: L("Band", "Занят", "Busy"), orders: os };
 }
@@ -493,7 +493,6 @@ function tableCard(t) {
   const w = waiterById(tableWaiterId(t));
   const total = st.orders.reduce((s, o) => s + orderTotal(o), 0);
   const since = st.orders[0]?.createdAt;
-  const draft = getCart(t.id).reduce((s, c) => s + c.qty, 0);
   return `
   <button class="table-card st-${st.key}" data-table="${esc(t.id)}">
     <div class="tc-top"><span class="tc-no">${esc(t.no)}</span><span class="tc-seats">👤 ${esc(t.seats || "")}</span></div>
@@ -501,7 +500,6 @@ function tableCard(t) {
     ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${agoL(Math.max(...st.orders.map((o) => o.servedAt || 0)))} ${L("oldin berildi", "назад подано", "ago served")}` : since ? agoL(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
     <div class="tc-waiter">${esc(fullName(w) || "—")}</div>
     ${st.key !== "free" ? `<span class="tc-add">➕ ${L("Qo'shish", "Добавить", "Add")}</span>` : ""}
-    ${draft ? `<span class="tc-draft">${draft} ${L("ta savatda", "в корзине", "in cart")}</span>` : ""}
   </button>`;
 }
 
@@ -870,7 +868,7 @@ function renderCart() {
     <div class="cart-foot">
       ${cart.length ? `
         <div class="sum-row"><span>${ui.guest ? T("newOrder") : orders.length ? L("Yangi tanlangan taomlar", "Новые выбранные блюда", "Newly picked dishes") : L("Yangi buyurtma", "Новый заказ", "New order")}</span><b>${money(cartSum, cur())}</b></div>
-        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : orders.length ? L("✓ Buyurtmaga qo'shish →", "✓ Добавить к заказу →", "✓ Add to order →") : L("Buyurtmani tasdiqlash →", "Подтвердить заказ →", "Confirm order →")}</button>` : ""}
+        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : orders.length ? L("✓ Buyurtmaga qo'shish", "✓ Добавить к заказу", "✓ Add to order") : L("🍳 Oshxonaga yuborish", "🍳 Отправить на кухню", "🍳 Send to kitchen")}</button>` : ""}
       ${orders.length && !cart.length && !ui.guest ? `
         ${`<button class="btn btn-info btn-lg btn-block" data-act="add-more">➕ ${L("Buyurtma qo'shish", "Добавить заказ", "Add order")}</button>
         <button class="btn btn-ok btn-lg btn-block" data-act="bill">✓ ${L("Mijoz ketdi · Yakunlash", "Гость ушёл · Закрыть", "Guest left · Close")}</button>`}` : ""}
@@ -898,7 +896,7 @@ function renderCart() {
   pane.querySelector("[data-act=add-more]")?.addEventListener("click", () => {
     ui.cartOpen = false; pane.classList.remove("open");
     window.scrollTo({ top: 0, behavior: "smooth" });
-    toast(`${ST(esc(t.no))}: ${L(`menyudan taom tanlang, keyin savatda "Buyurtmaga qo'shish"ni bosing`, "выберите блюда в меню, затем в корзине нажмите «Добавить к заказу»", `pick dishes, then tap "Add to order" in the cart`)}`);
+    toast(`${ST(esc(t.no))}: ${L(`menyudan taom tanlang, keyin pastdagi "Buyurtmaga qo'shish"ni bosing`, "выберите блюда в меню, затем внизу нажмите «Добавить к заказу»", `pick dishes, then tap "Add to order" below`)}`);
   });
   pane.querySelector("[data-act=confirm]")?.addEventListener("click", () => (ui.guest ? guestConfirm(t) : confirmOrder(t)));
   pane.querySelector("[data-act=bill]")?.addEventListener("click", () => billModal(t));
@@ -946,63 +944,37 @@ function nextNo() {
   return Math.max(0, ...today.map((o) => Number(o.no) || 0)) + 1;
 }
 
+// Ofitsiant tasdiqlashi bilan buyurtma darhol oshxonaga ketadi (alohida oyna yo'q)
 function confirmOrder(t) {
   const cart = getCart(t.id);
   if (!cart.length) return;
+  const me = meW();
+  const active = activeOrders(t.id);
   // bo'sh stolga buyurtmani kim yuborsa, stol o'sha ofitsiantniki bo'ladi
-  const w = activeOrders(t.id).length ? waiterById(tableWaiterId(t)) : meW();
-  const sum = cart.reduce((s, c) => s + c.price * c.qty, 0);
-  let guests = activeOrders(t.id)[0]?.guests || Math.min(t.seats || 2, 2);
-  modal(`
-    <div class="modal-head"><h3>${activeOrders(t.id).length ? L("Buyurtmaga qo'shish", "Добавить к заказу", "Add to order") : L("Buyurtmani tasdiqlang", "Подтвердите заказ", "Confirm the order")}</h3><button class="icon-btn" data-close>✕</button></div>
-    <div class="modal-body">
-      <div class="confirm-meta">
-        <div><small>Stol</small><b>${esc(t.no)}</b></div>
-        <div><small>Ofitsiant</small><b>${esc(fullName(w))}</b></div>
-        <div><small>${L("Mehmonlar", "Гости", "Guests")}</small><div class="stepper sm"><button data-g="-1">−</button><b id="guests">${guests}</b><button data-g="1">+</button></div></div>
-      </div>
-      <ul class="confirm-list">
-        ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(c.name)}${optsHtml(c)}${c.note ? `<small>📝 ${esc(c.note)}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
-      </ul>
-      <div class="sum-row big"><span>${L("Jami", "Итого", "Total")}</span><b>${money(sum, cur())}</b></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" data-close>${L("Tahrirlash", "Изменить", "Edit")}</button>
-      <button class="btn btn-primary btn-lg" id="send">🍳 ${L("Oshxonaga yuborish", "Отправить на кухню", "Send to kitchen")}</button>
-    </div>`, {
-    onMount(m, close) {
-      m.querySelectorAll("[data-g]").forEach((b) => b.addEventListener("click", () => {
-        guests = Math.max(1, guests + Number(b.dataset.g)); m.querySelector("#guests").textContent = guests;
-      }));
-      m.querySelector("#send").addEventListener("click", () => {
-        const me = meW();
-        const order = {
-          id: newId(),
-          no: nextNo(),
-          tableId: t.id,
-          tableNo: t.no,
-          zone: t.zone || "",
-          waiterId: w?.id || me.id,
-          waiterName: fullName(w || me),
-          sentBy: fullName(me),
-          guests,
-          comment: "",
-          items: cart.map(orderLine),
-          status: "new",
-          createdAt: Date.now()
-        };
-        if (activeOrders(t.id).length) order.extra = true;
-        store.putOrder(order);
-        setCart(t.id, []);
-        close();
-        ui.cartOpen = false;
-        toast(`✓ ${ST(esc(t.no))}: ${order.extra ? L("buyurtmaga qo'shildi va oshxonaga yuborildi", "добавлено к заказу и отправлено на кухню", "added to the order and sent to the kitchen") : L("buyurtma oshxonaga yuborildi", "заказ отправлен на кухню", "order sent to the kitchen")}`, { kind: "ok" });
-        if (!S.online) toast(L("Aloqa yo'q: buyurtma aloqa tiklanishi bilan yuboriladi", "Нет связи: заказ отправится, когда связь восстановится", "Offline: the order will be sent when the connection is back"), { kind: "error", timeout: 6000 });
-        ui.view = "tables";
-        render();
-      });
-    }
-  });
+  const w = active.length ? waiterById(tableWaiterId(t)) : me;
+  const order = {
+    id: newId(),
+    no: nextNo(),
+    tableId: t.id,
+    tableNo: t.no,
+    zone: t.zone || "",
+    waiterId: w?.id || me.id,
+    waiterName: fullName(w || me),
+    sentBy: fullName(me),
+    guests: active[0]?.guests || Math.min(t.seats || 2, 2),
+    comment: "",
+    items: cart.map(orderLine),
+    status: "new",
+    createdAt: Date.now()
+  };
+  if (active.length) order.extra = true;
+  store.putOrder(order);
+  setCart(t.id, []);
+  ui.cartOpen = false;
+  toast(`✓ ${ST(esc(t.no))}: ${order.extra ? L("buyurtmaga qo'shildi va oshxonaga yuborildi", "добавлено к заказу и отправлено на кухню", "added to the order and sent to the kitchen") : L("buyurtma oshxonaga yuborildi", "заказ отправлен на кухню", "order sent to the kitchen")}`, { kind: "ok" });
+  if (!S.online) toast(L("Aloqa yo'q: buyurtma aloqa tiklanishi bilan yuboriladi", "Нет связи: заказ отправится, когда связь восстановится", "Offline: the order will be sent when the connection is back"), { kind: "error", timeout: 6000 });
+  ui.view = "tables";
+  render();
 }
 
 function markServed(id) {
