@@ -66,6 +66,7 @@ function unitPrice(item, sel) {
   return (sel?.variant ? sel.variant.price : item.price) + (sel?.extras || []).reduce((s, e) => s + (Number(e.price) || 0), 0);
 }
 function addToCart(tid, item, qty = 1, note = "", sel = null) {
+  ui.sentFor = null;
   const v = sel?.variant || null;
   const exs = sel?.extras || [];
   const opts = [v?.name, ...exs.map((e) => "+ " + e.name)].filter(Boolean).join(", ");
@@ -272,6 +273,7 @@ function guestConfirm(t) {
           createdAt: Date.now()
         });
         setCart(t.id, []);
+        ui.sentFor = t.id;
         close();
         ui.cartOpen = false;
         renderCart();
@@ -925,7 +927,7 @@ function renderCart() {
             <div class="cl-main"><b>${esc(cartName(c))}</b>${optsHtml(c)}${c.note ? `<small class="cl-note">📝 ${esc(noteText(c.note))}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
             <div class="stepper sm"><button data-q="${esc(c.key)}" data-d="-1">−</button><b>${c.qty}</b><button data-q="${esc(c.key)}" data-d="1">+</button></div>
           </li>`).join("")}
-      </ul>` : `<div class="empty small"><i class="serve-ico" aria-hidden="true"></i>${ui.guest ? T("emptyCart") : orders.length ? L("Menyudan taom tanlang, u shu stol buyurtmasiga qo'shiladi", "Выберите блюдо в меню, оно добавится к заказу стола", "Pick a dish from the menu, it will be added to this table's order") : L("Menyudan taom tanlang", "Выберите блюдо в меню", "Pick a dish from the menu")}</div>`}
+      </ul>` : `<div class="empty small"><i class="serve-ico${ui.guest && ui.sentFor === t.id ? " sent" : ""}" aria-hidden="true"></i>${ui.guest ? T("emptyCart") : orders.length ? L("Menyudan taom tanlang, u shu stol buyurtmasiga qo'shiladi", "Выберите блюдо в меню, оно добавится к заказу стола", "Pick a dish from the menu, it will be added to this table's order") : L("Menyudan taom tanlang", "Выберите блюдо в меню", "Pick a dish from the menu")}</div>`}
 
       ${orders.length ? `
         <div class="tickets">
