@@ -322,7 +322,7 @@ function renderTables() {
   const tables = cfg().tables.filter((t) => ui.filter === "all" || tableWaiterId(t) === ui.me.id);
   const zones = [...new Set(tables.map((t) => t.zone || "Zal"))];
   const ready = readyForMe();
-  const calls = callsForMe();
+  const calls = [];
   const counts = { free: 0, busy: 0, ready: 0, served: 0 };
   tables.forEach((t) => { const k = tableState(t.id).key; if (k === "free") counts.free++; else if (k === "ready") counts.ready++; else if (k === "served") counts.served++; else counts.busy++; });
 
@@ -482,7 +482,6 @@ function tableCard(t) {
     <div class="tc-status">${st.label}</div>
     ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${ago(Math.max(...st.orders.map((o) => o.servedAt || 0)))} oldin berildi` : since ? ago(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
     <div class="tc-waiter">${esc(fullName(w) || "—")}</div>
-    ${S.calls[t.id] ? `<span class="tc-call">${S.calls[t.id].type === "bill" ? "🧾 Hisob" : "🙋 Chaqiryapti"}</span>` : ""}
     ${st.key !== "free" ? `<span class="tc-add">➕ Qo'shish</span>` : ""}
     ${draft ? `<span class="tc-draft">${draft} ta savatda</span>` : ""}
   </button>`;
@@ -835,7 +834,7 @@ function renderCart() {
             <div class="cl-main"><b>${esc(cartName(c))}</b>${optsHtml(c)}${c.note ? `<small class="cl-note">📝 ${esc(noteText(c.note))}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
             <div class="stepper sm"><button data-q="${esc(c.key)}" data-d="-1">−</button><b>${c.qty}</b><button data-q="${esc(c.key)}" data-d="1">+</button></div>
           </li>`).join("")}
-      </ul>` : `<div class="empty small"><span class="big">🧺</span>${ui.guest ? T("emptyCart") : orders.length ? "Menyudan taom tanlang, u shu stol buyurtmasiga qo'shiladi" : "Menyudan taom tanlang"}</div>`}
+      </ul>` : `<div class="empty small"><i class="serve-ico" aria-hidden="true"></i>${ui.guest ? T("emptyCart") : orders.length ? "Menyudan taom tanlang, u shu stol buyurtmasiga qo'shiladi" : "Menyudan taom tanlang"}</div>`}
 
       ${orders.length ? `
         <div class="tickets">
@@ -853,20 +852,19 @@ function renderCart() {
       ${cart.length ? `
         <div class="sum-row"><span>${ui.guest ? T("newOrder") : orders.length ? "Yangi tanlangan taomlar" : "Yangi buyurtma"}</span><b>${money(cartSum, cur())}</b></div>
         <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : orders.length ? "✓ Buyurtmaga qo'shish →" : "Buyurtmani tasdiqlash →"}</button>` : ""}
-      ${orders.length ? `
-        <div class="sum-row muted"><span>${ui.guest ? T("tableBill") : "Stol hisobi"}</span><b>${money(billSum, cur())}</b></div>
-        ${ui.guest ? "" : `<button class="btn btn-info btn-lg btn-block" data-act="add-more">➕ Buyurtma qo'shish</button>
+      ${orders.length && !cart.length && !ui.guest ? `
+        ${`<button class="btn btn-info btn-lg btn-block" data-act="add-more">➕ Buyurtma qo'shish</button>
         <button class="btn btn-ok btn-lg btn-block" data-act="bill">✓ Mijoz ketdi · Yakunlash</button>`}` : ""}
     </div>`;
 
   fab.innerHTML = ui.guest
-    ? (cartCount ? `${CART_ICON}<b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🧾 ${T("tableBill")} · ${money(billSum, cur())} <span>${T("view")}</span>` : "")
-    : (cartCount ? `${CART_ICON}<b>${cartCount} ta</b> · ${money(cartSum, cur())} <span>Ko'rish →</span>` : orders.length ? `🧾 Stol hisobi · ${money(billSum, cur())} <span>Ko'rish →</span>` : "");
+    ? (cartCount ? `${CART_ICON}<b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🍽 ${T("yourOrders")} <span>${T("view")}</span>` : "")
+    : (cartCount ? `${CART_ICON}<b>${cartCount} ta</b> · ${money(cartSum, cur())} <span>Ko'rish →</span>` : orders.length ? `🍽 Stol buyurtmalari <span>Ko'rish →</span>` : "");
   fab.hidden = !cartCount && !orders.length;
   const hint = app.querySelector("#addHint");
   if (hint) {
     hint.hidden = !orders.length;
-    hint.innerHTML = orders.length ? `<b>➕ Stolda ${orders.length} ta buyurtma bor (${money(billSum, cur())}).</b> <span>Mijoz yana nimadir so'rasa, taomni tanlang va tasdiqlang: u shu stolga qo'shiladi.</span>` : "";
+    hint.innerHTML = orders.length ? `<b>➕ Stolda ${orders.length} ta buyurtma bor.</b> <span>Mijoz yana nimadir so'rasa, taomni tanlang va tasdiqlang: u shu stolga qo'shiladi.</span>` : "";
   }
 
   pane.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => {
@@ -946,7 +944,6 @@ function confirmOrder(t) {
       <ul class="confirm-list">
         ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(c.name)}${optsHtml(c)}${c.note ? `<small>📝 ${esc(c.note)}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
       </ul>
-      <label class="field"><span>Oshxona uchun umumiy izoh</span><input type="text" id="comment" placeholder="Masalan: avval salatlarni bering"></label>
       <div class="sum-row big"><span>Jami</span><b>${money(sum, cur())}</b></div>
     </div>
     <div class="modal-actions">
@@ -969,7 +966,7 @@ function confirmOrder(t) {
           waiterName: fullName(w || me),
           sentBy: fullName(me),
           guests,
-          comment: m.querySelector("#comment").value.trim(),
+          comment: "",
           items: cart.map(orderLine),
           status: "new",
           createdAt: Date.now()
@@ -1181,16 +1178,6 @@ function bindCommon() {
 // ---------- Realtime hodisalar ----------
 store.on((evt) => {
   if (ui.guest) return guestEvent(evt);
-  if (evt.type === "call" && !evt.local && evt.call && (!evt.prev || evt.prev.type !== evt.call.type || evt.prev.at !== evt.call.at)) {
-    const c = evt.call;
-    const t = tableById(evt.tableId);
-    if (ui.me && t && (tableWaiterId(t) === ui.me.id || ui.filter === "all")) {
-      chime("ready");
-      vibrate([200, 100, 200]);
-      toast(`<b>Stol ${esc(c.tableNo)}</b> ${callText(c)}`, { kind: "ready", timeout: 9000, onClick: () => openTable(evt.tableId) });
-      flashTitle(`Stol ${c.tableNo}: ${c.type === "bill" ? "hisob" : "chaqiruv"}`);
-    }
-  }
   if (evt.type === "order" && !evt.local && evt.order.status === "ready" && evt.prev && evt.prev.status !== "ready") {
     const o = evt.order;
     const mine = o.waiterId === ui.me?.id;
