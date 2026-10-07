@@ -103,6 +103,9 @@ function tableState(tid) {
   return { key: "busy", label: L("Band", "Занят", "Busy"), orders: os };
 }
 function tableWaiterId(t) {
+  // Stol band bo'lsa — buyurtmani olgan ofitsiant; bo'sh bo'lsa — stolga biriktirilgan ofitsiant
+  const active = activeOrders(t.id);
+  if (active.length) return active[active.length - 1].waiterId || active[0].waiterId;
   return t.waiterId || ui.me?.id;
 }
 function readyForMe() {
@@ -339,6 +342,7 @@ function renderTables() {
   ${topbar()}
   <div class="tv-bg" style="--tv-bg:url('${esc(absUrl(cfg().categories.find((c) => c.hero)?.hero || ""))}')"></div>
   <main class="tables-view">
+    <div class="tv-back"><button class="btn btn-ghost" data-act="tables-back">← ${L("Orqaga", "Назад", "Back")}</button></div>
     ${helloHtml()}
     ${ready.length ? `
       <section class="ready-strip">
@@ -376,6 +380,11 @@ function renderTables() {
   </main>`;
 
   bindCommon();
+  app.querySelector("[data-act=tables-back]")?.addEventListener("click", () => {
+    // oxirgi ochilgan stolga qaytadi; bo'lmasa — restoranlar ro'yxatiga
+    if (ui.lastTable && tableById(ui.lastTable)) return openTable(ui.lastTable);
+    location.href = "index.html";
+  });
   app.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { ui.filter = b.dataset.filter; render(); }));
   app.querySelectorAll("[data-table]").forEach((b) => b.addEventListener("click", () => openTable(b.dataset.table)));
   app.querySelectorAll("[data-callok]").forEach((b) => b.addEventListener("click", () => { store.setCall(b.dataset.callok, null); render(); }));
@@ -499,6 +508,7 @@ function tableCard(t) {
 function openTable(tid) {
   ui.view = "table";
   ui.tableId = tid;
+  ui.lastTable = tid;
   ui.cat = "all";
   ui.q = "";
   ui.cartOpen = false;
@@ -939,7 +949,8 @@ function nextNo() {
 function confirmOrder(t) {
   const cart = getCart(t.id);
   if (!cart.length) return;
-  const w = waiterById(tableWaiterId(t));
+  // bo'sh stolga buyurtmani kim yuborsa, stol o'sha ofitsiantniki bo'ladi
+  const w = activeOrders(t.id).length ? waiterById(tableWaiterId(t)) : meW();
   const sum = cart.reduce((s, c) => s + c.price * c.qty, 0);
   let guests = activeOrders(t.id)[0]?.guests || Math.min(t.seats || 2, 2);
   modal(`

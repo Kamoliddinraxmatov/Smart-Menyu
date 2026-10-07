@@ -520,3 +520,6 @@ body.lux {
   .modal-actions:has(.stepper) .btn { padding-left: 12px; padding-right: 12px; font-size: 14px; min-width: 0; }
   .modal-actions .stepper button { width: 36px; }
 }
+/* Stollar oynasida tepada "Orqaga" tugmasi */
+.tv-back { margin: 2px 0 10px; }
+.tv-back .btn { padding: 8px 16px; }
