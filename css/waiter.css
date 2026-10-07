@@ -525,3 +525,5 @@ body.lux {
 .tv-back .btn { padding: 8px 16px; }
 /* "Tayyor buyurtmalar" ostidagi qizil eslatma */
 .ready-sub { display: block; margin-top: 6px; color: #ef4444; font-size: .8em; font-weight: 700; }
+/* tayyor buyurtma qatorida "buyurtmasi tayyor" bilan bir xil kattalikda qizil eslatma */
+.ready-go { display: block; color: #ef4444; font-weight: 700; }

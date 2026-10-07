@@ -348,7 +348,7 @@ function renderTables() {
       <section class="ready-strip">
         ${ready.map((o) => `
           <div class="ready-item">
-            <div><span class="check">✓</span><b>${ST(esc(o.tableNo))}</b> ${L("buyurtmasi tayyor", "заказ готов", "order ready")} <small>#${esc(shortNo(o))} · ${agoL(o.readyAt)} ${L("oldin", "назад", "ago")} · ${esc(o.waiterName)}</small></div>
+            <div><span class="check">✓</span><b>${ST(esc(o.tableNo))}</b> ${L("buyurtmasi tayyor", "заказ готов", "order ready")} <span class="ready-go">${L("Mijozga olib boring", "Отнесите гостю", "Take it to the guest")}</span><small>#${esc(shortNo(o))} · ${agoL(o.readyAt)} ${L("oldin", "назад", "ago")} · ${esc(o.waiterName)}</small></div>
             <button class="btn btn-ok" data-served="${esc(o.id)}">🍽 ${L("Stolga olib kelindi", "Подано на стол", "Served to table")}</button>
           </div>`).join("")}
       </section>` : ""}
