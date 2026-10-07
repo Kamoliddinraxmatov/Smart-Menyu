@@ -449,3 +449,12 @@ body.lux {
   .menu-top { top: auto; margin: 0; padding: 0; }
   .menu-pane > .cats { top: 0; margin: 0 -14px 14px; padding: 8px 14px 10px; }
 }
+
+/* Orqaga: taomlar ichidan bo'limlar ro'yxatiga qaytish */
+.menu-back { position: fixed; left: 20px; bottom: 20px; z-index: 69; display: inline-flex; align-items: center; gap: 6px; height: 50px; padding: 0 20px; border-radius: 99px; background: rgba(23,20,18,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); color: var(--gold); border: 1px solid rgba(214,179,112,.5); font-weight: 800; font-size: 15px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.menu-back[hidden] { display: none; }
+.menu-back:active { transform: scale(.96); }
+@media (max-width: 900px) {
+  .menu-back { left: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }
+  .cart-fab:not([hidden]) ~ .menu-back { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px); }
+}

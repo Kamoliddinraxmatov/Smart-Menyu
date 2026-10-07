@@ -15,6 +15,7 @@ const STR = {
   popularTag: { uz: "mehmonlarimiz tanlovi", ru: "выбор наших гостей", en: "our guests' choice" },
   dishes: { uz: "ta taom", ru: "блюд", en: "dishes" },
   search: { uz: "Taom qidirish…", ru: "Поиск блюда…", en: "Search dishes…" },
+  back: { uz: "Orqaga", ru: "Назад", en: "Back" },
   searchRes: { uz: "qidiruv natijalari", ru: "результаты поиска", en: "search results" },
   notFound: { uz: "Hech narsa topilmadi", ru: "Ничего не найдено", en: "Nothing found" },
   soldOut: { uz: "Tugagan", ru: "Нет в наличии", en: "Sold out" },

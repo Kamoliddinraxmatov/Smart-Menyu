@@ -461,6 +461,7 @@ function renderTable() {
     </section>
     <aside class="cart-pane ${ui.cartOpen ? "open" : ""}" id="cartPane"></aside>
     <button class="cart-fab" id="cartFab"></button>
+    <button class="menu-back" id="menuBack" hidden>← ${esc(T("back"))}</button>
   </div>`;
   bindCommon();
   bindGuestActs();
@@ -490,8 +491,16 @@ function bindHeadroom() {
     const past = cats.getBoundingClientRect().top <= (window.innerWidth <= 900 ? 1 : pane.getBoundingClientRect().top + 1);
     cats.classList.toggle("stuck", past);
     cats.classList.toggle("hide", past && dy > 0);
+    if (back) back.hidden = !past;
     last = y;
   };
+  // "Orqaga": eng tepaga, bo'limlar ro'yxatiga qaytaradi
+  const back = app.querySelector("#menuBack");
+  back?.addEventListener("click", () => {
+    if (pane.scrollHeight > pane.clientHeight && window.innerWidth > 900) pane.scrollTo({ top: 0, behavior: "smooth" });
+    else window.scrollTo({ top: 0, behavior: "smooth" });
+    back.hidden = true;
+  });
   pane.addEventListener("scroll", () => onScroll(pane.scrollTop), { passive: true });
   if (!window.__headroomWin) {
     window.__headroomWin = true;
