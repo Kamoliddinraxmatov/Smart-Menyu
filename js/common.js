@@ -291,6 +291,11 @@ export async function cropImage(file, { ratio = 4 / 3, outW = 800, quality = 0.7
 export function registerSW() {
   if (window.MENYU_DEMO) return;
   try {
-    if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+      // Sayt yangilansa, ochilgan zahoti bir marta qayta yuklab, yangi versiyani ko'rsatamiz
+      const had = !!navigator.serviceWorker.controller, t0 = Date.now();
+      navigator.serviceWorker.addEventListener("controllerchange", () => { if (had && Date.now() - t0 < 15000) location.reload(); });
+      navigator.serviceWorker.register("sw.js").then((r) => r.update()).catch(() => {});
+    }
   } catch {}
 }
