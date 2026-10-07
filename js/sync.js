@@ -7,6 +7,7 @@
 //   <base>/stop            stop-list (tugagan taomlar): { itemId: true }
 //   <base>/orders/<id>     har bir buyurtma (chek)
 //   <base>/calls/<tableId> stoldan signal: ofitsiantni chaqirish yoki hisobni so'rash
+//   <base>/reserves/<tableId> stol oldindan band (bron): { at, waiterId, waiterName, note }
 //   <base>/sales/<sana>/<id> yopilgan chekning ixcham nusxasi (hisobot uchun, faqat admin o'qiydi)
 import { DEFAULT_CONFIG } from "./defaults.js";
 
@@ -63,6 +64,7 @@ export function createStore(rid) {
     stop: cached?.stop || {},
     orders: cached?.orders || {},
     calls: {},
+    reserves: {},
     sales: {},
     salesLoaded: false,
     configLoaded: !!cached?.config
@@ -99,7 +101,7 @@ export function createStore(rid) {
   client.on("connect", () => {
     state.online = true;
     seen = new Set();
-    client.subscribe([`${base}/config`, `${base}/stop`, `${base}/orders/+`, `${base}/calls/+`], { qos: 1 }, (err) => {
+    client.subscribe([`${base}/config`, `${base}/stop`, `${base}/orders/+`, `${base}/calls/+`, `${base}/reserves/+`], { qos: 1 }, (err) => {
       if (err) return;
       setTimeout(() => {
         if (!seen || !state.online) return;
@@ -140,6 +142,14 @@ export function createStore(rid) {
     if (sm) {
       if (data) state.sales[sm[1]] = data; else delete state.sales[sm[1]];
       changed({ type: "sales" });
+      return;
+    }
+    const rm = topic.match(/\/reserves\/([^/]+)$/);
+    if (rm) {
+      // bron 24 soatdan keyin o'z-o'zidan tushadi
+      if (data && Date.now() - (data.at || 0) < 24 * 3600 * 1000) state.reserves[rm[1]] = data;
+      else delete state.reserves[rm[1]];
+      changed({ type: "reserve", tableId: rm[1] });
       return;
     }
     const cm = topic.match(/\/calls\/([^/]+)$/);
@@ -215,6 +225,13 @@ export function createStore(rid) {
       if (call) state.calls[tableId] = call; else delete state.calls[tableId];
       publish(`${base}/calls/${tableId}`, call);
       changed({ type: "call", tableId, call, prev, local: true });
+    },
+
+    // Stolni oldindan band qilish (bron) yoki bronni olib tashlash (null)
+    setReserve(tableId, r) {
+      if (r) state.reserves[tableId] = r; else delete state.reserves[tableId];
+      publish(`${base}/reserves/${tableId}`, r);
+      changed({ type: "reserve", tableId, local: true });
     },
 
     // Yopilgan chekni hisobot arxiviga yozish (kun/hafta/oy hisobotlari shundan olinadi)

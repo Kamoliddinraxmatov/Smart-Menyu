@@ -95,6 +95,7 @@ function activeOrders(tid) {
 }
 function tableState(tid) {
   const os = activeOrders(tid);
+  if (!os.length && S.reserves?.[tid]) return { key: "reserved", label: `🔖 ${L("Bron", "Бронь", "Reserved")}`, orders: os, res: S.reserves[tid] };
   if (!os.length) return { key: "free", label: L("Bo'sh", "Свободен", "Free"), orders: os };
   if (os.some((o) => o.status === "ready")) return { key: "ready", label: L("Tayyor ✓", "Готово ✓", "Ready ✓"), orders: os };
   if (os.some((o) => o.status === "cooking")) return { key: "cooking", label: L("Tayyorlanmoqda", "Готовится", "Cooking"), orders: os };
@@ -106,7 +107,7 @@ function tableWaiterId(t) {
   // Stol band bo'lsa — mijozni o'tqazib buyurtma olgan ofitsiant; bo'sh stol hech kimniki emas
   const active = activeOrders(t.id);
   if (active.length) return active[active.length - 1].waiterId || active[0].waiterId;
-  return "";
+  return S.reserves?.[t.id]?.waiterId || "";
 }
 // qo'ng'iroqcha faqat buyurtmani olgan ofitsiantda yonadi ("Barcha stollar" tanlangan bo'lsa ham)
 function myReady() {
@@ -246,6 +247,7 @@ function guestConfirm(t) {
     </div>`, {
     onMount(m, close) {
       m.querySelector("#send").addEventListener("click", () => {
+        if (S.reserves?.[t.id]) store.setReserve(t.id, null);
         store.putOrder({
           id: newId(),
           no: nextNo(),
@@ -336,12 +338,12 @@ function pinPad(w) {
 
 function renderTables() {
   // "Mening stollarim": men xizmat qilayotgan stollar + bo'sh stollar (mijozni istalgan ofitsiant o'tqazishi mumkin)
-  const tables = cfg().tables.filter((t) => ui.filter === "all" || !activeOrders(t.id).length || tableWaiterId(t) === ui.me.id);
+  const tables = cfg().tables.filter((t) => ui.filter === "all" || tableState(t.id).key === "free" || tableWaiterId(t) === ui.me.id);
   const zones = [...new Set(tables.map((t) => t.zone || "Zal"))];
   const ready = readyForMe();
   const calls = [];
-  const counts = { free: 0, busy: 0, ready: 0, served: 0 };
-  tables.forEach((t) => { const k = tableState(t.id).key; if (k === "free") counts.free++; else if (k === "ready") counts.ready++; else if (k === "served") counts.served++; else counts.busy++; });
+  const counts = { free: 0, busy: 0, ready: 0, served: 0, reserved: 0 };
+  tables.forEach((t) => { const k = tableState(t.id).key; if (k === "free") counts.free++; else if (k === "reserved") counts.reserved++; else if (k === "ready") counts.ready++; else if (k === "served") counts.served++; else counts.busy++; });
 
   app.innerHTML = `
   ${topbar()}
@@ -372,7 +374,8 @@ function renderTables() {
       </div>
       <div class="legend">
         <span><i class="dot free"></i>${L("Bo'sh", "Свободно", "Free")} ${counts.free}</span>
-        <span class="lg-band"><i class="dot band"></i>${L("Band", "Занято", "Busy")} <b>${counts.busy + counts.ready + counts.served}</b></span>
+        <span class="lg-band"><i class="dot band"></i>${L("Band", "Занято", "Busy")} <b>${counts.busy + counts.ready + counts.served + counts.reserved}</b></span>
+        ${counts.reserved ? `<span><i class="dot reserved"></i>${L("Bron", "Бронь", "Reserved")} ${counts.reserved}</span>` : ""}
         <span><i class="dot busy"></i>${L("Oshxonada", "На кухне", "In kitchen")} ${counts.busy}</span>
         <span><i class="dot ready"></i>${L("Tayyor", "Готово", "Ready")} ${counts.ready}</span>
         <span><i class="dot served"></i>${L("Stolda", "На столе", "Served")} ${counts.served}</span>
@@ -503,9 +506,10 @@ function tableCard(t) {
   <button class="table-card st-${st.key}" data-table="${esc(t.id)}">
     <div class="tc-top"><span class="tc-no">${esc(t.no)}</span><span class="tc-seats">👤 ${esc(t.seats || "")}</span></div>
     <div class="tc-status">${st.label}</div>
+    ${st.key === "reserved" && st.res.note ? `<div class="tc-res">${esc(st.res.note)}</div>` : ""}
     ${st.key === "ready" ? `<div class="tc-go">${L("Mijozga olib boring", "Отнесите гостю", "Take it to the guest")}</div>` : ""}
-    ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${agoL(Math.max(...st.orders.map((o) => o.servedAt || 0)))} ${L("oldin berildi", "назад подано", "ago served")}` : since ? agoL(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
-    <div class="tc-waiter">${st.key === "free" ? "&nbsp;" : esc(fullName(w) || "—")}</div>
+    ${st.key === "reserved" ? `<div class="tc-meta"><span>${clock(st.res.at)} ${L("da bron qilindi", "— забронирован", "reserved at")}</span></div>` : st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${agoL(Math.max(...st.orders.map((o) => o.servedAt || 0)))} ${L("oldin berildi", "назад подано", "ago served")}` : since ? agoL(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
+    <div class="tc-waiter">${st.key === "free" ? "&nbsp;" : esc(fullName(w) || st.res?.waiterName || "—")}</div>
   </button>`;
 }
 
@@ -513,7 +517,8 @@ function tableCard(t) {
 function tableTap(tid) {
   const t = tableById(tid);
   const st = tableState(tid);
-  if (!t || st.key === "free") return openTable(tid);
+  if (!t) return;
+  if (st.key === "free" || st.key === "reserved") return freeTap(t, st);
   const total = st.orders.reduce((s, o) => s + orderTotal(o), 0);
   modal(`
     <div class="modal-head"><h3>${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
@@ -527,6 +532,39 @@ function tableTap(tid) {
     onMount(m, close) {
       m.querySelector("#tapAdd").addEventListener("click", () => { close(); openTable(tid); });
       m.querySelector("#tapClose").addEventListener("click", () => { close(); billModal(t); });
+    }
+  });
+}
+
+// Bo'sh stol: buyurtma berish yoki oldindan bron qilish; bron qilingan stol: mijoz keldi yoki bronni bekor qilish
+function freeTap(t, st) {
+  const res = st.key === "reserved" ? st.res : null;
+  modal(`
+    <div class="modal-head"><h3>${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body">
+      ${res
+        ? `<p class="tap-status">🔖 ${L("Bron qilingan", "Забронирован", "Reserved")}${res.note ? ` · <b>${esc(res.note)}</b>` : ""}</p><p class="muted small">${esc(res.waiterName || "")} · ${clock(res.at)}</p>`
+        : `<p class="tap-status">${L("Bo'sh stol", "Свободный стол", "Free table")}</p>
+           <label class="res-note"><small>${L("Bron uchun izoh (ixtiyoriy): mijoz ismi, vaqti", "Комментарий к брони (необязательно): имя, время", "Reservation note (optional): name, time")}</small>
+           <input id="resNote" maxlength="60" placeholder="${L("Masalan: Alisher, 19:30", "Например: Алишер, 19:30", "e.g. Alisher, 7:30 pm")}"></label>`}
+    </div>
+    <div class="modal-actions tap-actions">
+      <button class="btn btn-info btn-lg btn-block" id="tapOrder">🍽 ${res ? L("Mijoz keldi · Buyurtma", "Гость пришёл · Заказ", "Guest arrived · Order") : L("Buyurtma berish", "Принять заказ", "Take order")}</button>
+      ${res
+        ? `<button class="btn btn-ghost btn-lg btn-block" id="tapUnres">✕ ${L("Bronni bekor qilish", "Отменить бронь", "Cancel reservation")}</button>`
+        : `<button class="btn btn-res btn-lg btn-block" id="tapRes">🔖 ${L("Bron qilish", "Забронировать", "Reserve")}</button>`}
+    </div>`, {
+    onMount(m, close) {
+      m.querySelector("#tapOrder").addEventListener("click", () => { close(); openTable(t.id); });
+      m.querySelector("#tapRes")?.addEventListener("click", () => {
+        const me = meW();
+        store.setReserve(t.id, { at: Date.now(), tableNo: t.no, waiterId: me.id, waiterName: fullName(me), note: m.querySelector("#resNote").value.trim() });
+        close(); toast(`🔖 ${ST(esc(t.no))}: ${L("bron qilindi", "забронирован", "reserved")}`, { kind: "ok" }); render();
+      });
+      m.querySelector("#tapUnres")?.addEventListener("click", () => {
+        store.setReserve(t.id, null);
+        close(); toast(`${ST(esc(t.no))}: ${L("bron bekor qilindi", "бронь отменена", "reservation cancelled")}`); render();
+      });
     }
   });
 }
@@ -998,6 +1036,7 @@ function confirmOrder(t) {
   };
   if (active.length) order.extra = true;
   store.putOrder(order);
+  if (S.reserves?.[t.id]) store.setReserve(t.id, null);
   setCart(t.id, []);
   ui.cartOpen = false;
   toast(`✓ ${ST(esc(t.no))}: ${order.extra ? L("buyurtmaga qo'shildi va oshxonaga yuborildi", "добавлено к заказу и отправлено на кухню", "added to the order and sent to the kitchen") : L("buyurtma oshxonaga yuborildi", "заказ отправлен на кухню", "order sent to the kitchen")}`, { kind: "ok" });
