@@ -527,3 +527,8 @@ body.lux {
 .ready-sub { display: block; margin-top: 6px; color: #ef4444; font-size: .8em; font-weight: 700; }
 /* tayyor buyurtma qatorida "buyurtmasi tayyor" bilan bir xil kattalikda qizil eslatma */
 .ready-go { display: block; color: #ef4444; font-weight: 700; }
+/* band stolni bosganda chiqadigan oyna */
+.tap-status { margin: 0; font-size: 17px; color: var(--muted); }
+.tap-status b { color: var(--gold); }
+.tap-actions { flex-direction: column; flex-wrap: nowrap; }
+.tap-actions .btn { width: 100%; flex: none; order: 0 !important; }

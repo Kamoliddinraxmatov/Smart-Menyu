@@ -386,7 +386,7 @@ function renderTables() {
     location.href = "index.html";
   });
   app.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { ui.filter = b.dataset.filter; render(); }));
-  app.querySelectorAll("[data-table]").forEach((b) => b.addEventListener("click", () => openTable(b.dataset.table)));
+  app.querySelectorAll("[data-table]").forEach((b) => b.addEventListener("click", () => tableTap(b.dataset.table)));
   app.querySelectorAll("[data-callok]").forEach((b) => b.addEventListener("click", () => { store.setCall(b.dataset.callok, null); render(); }));
 }
 
@@ -499,8 +499,29 @@ function tableCard(t) {
     <div class="tc-status">${st.label}</div>
     ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${agoL(Math.max(...st.orders.map((o) => o.servedAt || 0)))} ${L("oldin berildi", "назад подано", "ago served")}` : since ? agoL(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
     <div class="tc-waiter">${esc(fullName(w) || "—")}</div>
-    ${st.key !== "free" ? `<span class="tc-add">➕ ${L("Qo'shish", "Добавить", "Add")}</span>` : ""}
   </button>`;
+}
+
+// Bo'sh stol — darhol menyu; band stol — "Buyurtma qo'shish" yoki "Yakunlash"
+function tableTap(tid) {
+  const t = tableById(tid);
+  const st = tableState(tid);
+  if (!t || st.key === "free") return openTable(tid);
+  const total = st.orders.reduce((s, o) => s + orderTotal(o), 0);
+  modal(`
+    <div class="modal-head"><h3>${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body">
+      <p class="tap-status">${st.label} · <b>${money(total, cur())}</b></p>
+    </div>
+    <div class="modal-actions tap-actions">
+      <button class="btn btn-info btn-lg btn-block" id="tapAdd">➕ ${L("Buyurtma qo'shish", "Добавить заказ", "Add to order")}</button>
+      <button class="btn btn-ok btn-lg btn-block" id="tapClose">✓ ${L("Yakunlash", "Завершить", "Finish")}</button>
+    </div>`, {
+    onMount(m, close) {
+      m.querySelector("#tapAdd").addEventListener("click", () => { close(); openTable(tid); });
+      m.querySelector("#tapClose").addEventListener("click", () => { close(); billModal(t); });
+    }
+  });
 }
 
 function openTable(tid) {

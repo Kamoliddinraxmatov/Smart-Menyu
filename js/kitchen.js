@@ -268,11 +268,7 @@ setInterval(() => {
   if (c) c.textContent = clock();
 }, 1000);
 
-// Boshlanmagan yangi buyurtma bo'lsa har 45 soniyada eslatma signal
-setInterval(() => {
-  if (!ui.started || !ui.sound) return;
-  if (active().some((o) => o.status === "new" && Date.now() - o.createdAt > 45000)) chime("new");
-}, 45000);
+// Signal faqat yangi buyurtma kelganda bir marta chalinadi (takroriy eslatma yo'q — oshpazni bezovta qilmasin)
 
 document.addEventListener("pointerdown", unlockAudio);
 store.cleanup();
