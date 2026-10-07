@@ -458,3 +458,5 @@ body.lux {
   .menu-back { left: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }
   .cart-fab:not([hidden]) ~ .menu-back { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 72px); }
 }
+/* Savat tugmasidagi logo: rang tugma matnidan olinadi */
+.fab-ico { display: inline-block; width: 30px; height: 30px; flex: none; background: currentColor; -webkit-mask: url("../img/cloche.png") center/contain no-repeat; mask: url("../img/cloche.png") center/contain no-repeat; }

@@ -12,7 +12,6 @@ const store = createStore(rid);
 const S = store.state;
 const app = document.getElementById("app");
 
-const QUICK_NOTES = ["Achchiq", "Achchiq emas", "Piyozsiz", "Ko'katsiz", "Tuzi kam", "Tezroq", "Bolalar uchun", "Olib ketish"];
 
 const ui = {
   me: loadMe(),
@@ -684,7 +683,6 @@ function refreshCard(itemId, bump = false) {
 
 function itemModal(item) {
   let qty = 1;
-  const notes = new Set();
   const variants = item.variants || [];
   const extras = item.extras || [];
   let variant = variants.length === 1 ? variants[0] : null;
@@ -706,9 +704,6 @@ function itemModal(item) {
       ${extras.length ? `
         <div class="label">${T("extras")}</div>
         <div class="opt-extras">${extras.map((e) => `<button class="opt-ex" data-e="${esc(e.id)}"><i></i><b>${esc(optName(e))}</b><span>${plus(e.price)}</span></button>`).join("")}</div>` : ""}
-      <div class="label">${T("noteForChef")}</div>
-      <div class="chips">${QUICK_NOTES.map((n) => `<button class="chip" data-n="${esc(n)}">${esc(noteLabel(n))}</button>`).join("")}</div>
-      <input type="text" id="note" placeholder="${esc(T("otherNote"))}">
     </div>
     <div class="modal-actions">
       <div class="stepper"><button data-d="-1">−</button><b id="qty">1</b><button data-d="1">+</button></div>
@@ -730,9 +725,6 @@ function itemModal(item) {
       m.querySelectorAll("[data-e]").forEach((b) => b.addEventListener("click", () => {
         const id = b.dataset.e; chosen.has(id) ? chosen.delete(id) : chosen.add(id); b.classList.toggle("on"); paint();
       }));
-      m.querySelectorAll("[data-n]").forEach((b) => b.addEventListener("click", () => {
-        const n = b.dataset.n; notes.has(n) ? notes.delete(n) : notes.add(n); b.classList.toggle("on");
-      }));
       m.querySelectorAll("[data-d]").forEach((b) => b.addEventListener("click", () => {
         qty = Math.max(1, qty + Number(b.dataset.d));
         m.querySelector("#qty").textContent = qty;
@@ -745,13 +737,15 @@ function itemModal(item) {
           toast(T("chooseFirst"), { kind: "error" });
           return;
         }
-        const note = [...notes, m.querySelector("#note").value.trim()].filter(Boolean).join(", ");
-        addToCart(ui.tableId, item, qty, note, sel());
+        addToCart(ui.tableId, item, qty, "", sel());
         close(); refreshCard(item.id, true); renderCart();
       });
     }
   });
 }
+
+// Savat belgisi: qopqoqli patnis (Kamoliddin bergan logo)
+const CART_ICON = `<i class="fab-ico" aria-hidden="true"></i>`;
 
 function renderCart() {
   const pane = app.querySelector("#cartPane");
@@ -801,8 +795,8 @@ function renderCart() {
     </div>`;
 
   fab.innerHTML = ui.guest
-    ? (cartCount ? `🧺 <b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🧾 ${T("tableBill")} · ${money(billSum, cur())} <span>${T("view")}</span>` : "")
-    : (cartCount ? `🧺 <b>${cartCount} ta</b> · ${money(cartSum, cur())} <span>Ko'rish →</span>` : orders.length ? `🧾 Stol hisobi · ${money(billSum, cur())} <span>Ko'rish →</span>` : "");
+    ? (cartCount ? `${CART_ICON}<b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🧾 ${T("tableBill")} · ${money(billSum, cur())} <span>${T("view")}</span>` : "")
+    : (cartCount ? `${CART_ICON}<b>${cartCount} ta</b> · ${money(cartSum, cur())} <span>Ko'rish →</span>` : orders.length ? `🧾 Stol hisobi · ${money(billSum, cur())} <span>Ko'rish →</span>` : "");
   fab.hidden = !cartCount && !orders.length;
 
   pane.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => {
