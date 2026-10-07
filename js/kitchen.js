@@ -128,7 +128,7 @@ function ticket(o) {
         <li class="${it.done ? "done" : ""}" data-item="${idx}">
           <span class="kt-qty">${it.qty}</span>
           ${thumb(it)}
-          <span class="kt-name">${esc(it.name)}${it.opts ? `<em class="kt-opts">${esc(it.opts)}</em>` : ""}${it.note ? `<em>📝 ${esc(it.note)}</em>` : ""}</span>
+          <span class="kt-name">${esc(it.name)}<em class="kt-opts">${esc(portionText(it.opts))}</em>${it.note ? `<em>📝 ${esc(it.note)}</em>` : ""}</span>
         </li>`).join("")}
     </ul>
     ${o.comment ? `<div class="kt-comment">💬 ${esc(o.comment)}</div>` : ""}
@@ -231,6 +231,9 @@ function stopList() {
     <div class="modal-body"><p class="muted">Tugagan taomni o'chiring: ofitsiant planshetida u "Tugagan" bo'lib ko'rinadi va buyurtma qilib bo'lmaydi.</p><div id="sl" class="sl"></div></div>`,
   { onMount: (m) => draw(m), wide: true });
 }
+
+// Oshpaz porsiyani doim ko'rsin: porsiya tanlanmagan taom — "1 porsiya"
+const portionText = (opts) => (!opts ? "1 porsiya" : /porsiya/i.test(opts) ? opts : `1 porsiya, ${opts}`);
 
 // ---------- Realtime ----------
 store.on((evt) => {
