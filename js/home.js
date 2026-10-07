@@ -99,7 +99,7 @@ function newRest() {
         const c = structuredClone(S.config);
         c.restaurant = { ...c.restaurant, name, logo: "", slogan: "" };
         c.adminPin = "";
-        setTimeout(() => { s2.saveConfig(c); setTimeout(() => { location.href = `admin.html?r=${encodeURIComponent(code)}`; }, 800); }, 600);
+        setTimeout(() => { s2.saveConfig(c); setTimeout(() => { location.href = `admin.html?r=${encodeURIComponent(code)}&owner=1`; }, 800); }, 600);
       });
     }
   });

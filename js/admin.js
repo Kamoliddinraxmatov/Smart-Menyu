@@ -11,7 +11,7 @@ const store = createStore(rid);
 const S = store.state;
 const app = document.getElementById("app");
 
-const ui = { tab: "brand", unlocked: sessionStorage.getItem(`menyu.admin.${rid}`) === "1", catFilter: "all" };
+const ui = { tab: new URLSearchParams(location.search).has("owner") ? "brand" : "menu", unlocked: sessionStorage.getItem(`menyu.admin.${rid}`) === "1", catFilter: "all" };
 const cfg = () => S.config;
 const cur = () => cfg().restaurant.currency || "so'm";
 
@@ -30,8 +30,10 @@ function mutate(fn, msg) {
   save(c, msg);
 }
 
+// "Restoran" (nom, logo, rang, PIN) bo'limi faqat egasi uchun: admin.html?owner=1 bilan ochiladi
+const OWNER = new URLSearchParams(location.search).has("owner");
 const TABS = [
-  ["brand", "🎨", "Restoran"],
+  ...(OWNER ? [["brand", "🎨", "Restoran"]] : []),
   ["menu", "📋", "Menyu"],
   ["waiters", "🧑‍💼", "Ofitsiantlar"],
   ["tables", "🪑", "Stollar"],
@@ -626,19 +628,10 @@ function tabDevices(c) {
       </div>`;
     }).join("")}
   </div>
-  <div class="card danger-zone">
-    <h3>Tozalash</h3>
-    <p class="muted">Sinov paytida yuborilgan barcha buyurtmalarni o'chiradi (menyu va sozlamalar saqlanib qoladi).</p>
-    <button class="btn btn-danger" id="wipe">Barcha buyurtmalarni o'chirish</button>
-  </div>`;
+`;
   c.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(b.dataset.copy); toast("Nusxa olindi", { kind: "ok" }); } catch { prompt("Havola:", b.dataset.copy); }
   }));
-  c.querySelector("#wipe").addEventListener("click", async () => {
-    if (!(await confirmBox("Barcha buyurtmalar o'chirilsinmi?", "O'chirish", { danger: true }))) return;
-    Object.keys(S.orders).forEach((id) => store.removeOrder(id));
-    toast("Buyurtmalar tozalandi", { kind: "ok" });
-  });
 }
 
 store.on((evt) => {
