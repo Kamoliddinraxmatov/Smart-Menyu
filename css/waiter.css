@@ -532,3 +532,5 @@ body.lux {
 .tap-status b { color: var(--gold); }
 .tap-actions { flex-direction: column; flex-wrap: nowrap; }
 .tap-actions .btn { width: 100%; flex: none; order: 0 !important; }
+/* nimani olib borish kerak — sariq rangda */
+.ready-what { display: block; color: #FACC15; font-weight: 700; margin-top: 2px; }
