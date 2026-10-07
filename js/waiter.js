@@ -8,6 +8,15 @@ import { LANGS, t as T, setLang, getLang, itemName, itemDesc, catName, catTaglin
 
 const rid = getRid();
 try { setLang(localStorage.getItem("menyu.lang") || "uz"); } catch { setLang("uz"); }
+// Ofitsiant ekranidagi yozuvlar ham tanlangan tilda: L("o'zbekcha", "русский", "english")
+const L = (uz, ru, en) => ({ ru, en })[getLang()] ?? uz;
+const agoL = (ts) => {
+  const m = Math.max(0, Math.floor((Date.now() - ts) / 60000));
+  if (m < 1) return L("hozir", "сейчас", "now");
+  if (m < 60) return `${m} ${L("daq", "мин", "min")}`;
+  return `${Math.floor(m / 60)} ${L("soat", "ч", "h")} ${m % 60} ${L("daq", "мин", "min")}`;
+};
+const ST = (t) => `${L("Stol", "Стол", "Table")} ${t}`;
 const store = createStore(rid);
 const S = store.state;
 const app = document.getElementById("app");
@@ -86,12 +95,12 @@ function activeOrders(tid) {
 }
 function tableState(tid) {
   const os = activeOrders(tid);
-  if (!os.length) return { key: "free", label: "Bo'sh", orders: os };
-  if (os.some((o) => o.status === "ready")) return { key: "ready", label: "Tayyor ✓", orders: os };
-  if (os.some((o) => o.status === "cooking")) return { key: "cooking", label: "Tayyorlanmoqda", orders: os };
-  if (os.some((o) => o.status === "new")) return { key: "new", label: "Oshxonaga yuborildi", orders: os };
-  if (os.every((o) => o.status === "served")) return { key: "served", label: "🍽 Taom stolda", orders: os };
-  return { key: "busy", label: "Band", orders: os };
+  if (!os.length) return { key: "free", label: L("Bo'sh", "Свободен", "Free"), orders: os };
+  if (os.some((o) => o.status === "ready")) return { key: "ready", label: L("Tayyor ✓", "Готово ✓", "Ready ✓"), orders: os };
+  if (os.some((o) => o.status === "cooking")) return { key: "cooking", label: L("Tayyorlanmoqda", "Готовится", "Cooking"), orders: os };
+  if (os.some((o) => o.status === "new")) return { key: "new", label: L("Oshxonaga yuborildi", "Отправлено на кухню", "Sent to kitchen"), orders: os };
+  if (os.every((o) => o.status === "served")) return { key: "served", label: L("🍽 Taom stolda", "🍽 Блюда на столе", "🍽 Served"), orders: os };
+  return { key: "busy", label: L("Band", "Занят", "Busy"), orders: os };
 }
 function tableWaiterId(t) {
   return t.waiterId || ui.me?.id;
@@ -130,7 +139,7 @@ function topbar(extra = "") {
     ${extra}
     <div class="top-right">
       ${connBadge(S.online)}
-      <button class="ready-pill ${ready ? "on" : ""}" data-act="show-ready" title="Tayyor buyurtmalar">🔔 <b>${ready}</b></button>
+      <button class="ready-pill ${ready ? "on" : ""}" data-act="show-ready" title="${L("Tayyor buyurtmalar", "Готовые заказы", "Ready orders")}">🔔 <b>${ready}</b></button>
       <button class="me-chip" data-act="me"><span class="avatar">${esc(initials(me))}</span><span class="me-name">${esc(fullName(me))}</span></button>
     </div>
   </header>`;
@@ -273,13 +282,13 @@ function renderLogin() {
   <div class="login" style="--login-bg:url('${esc(absUrl(loginBg))}')">
     <div class="login-card">
       <div class="login-brand">${logoHtml(r, "logo logo-xl")}<h1>${esc(r.name)}</h1><p>${esc(r.slogan || "")}</p></div>
-      <h2>Ofitsiant, ismingizni tanlang</h2>
+      <h2>${L("Ofitsiant, ismingizni tanlang", "Официант, выберите своё имя", "Waiter, choose your name")}</h2>
       <div class="waiter-grid">
         ${cfg().waiters.map((w) => `
           <button class="waiter-card" data-w="${esc(w.id)}">
             <span class="avatar avatar-lg">${esc(initials(w))}</span>
             <b>${esc(w.first)}</b><small>${esc(w.last)}</small>
-          </button>`).join("") || `<p class="empty">Admin panelda ofitsiantlarni qo'shing.</p>`}
+          </button>`).join("") || `<p class="empty">${L("Admin panelda ofitsiantlarni qo'shing.", "Добавьте официантов в админ-панели.", "Add waiters in the admin panel.")}</p>`}
       </div>
       <div class="login-foot">${connBadge(S.online)} <a href="${link("index.html", rid)}">Bosh sahifa</a></div>
     </div>
@@ -335,35 +344,35 @@ function renderTables() {
       <section class="ready-strip">
         ${ready.map((o) => `
           <div class="ready-item">
-            <div><span class="check">✓</span><b>Stol ${esc(o.tableNo)}</b> buyurtmasi tayyor <small>#${esc(shortNo(o))} · ${ago(o.readyAt)} oldin · ${esc(o.waiterName)}</small></div>
-            <button class="btn btn-ok" data-served="${esc(o.id)}">🍽 Stolga olib kelindi</button>
+            <div><span class="check">✓</span><b>${ST(esc(o.tableNo))}</b> ${L("buyurtmasi tayyor", "заказ готов", "order ready")} <small>#${esc(shortNo(o))} · ${agoL(o.readyAt)} ${L("oldin", "назад", "ago")} · ${esc(o.waiterName)}</small></div>
+            <button class="btn btn-ok" data-served="${esc(o.id)}">🍽 ${L("Stolga olib kelindi", "Подано на стол", "Served to table")}</button>
           </div>`).join("")}
       </section>` : ""}
     ${calls.length ? `
       <section class="call-strip">
         ${calls.map((c) => `
           <div class="call-item ${c.type}">
-            <div><b>Stol ${esc(c.tableNo)}</b> ${callText(c)} <small>${ago(c.at)} oldin</small></div>
+            <div><b>Stol ${esc(c.tableNo)}</b> ${callText(c)} <small>${agoL(c.at)} oldin</small></div>
             <button class="btn btn-primary" data-callok="${esc(c.tableId)}">Bordim ✓</button>
           </div>`).join("")}
       </section>` : ""}
     <div class="tables-head">
       <div class="seg">
-        <button class="${ui.filter === "mine" ? "on" : ""}" data-filter="mine">Mening stollarim</button>
-        <button class="${ui.filter === "all" ? "on" : ""}" data-filter="all">Barcha stollar</button>
+        <button class="${ui.filter === "mine" ? "on" : ""}" data-filter="mine">${L("Mening stollarim", "Мои столы", "My tables")}</button>
+        <button class="${ui.filter === "all" ? "on" : ""}" data-filter="all">${L("Barcha stollar", "Все столы", "All tables")}</button>
       </div>
       <div class="legend">
-        <span><i class="dot free"></i>Bo'sh ${counts.free}</span>
-        <span><i class="dot busy"></i>Band ${counts.busy}</span>
-        <span><i class="dot ready"></i>Tayyor ${counts.ready}</span>
-        <span><i class="dot served"></i>Stolda ${counts.served}</span>
+        <span><i class="dot free"></i>${L("Bo'sh", "Свободно", "Free")} ${counts.free}</span>
+        <span><i class="dot busy"></i>${L("Band", "Занято", "Busy")} ${counts.busy}</span>
+        <span><i class="dot ready"></i>${L("Tayyor", "Готово", "Ready")} ${counts.ready}</span>
+        <span><i class="dot served"></i>${L("Stolda", "На столе", "Served")} ${counts.served}</span>
       </div>
     </div>
     ${zones.map((z) => `
       <h3 class="zone">${esc(z)}</h3>
       <div class="table-grid">
         ${tables.filter((t) => (t.zone || "Zal") === z).map(tableCard).join("")}
-      </div>`).join("") || `<div class="empty"><span class="big">🪑</span>Sizga biriktirilgan stol yo'q. "Barcha stollar"ni bosing.</div>`}
+      </div>`).join("") || `<div class="empty"><span class="big">🪑</span>${L(`Sizga biriktirilgan stol yo'q. "Barcha stollar"ni bosing.`, "За вами нет столов. Нажмите «Все столы».", `No tables assigned to you. Tap "All tables".`)}</div>`}
   </main>`;
 
   bindCommon();
@@ -408,7 +417,7 @@ function renderHistory() {
   const total = list.reduce((s, v) => s + v.sum + v.svc, 0);
   const svc = list.reduce((s, v) => s + v.svc, 0);
   const guests = list.reduce((s, v) => s + (v.guests || 0), 0);
-  const dayName = (ts) => { const d = new Date(ts); const t0 = start.getTime(); return ts >= t0 ? "Bugun" : ts >= t0 - 86400000 ? "Kecha" : d.toLocaleDateString("ru-RU"); };
+  const dayName = (ts) => { const d = new Date(ts); const t0 = start.getTime(); return ts >= t0 ? L("Bugun", "Сегодня", "Today") : ts >= t0 - 86400000 ? L("Kecha", "Вчера", "Yesterday") : d.toLocaleDateString("ru-RU"); };
   const groups = {};
   list.forEach((v) => (groups[dayName(v.at)] = groups[dayName(v.at)] || []).push(v));
   const payName = { naqd: "💵 Naqd", karta: "💳 Karta", click: "📱 Click/Payme" };
@@ -417,17 +426,17 @@ function renderHistory() {
   ${topbar()}
   <main class="tables-view hist-view">
     <div class="hist-head">
-      <button class="icon-btn" data-act="back" title="Orqaga">←</button>
-      <div><h2>Xizmat tarixim</h2><small class="muted">${esc(fullName(me))}</small></div>
+      <button class="icon-btn" data-act="back" title="${L("Orqaga", "Назад", "Back")}">←</button>
+      <div><h2>${L("Xizmat tarixim", "История обслуживания", "Service history")}</h2><small class="muted">${esc(fullName(me))}</small></div>
     </div>
     <div class="seg hist-seg">
-      ${[["today", "Bugun"], ["week", "7 kun"], ["all", "Hammasi"]].map(([k, l]) => `<button class="${ui.histPeriod === k ? "on" : ""}" data-hp="${k}">${l}</button>`).join("")}
+      ${[["today", L("Bugun", "Сегодня", "Today")], ["week", L("7 kun", "7 дней", "7 days")], ["all", L("Hammasi", "Все", "All")]].map(([k, l]) => `<button class="${ui.histPeriod === k ? "on" : ""}" data-hp="${k}">${l}</button>`).join("")}
     </div>
     <div class="tv-stats hist-stats">
-      <span><b>${list.length}</b><small>xizmat qilingan stol</small></span>
-      <span><b>${guests}</b><small>mijoz</small></span>
-      <span><b>${money(total, cur())}</b><small>savdo</small></span>
-      <span><b>${money(svc, cur())}</b><small>xizmat haqi</small></span>
+      <span><b>${list.length}</b><small>${L("xizmat qilingan stol", "обслужено столов", "tables served")}</small></span>
+      <span><b>${guests}</b><small>${L("mijoz", "гостей", "guests")}</small></span>
+      <span><b>${money(total, cur())}</b><small>${L("savdo", "продажи", "sales")}</small></span>
+      <span><b>${money(svc, cur())}</b><small>${L("xizmat haqi", "обслуживание", "service")}</small></span>
     </div>
     ${list.length ? Object.entries(groups).map(([d, vs]) => `
       <h3 class="zone">${esc(d)}</h3>
@@ -435,12 +444,12 @@ function renderHistory() {
         <details class="hist-item">
           <summary>
             <span class="hi-no">${esc(v.tableNo)}</span>
-            <span class="hi-main"><b>Stol ${esc(v.tableNo)}</b><small>${v.zone ? `${esc(v.zone)} · ` : ""}${clock(v.start)} – ${clock(v.at)} · ${mins(v.at - v.start)} daq${v.guests ? ` · 👤 ${v.guests}` : ""}</small></span>
+            <span class="hi-main"><b>${ST(esc(v.tableNo))}</b><small>${v.zone ? `${esc(v.zone)} · ` : ""}${clock(v.start)} – ${clock(v.at)} · ${mins(v.at - v.start)} ${L("daq", "мин", "min")}${v.guests ? ` · 👤 ${v.guests}` : ""}</small></span>
             <span class="hi-sum"><b>${money(v.sum + v.svc, cur())}</b><small>${v.pay ? payName[v.pay] || esc(v.pay) : ""}</small></span>
           </summary>
           <ul>${Object.entries(v.items).map(([n, q]) => `<li><span>${q} × ${esc(n)}</span></li>`).join("")}</ul>
         </details>`).join("")}
-      </div>`).join("") : `<div class="empty"><span class="big">📜</span>${S.salesLoaded || ui.histPeriod === "today" ? "Bu davrda yakunlangan stol yo'q." : "Tarix yuklanmoqda…"}</div>`}
+      </div>`).join("") : `<div class="empty"><span class="big">📜</span>${S.salesLoaded || ui.histPeriod === "today" ? L("Bu davrda yakunlangan stol yo'q.", "За этот период нет закрытых столов.", "No closed tables in this period.") : L("Tarix yuklanmoqda…", "История загружается…", "Loading history…")}</div>`}
   </main>`;
   bindCommon();
   app.querySelector("[data-act=back]").addEventListener("click", () => { ui.view = "tables"; render(); });
@@ -450,7 +459,7 @@ function renderHistory() {
 function helloHtml() {
   const me = meW();
   const h = new Date().getHours();
-  const greet = h < 5 ? "Xayrli tun" : h < 12 ? "Xayrli tong" : h < 18 ? "Xayrli kun" : "Xayrli kech";
+  const greet = h < 5 ? L("Xayrli tun", "Доброй ночи", "Good night") : h < 12 ? L("Xayrli tong", "Доброе утро", "Good morning") : h < 18 ? L("Xayrli kun", "Добрый день", "Good afternoon") : L("Xayrli kech", "Добрый вечер", "Good evening");
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const mine = Object.values(S.orders).filter((o) => o.waiterId === me.id);
   const closedToday = mine.filter((o) => o.status === "closed" && (o.closedAt || 0) >= start.getTime());
@@ -461,11 +470,11 @@ function helloHtml() {
     <section class="tv-hello">
       <div><small>${clock()} · ${new Date().toLocaleDateString("ru-RU")}</small><h1>${greet}, ${esc(me.first)}!</h1></div>
       <div class="tv-stats">
-        <span><b>${busy}</b><small>band stolim</small></span>
-        <span><b>${closedToday.length}</b><small>bugun yopilgan chek</small></span>
-        <span><b>${money(sales, cur())}</b><small>bugungi savdom</small></span>
-        <span><b>${money(tips, cur())}</b><small>xizmat haqi</small></span>
-        <button class="tv-hist" data-act="history"><b>📜</b><small>Xizmat tarixim</small></button>
+        <span><b>${busy}</b><small>${L("band stolim", "мои занятые столы", "my busy tables")}</small></span>
+        <span><b>${closedToday.length}</b><small>${L("bugun yopilgan chek", "закрыто чеков сегодня", "checks closed today")}</small></span>
+        <span><b>${money(sales, cur())}</b><small>${L("bugungi savdom", "мои продажи сегодня", "my sales today")}</small></span>
+        <span><b>${money(tips, cur())}</b><small>${L("xizmat haqi", "обслуживание", "service")}</small></span>
+        <button class="tv-hist" data-act="history"><b>📜</b><small>${L("Xizmat tarixim", "История", "History")}</small></button>
       </div>
     </section>`;
 }
@@ -480,10 +489,10 @@ function tableCard(t) {
   <button class="table-card st-${st.key}" data-table="${esc(t.id)}">
     <div class="tc-top"><span class="tc-no">${esc(t.no)}</span><span class="tc-seats">👤 ${esc(t.seats || "")}</span></div>
     <div class="tc-status">${st.label}</div>
-    ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${ago(Math.max(...st.orders.map((o) => o.servedAt || 0)))} oldin berildi` : since ? ago(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
+    ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${agoL(Math.max(...st.orders.map((o) => o.servedAt || 0)))} ${L("oldin berildi", "назад подано", "ago served")}` : since ? agoL(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
     <div class="tc-waiter">${esc(fullName(w) || "—")}</div>
-    ${st.key !== "free" ? `<span class="tc-add">➕ Qo'shish</span>` : ""}
-    ${draft ? `<span class="tc-draft">${draft} ta savatda</span>` : ""}
+    ${st.key !== "free" ? `<span class="tc-add">➕ ${L("Qo'shish", "Добавить", "Add")}</span>` : ""}
+    ${draft ? `<span class="tc-draft">${draft} ${L("ta savatda", "в корзине", "in cart")}</span>` : ""}
   </button>`;
 }
 
@@ -508,11 +517,11 @@ function renderTable() {
     <section class="menu-pane" id="menuPane">
       <div class="menu-top">
       <div class="menu-head">
-        ${ui.guest ? "" : `<button class="btn btn-ghost to-tables" data-act="back" title="Barcha stollar">← Stollar</button>`}
+        ${ui.guest ? "" : `<button class="btn btn-ghost to-tables" data-act="back" title="${L("Barcha stollar", "Все столы", "All tables")}">← ${L("Stollar", "Столы", "Tables")}</button>`}
         <div class="mh-title">${ui.guest
           ? `<h2>${T("menu")}</h2><small>${T("yourWaiter")}: <b>${esc(fullName(w) || "—")}</b></small>`
-          : `<h2>Stol ${esc(t.no)}</h2><small>${esc(t.zone || "")} · Ofitsiant: <b>${esc(fullName(w) || "—")}</b></small>`}</div>
-        ${ui.guest ? "" : `<button class="btn btn-ghost guest-start" data-act="guest" title="Planshetni mijozga berish">📱 Mijozga berish</button>`}
+          : `<h2>${ST(esc(t.no))}</h2><small>${esc(t.zone || "")} · ${L("Ofitsiant", "Официант", "Waiter")}: <b>${esc(fullName(w) || "—")}</b></small>`}</div>
+        ${ui.guest ? "" : `<button class="btn btn-ghost guest-start" data-act="guest" title="${L("Planshetni mijozga berish", "Передать планшет гостю", "Hand tablet to guest")}">📱 ${L("Mijozga berish", "Гостю", "To guest")}</button>`}
         <div class="langs" id="langs">${LANGS.map((l) => `<button class="${getLang() === l.id ? "on" : ""}" data-lang="${l.id}" title="${l.label}">${l.short}</button>`).join("")}</div>
         <div class="search"><input type="search" id="q" placeholder="${esc(T("search"))}" value="${esc(ui.q)}"></div>
       </div>
@@ -654,7 +663,7 @@ function dishCard(i, cart) {
       <div class="dish-foot">
         <span class="dish-price">${stop ? T("soldOut") : `${esc(priceTxt)}<small>${esc(cur() + fromSuffix)}</small>`}</span>
         ${i.weight && !stop ? `<span class="dish-weight">${esc(weightText(i.weight))}</span>` : ""}
-        ${stop ? "" : `<button class="dish-add" data-add="${esc(i.id)}" aria-label="Qo'shish">+</button>`}
+        ${stop ? "" : `<button class="dish-add" data-add="${esc(i.id)}" aria-label="${L("Qo'shish", "Добавить", "Add")}">+</button>`}
       </div>
     </div>
   </article>`;
@@ -823,7 +832,7 @@ function renderCart() {
 
   pane.innerHTML = `
     <div class="cart-head">
-      <h3>${ui.guest ? `${T("cart")} <small>${T("table")} ${esc(t.no)}</small>` : orders.length ? `Stol ${esc(t.no)}` : `Yangi buyurtma <small>Stol ${esc(t.no)}</small>`}</h3>
+      <h3>${ui.guest ? `${T("cart")} <small>${T("table")} ${esc(t.no)}</small>` : orders.length ? ST(esc(t.no)) : `${L("Yangi buyurtma", "Новый заказ", "New order")} <small>${ST(esc(t.no))}</small>`}</h3>
       <button class="icon-btn cart-close" data-act="close-cart">✕</button>
     </div>
     <div class="cart-scroll">
@@ -834,37 +843,37 @@ function renderCart() {
             <div class="cl-main"><b>${esc(cartName(c))}</b>${optsHtml(c)}${c.note ? `<small class="cl-note">📝 ${esc(noteText(c.note))}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
             <div class="stepper sm"><button data-q="${esc(c.key)}" data-d="-1">−</button><b>${c.qty}</b><button data-q="${esc(c.key)}" data-d="1">+</button></div>
           </li>`).join("")}
-      </ul>` : `<div class="empty small"><i class="serve-ico" aria-hidden="true"></i>${ui.guest ? T("emptyCart") : orders.length ? "Menyudan taom tanlang, u shu stol buyurtmasiga qo'shiladi" : "Menyudan taom tanlang"}</div>`}
+      </ul>` : `<div class="empty small"><i class="serve-ico" aria-hidden="true"></i>${ui.guest ? T("emptyCart") : orders.length ? L("Menyudan taom tanlang, u shu stol buyurtmasiga qo'shiladi", "Выберите блюдо в меню, оно добавится к заказу стола", "Pick a dish from the menu, it will be added to this table's order") : L("Menyudan taom tanlang", "Выберите блюдо в меню", "Pick a dish from the menu")}</div>`}
 
       ${orders.length ? `
         <div class="tickets">
-          <h4>${ui.guest ? T("yourOrders") : "Stol cheklari"}</h4>
+          <h4>${ui.guest ? T("yourOrders") : L("Stol cheklari", "Чеки стола", "Table checks")}</h4>
           ${orders.map((o) => `
             <div class="ticket">
               <div class="tk-head"><b>#${esc(shortNo(o))}</b><span class="badge b-${o.status}">${ui.guest ? T("st_" + o.status) : statusLabel(o.status)}</span><small>${clock(o.createdAt)}</small></div>
-              <ul>${o.items.map((it) => `<li class="${it.done ? "done" : ""}"><span>${it.qty} × ${esc(ui.guest ? cartName(it) : it.name)}${it.opts ? ` <i class="tk-opts">(${esc(optsText(it))})</i>` : ""}</span><span>${money(it.qty * it.price, cur())}</span></li>`).join("")}</ul>
-              ${ui.guest ? "" : o.status === "ready" ? `<button class="btn btn-ok btn-block" data-served="${esc(o.id)}">🍽 Stolga olib kelindi</button>` : ""}
-              ${!ui.guest && o.status === "new" ? `<button class="link-btn" data-cancel="${esc(o.id)}">Bekor qilish</button>` : ""}
+              <ul>${o.items.map((it) => `<li class="${it.done ? "done" : ""}"><span>${it.qty} × ${esc(cartName(it))}${it.opts ? ` <i class="tk-opts">(${esc(optsText(it))})</i>` : ""}</span><span>${money(it.qty * it.price, cur())}</span></li>`).join("")}</ul>
+              ${ui.guest ? "" : o.status === "ready" ? `<button class="btn btn-ok btn-block" data-served="${esc(o.id)}">🍽 ${L("Stolga olib kelindi", "Подано на стол", "Served to table")}</button>` : ""}
+              ${!ui.guest && o.status === "new" ? `<button class="link-btn" data-cancel="${esc(o.id)}">${L("Bekor qilish", "Отменить", "Cancel")}</button>` : ""}
             </div>`).join("")}
         </div>` : ""}
     </div>
     <div class="cart-foot">
       ${cart.length ? `
-        <div class="sum-row"><span>${ui.guest ? T("newOrder") : orders.length ? "Yangi tanlangan taomlar" : "Yangi buyurtma"}</span><b>${money(cartSum, cur())}</b></div>
-        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : orders.length ? "✓ Buyurtmaga qo'shish →" : "Buyurtmani tasdiqlash →"}</button>` : ""}
+        <div class="sum-row"><span>${ui.guest ? T("newOrder") : orders.length ? L("Yangi tanlangan taomlar", "Новые выбранные блюда", "Newly picked dishes") : L("Yangi buyurtma", "Новый заказ", "New order")}</span><b>${money(cartSum, cur())}</b></div>
+        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : orders.length ? L("✓ Buyurtmaga qo'shish →", "✓ Добавить к заказу →", "✓ Add to order →") : L("Buyurtmani tasdiqlash →", "Подтвердить заказ →", "Confirm order →")}</button>` : ""}
       ${orders.length && !cart.length && !ui.guest ? `
-        ${`<button class="btn btn-info btn-lg btn-block" data-act="add-more">➕ Buyurtma qo'shish</button>
-        <button class="btn btn-ok btn-lg btn-block" data-act="bill">✓ Mijoz ketdi · Yakunlash</button>`}` : ""}
+        ${`<button class="btn btn-info btn-lg btn-block" data-act="add-more">➕ ${L("Buyurtma qo'shish", "Добавить заказ", "Add order")}</button>
+        <button class="btn btn-ok btn-lg btn-block" data-act="bill">✓ ${L("Mijoz ketdi · Yakunlash", "Гость ушёл · Закрыть", "Guest left · Close")}</button>`}` : ""}
     </div>`;
 
   fab.innerHTML = ui.guest
     ? (cartCount ? `${CART_ICON}<b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🍽 ${T("yourOrders")} <span>${T("view")}</span>` : "")
-    : (cartCount ? `${CART_ICON}<b>${cartCount} ta</b> · ${money(cartSum, cur())} <span>Ko'rish →</span>` : orders.length ? `🍽 Stol buyurtmalari <span>Ko'rish →</span>` : "");
+    : (cartCount ? `${CART_ICON}<b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🍽 ${L("Stol buyurtmalari", "Заказы стола", "Table orders")} <span>${T("view")}</span>` : "");
   fab.hidden = !cartCount && !orders.length;
   const hint = app.querySelector("#addHint");
   if (hint) {
     hint.hidden = !orders.length;
-    hint.innerHTML = orders.length ? `<b>➕ Stolda ${orders.length} ta buyurtma bor.</b> <span>Mijoz yana nimadir so'rasa, taomni tanlang va tasdiqlang: u shu stolga qo'shiladi.</span>` : "";
+    hint.innerHTML = orders.length ? `<b>➕ ${L(`Stolda ${orders.length} ta buyurtma bor.`, `На столе заказов: ${orders.length}.`, `Orders on this table: ${orders.length}.`)}</b> <span>${L("Mijoz yana nimadir so'rasa, taomni tanlang va tasdiqlang: u shu stolga qo'shiladi.", "Если гость закажет ещё, выберите блюдо и подтвердите: оно добавится к этому столу.", "If the guest orders more, pick the dish and confirm: it is added to this table.")}</span>` : "";
   }
 
   pane.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => {
@@ -879,7 +888,7 @@ function renderCart() {
   pane.querySelector("[data-act=add-more]")?.addEventListener("click", () => {
     ui.cartOpen = false; pane.classList.remove("open");
     window.scrollTo({ top: 0, behavior: "smooth" });
-    toast(`Stol ${esc(t.no)}: menyudan taom tanlang, keyin savatda "Buyurtmaga qo'shish"ni bosing`);
+    toast(`${ST(esc(t.no))}: ${L(`menyudan taom tanlang, keyin savatda "Buyurtmaga qo'shish"ni bosing`, "выберите блюда в меню, затем в корзине нажмите «Добавить к заказу»", `pick dishes, then tap "Add to order" in the cart`)}`);
   });
   pane.querySelector("[data-act=confirm]")?.addEventListener("click", () => (ui.guest ? guestConfirm(t) : confirmOrder(t)));
   pane.querySelector("[data-act=bill]")?.addEventListener("click", () => billModal(t));
@@ -887,7 +896,7 @@ function renderCart() {
   pane.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", async () => {
     const o = S.orders[b.dataset.cancel];
     if (o?.status !== "new") { toast("Oshpaz allaqachon boshlagan, bekor qilib bo'lmaydi", { kind: "error" }); return; }
-    if (await confirmBox(`#${esc(shortNo(o))} buyurtmani bekor qilasizmi?`, "Bekor qilish", { danger: true })) store.removeOrder(o.id);
+    if (await confirmBox(L(`#${esc(shortNo(o))} buyurtmani bekor qilasizmi?`, `Отменить заказ #${esc(shortNo(o))}?`, `Cancel order #${esc(shortNo(o))}?`), L("Bekor qilish", "Отменить", "Cancel"), { danger: true })) store.removeOrder(o.id);
   }));
 }
 
@@ -918,7 +927,7 @@ function cartThumb(c) {
 }
 
 function statusLabel(s) {
-  return { new: "Yangi", cooking: "Tayyorlanmoqda", ready: "Tayyor ✓", served: "Stolda 🍽", closed: "Yopilgan" }[s] || s;
+  return { new: L("Yangi", "Новый", "New"), cooking: L("Tayyorlanmoqda", "Готовится", "Cooking"), ready: L("Tayyor ✓", "Готово ✓", "Ready ✓"), served: L("Stolda 🍽", "На столе 🍽", "Served 🍽"), closed: L("Yopilgan", "Закрыт", "Closed") }[s] || s;
 }
 
 function nextNo() {
@@ -934,21 +943,21 @@ function confirmOrder(t) {
   const sum = cart.reduce((s, c) => s + c.price * c.qty, 0);
   let guests = activeOrders(t.id)[0]?.guests || Math.min(t.seats || 2, 2);
   modal(`
-    <div class="modal-head"><h3>${activeOrders(t.id).length ? "Buyurtmaga qo'shish" : "Buyurtmani tasdiqlang"}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-head"><h3>${activeOrders(t.id).length ? L("Buyurtmaga qo'shish", "Добавить к заказу", "Add to order") : L("Buyurtmani tasdiqlang", "Подтвердите заказ", "Confirm the order")}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       <div class="confirm-meta">
         <div><small>Stol</small><b>${esc(t.no)}</b></div>
         <div><small>Ofitsiant</small><b>${esc(fullName(w))}</b></div>
-        <div><small>Mehmonlar</small><div class="stepper sm"><button data-g="-1">−</button><b id="guests">${guests}</b><button data-g="1">+</button></div></div>
+        <div><small>${L("Mehmonlar", "Гости", "Guests")}</small><div class="stepper sm"><button data-g="-1">−</button><b id="guests">${guests}</b><button data-g="1">+</button></div></div>
       </div>
       <ul class="confirm-list">
         ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(c.name)}${optsHtml(c)}${c.note ? `<small>📝 ${esc(c.note)}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
       </ul>
-      <div class="sum-row big"><span>Jami</span><b>${money(sum, cur())}</b></div>
+      <div class="sum-row big"><span>${L("Jami", "Итого", "Total")}</span><b>${money(sum, cur())}</b></div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" data-close>Tahrirlash</button>
-      <button class="btn btn-primary btn-lg" id="send">🍳 Oshxonaga yuborish</button>
+      <button class="btn btn-ghost" data-close>${L("Tahrirlash", "Изменить", "Edit")}</button>
+      <button class="btn btn-primary btn-lg" id="send">🍳 ${L("Oshxonaga yuborish", "Отправить на кухню", "Send to kitchen")}</button>
     </div>`, {
     onMount(m, close) {
       m.querySelectorAll("[data-g]").forEach((b) => b.addEventListener("click", () => {
@@ -976,8 +985,8 @@ function confirmOrder(t) {
         setCart(t.id, []);
         close();
         ui.cartOpen = false;
-        toast(`✓ Stol ${esc(t.no)} ${order.extra ? "buyurtmasiga qo'shildi va" : "buyurtmasi"} oshxonaga yuborildi`, { kind: "ok" });
-        if (!S.online) toast("Aloqa yo'q: buyurtma aloqa tiklanishi bilan yuboriladi", { kind: "error", timeout: 6000 });
+        toast(`✓ ${ST(esc(t.no))}: ${order.extra ? L("buyurtmaga qo'shildi va oshxonaga yuborildi", "добавлено к заказу и отправлено на кухню", "added to the order and sent to the kitchen") : L("buyurtma oshxonaga yuborildi", "заказ отправлен на кухню", "order sent to the kitchen")}`, { kind: "ok" });
+        if (!S.online) toast(L("Aloqa yo'q: buyurtma aloqa tiklanishi bilan yuboriladi", "Нет связи: заказ отправится, когда связь восстановится", "Offline: the order will be sent when the connection is back"), { kind: "error", timeout: 6000 });
         ui.view = "tables";
         render();
       });
@@ -989,7 +998,7 @@ function markServed(id) {
   const o = S.orders[id];
   if (!o) return;
   store.updateOrder(id, { status: "served", servedAt: Date.now() });
-  toast(`Stol ${esc(o.tableNo)}: taom stolga olib kelindi`, { kind: "ok" });
+  toast(`${ST(esc(o.tableNo))}: ${L("taom stolga olib kelindi", "блюда поданы на стол", "food served")}`, { kind: "ok" });
 }
 
 function billLines(orders) {
@@ -1012,20 +1021,20 @@ function billModal(t) {
   const notServed = orders.filter((o) => o.status === "new" || o.status === "cooking" || o.status === "ready").length;
   const w = waiterById(tableWaiterId(t));
   modal(`
-    <div class="modal-head"><h3>Hisob · Stol ${esc(t.no)}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-head"><h3>${L("Hisob", "Счёт", "Bill")} · ${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       <div class="bill">
         <div class="bill-brand">${logoHtml(cfg().restaurant)}<b>${esc(cfg().restaurant.name)}</b></div>
         <ul>${lines.map((l) => `<li><span>${l.qty} × ${esc(l.name)}${l.opts ? ` <small>(${esc(l.opts)})</small>` : ""}</span><span>${money(l.qty * l.price, cur())}</span></li>`).join("")}</ul>
-        <div class="sum-row"><span>Jami taomlar</span><b>${money(sub, cur())}</b></div>
-        ${rate ? `<div class="sum-row"><span>Xizmat haqi ${rate}%</span><b>${money(service, cur())}</b></div>` : ""}
+        <div class="sum-row"><span>${L("Jami taomlar", "Блюда всего", "Food total")}</span><b>${money(sub, cur())}</b></div>
+        ${rate ? `<div class="sum-row"><span>${L("Xizmat haqi", "Обслуживание", "Service")} ${rate}%</span><b>${money(service, cur())}</b></div>` : ""}
         <div class="sum-row big"><span>To'lov uchun</span><b>${money(total, cur())}</b></div>
-        <p class="muted small">Ofitsiant: ${esc(fullName(w))} · ${clock()}</p>
+        <p class="muted small">${L("Ofitsiant", "Официант", "Waiter")}: ${esc(fullName(w))} · ${clock()}</p>
       </div>
-      ${notServed ? `<p class="warn-note">⚠️ ${notServed} ta chek hali mijozga berilmagan.</p>` : ""}
+      ${notServed ? `<p class="warn-note">⚠️ ${L(`${notServed} ta chek hali mijozga berilmagan.`, `Ещё не подано чеков: ${notServed}.`, `${notServed} check(s) not served yet.`)}</p>` : ""}
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ok btn-lg btn-block" id="close">✓ Stolni yopish</button>
+      <button class="btn btn-ok btn-lg btn-block" id="close">✓ ${L("Stolni yopish", "Закрыть стол", "Close table")}</button>
     </div>`, {
     onMount(m, close) {
       m.querySelector("#close").addEventListener("click", () => {
@@ -1036,7 +1045,7 @@ function billModal(t) {
         });
         if (S.calls[t.id]) store.setCall(t.id, null);
         close();
-        toast(`Stol ${esc(t.no)} yopildi va bo'shadi · ${money(total, cur())}`, { kind: "ok", timeout: 5000 });
+        toast(`${ST(esc(t.no))} ${L("yopildi va bo'shadi", "закрыт и свободен", "closed and free")} · ${money(total, cur())}`, { kind: "ok", timeout: 5000 });
         ui.view = "tables";
         render();
         showReceipt({ t, w, orders, lines });
@@ -1101,11 +1110,11 @@ function receiptHtml({ t, w, orders, lines, pay, split = 0, title = "" }) {
 function showReceipt(opts) {
   const native = window.Capacitor?.isNativePlatform?.();
   modal(`
-    <div class="modal-head"><h3>🧾 Chek · Stol ${esc(opts.t.no)}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-head"><h3>🧾 ${L("Chek", "Чек", "Receipt")} · ${ST(esc(opts.t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body"><iframe class="receipt-preview" srcdoc="${esc(receiptHtml(opts))}"></iframe></div>
     <div class="modal-actions">
-      ${native ? "" : `<button class="btn btn-ghost" data-act="print">🖨 Chop etish</button>`}
-      <button class="btn btn-primary btn-lg" data-close>Tayyor</button>
+      ${native ? "" : `<button class="btn btn-ghost" data-act="print">🖨 ${L("Chop etish", "Печать", "Print")}</button>`}
+      <button class="btn btn-primary btn-lg" data-close>${L("Tayyor", "Готово", "Done")}</button>
     </div>`, {
     onMount(m) { m.querySelector("[data-act=print]")?.addEventListener("click", () => printReceipt(opts)); }
   });
@@ -1137,13 +1146,13 @@ function printReceipt(opts) {
 function showReadyList() {
   const list = readyForMe();
   modal(`
-    <div class="modal-head"><h3>🔔 Tayyor buyurtmalar</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-head"><h3>🔔 ${L("Tayyor buyurtmalar", "Готовые заказы", "Ready orders")}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       ${list.length ? list.map((o) => `
         <div class="ready-item">
-          <div><span class="check">✓</span><b>Stol ${esc(o.tableNo)}</b> <small>#${esc(shortNo(o))} · ${o.items.map((i) => `${i.qty}× ${esc(i.name)}`).join(", ")}</small></div>
-          <button class="btn btn-ok" data-served="${esc(o.id)}" data-close>🍽 Stolga olib kelindi</button>
-        </div>`).join("") : `<div class="empty"><span class="big">🍽️</span>Hozircha tayyor buyurtma yo'q</div>`}
+          <div><span class="check">✓</span><b>${ST(esc(o.tableNo))}</b> <small>#${esc(shortNo(o))} · ${o.items.map((i) => `${i.qty}× ${esc(i.name)}`).join(", ")}</small></div>
+          <button class="btn btn-ok" data-served="${esc(o.id)}" data-close>🍽 ${L("Stolga olib kelindi", "Подано на стол", "Served to table")}</button>
+        </div>`).join("") : `<div class="empty"><span class="big">🍽️</span>${L("Hozircha tayyor buyurtma yo'q", "Пока нет готовых заказов", "No ready orders yet")}</div>`}
     </div>`, {
     onMount(m) { m.querySelectorAll("[data-served]").forEach((b) => b.addEventListener("click", () => markServed(b.dataset.served))); }
   });
@@ -1154,12 +1163,12 @@ function meMenu() {
   modal(`
     <div class="modal-head"><h3>${esc(fullName(me))}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
-      <p class="muted">Restoran: <b>${esc(cfg().restaurant.name)}</b></p>
-      <p class="muted">Sizga biriktirilgan stollar: <b>${cfg().tables.filter((t) => t.waiterId === me.id).map((t) => esc(t.no)).join(", ") || "yo'q"}</b></p>
-      <button class="btn btn-ghost btn-block" data-act="history">📜 Xizmat tarixim</button>
-      <button class="btn btn-ghost btn-block" data-act="sound">🔊 Ovozni sinash</button>
+      <p class="muted">${L("Restoran", "Ресторан", "Restaurant")}: <b>${esc(cfg().restaurant.name)}</b></p>
+      <p class="muted">${L("Sizga biriktirilgan stollar", "Ваши столы", "Your tables")}: <b>${cfg().tables.filter((t) => t.waiterId === me.id).map((t) => esc(t.no)).join(", ") || L("yo'q", "нет", "none")}</b></p>
+      <button class="btn btn-ghost btn-block" data-act="history">📜 ${L("Xizmat tarixim", "История обслуживания", "Service history")}</button>
+      <button class="btn btn-ghost btn-block" data-act="sound">🔊 ${L("Ovozni sinash", "Проверить звук", "Test sound")}</button>
     </div>
-    <div class="modal-actions"><button class="btn btn-danger" data-act="logout">Chiqish</button></div>`, {
+    <div class="modal-actions"><button class="btn btn-danger" data-act="logout">${L("Chiqish", "Выйти", "Log out")}</button></div>`, {
     onMount(m, close) {
       m.querySelector("[data-act=history]").addEventListener("click", () => { close(); openHistory(); });
       m.querySelector("[data-act=sound]").addEventListener("click", () => { unlockAudio(); chime("ready"); vibrate(); });
@@ -1184,8 +1193,8 @@ store.on((evt) => {
     if (ui.me && (mine || ui.filter === "all")) {
       chime("ready");
       vibrate([300, 120, 300, 120, 300]);
-      toast(`<b>✓ Stol ${esc(o.tableNo)}</b> buyurtmasi tayyor! Oshxonadan olib chiqing.`, { kind: "ready", timeout: 9000, onClick: () => openTable(o.tableId) });
-      flashTitle(`✓ Stol ${o.tableNo} tayyor`);
+      toast(`<b>✓ ${ST(esc(o.tableNo))}</b> ${L("buyurtmasi tayyor! Oshxonadan olib chiqing.", "заказ готов! Заберите на кухне.", "order is ready! Pick it up from the kitchen.")}`, { kind: "ready", timeout: 9000, onClick: () => openTable(o.tableId) });
+      flashTitle(`✓ ${ST(o.tableNo)} ${L("tayyor", "готов", "ready")}`);
     }
   }
   if (evt.type === "config" || evt.type === "stop") ui.menuDirty = true;

@@ -1,5 +1,5 @@
 // Mijozga ko'rinadigan menyu uchun uch til: o'zbek, rus, ingliz.
-// Oshxona va ofitsiant ichki ekranlari o'zbek tilida qoladi: oshxonaga taom nomi doim o'zbekcha boradi.
+// Mijoz menyusi ham, ofitsiant ekrani ham tanlangan tilda. Oshxonaga taom nomi doim o'zbekcha boradi.
 
 export const LANGS = [
   { id: "uz", label: "O'zbek", short: "UZ" },
