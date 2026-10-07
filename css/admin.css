@@ -195,3 +195,6 @@ h3.mt { margin-top: 18px; }
   background-size: 33.333% 33.333%; background-position: -1px -1px; }
 .crop-zoom { display: flex; align-items: center; gap: 12px; margin: 16px 4px 8px; font-size: 22px; color: var(--gold); }
 .crop-zoom input { flex: 1; accent-color: var(--gold); }
+/* Fayl tanlash: input tugma ustida shaffof turadi, telefon ichki oynalarida ham barmoq to'g'ridan-to'g'ri unga tegadi */
+label:has(> .file-overlay), label.btn, .cat-pic { position: relative; overflow: hidden; }
+.file-overlay { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; z-index: 2; }

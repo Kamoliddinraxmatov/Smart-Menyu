@@ -87,7 +87,7 @@ function tabBrand(c) {
       <div class="logo-edit">
         ${logoHtml(r, "logo logo-xl")}
         <div>
-          <label class="btn btn-ghost">📷 Logo yuklash<input type="file" accept="image/*" id="logo" hidden></label>
+          <label class="btn btn-ghost">📷 Logo yuklash<input type="file" accept="image/*" id="logo" class="file-overlay"></label>
           ${r.logo ? `<button class="btn btn-ghost" id="rmLogo">O'chirish</button>` : ""}
           <p class="hint">Kvadrat PNG yoki JPG, avtomatik kichraytiriladi.</p>
         </div>
@@ -173,7 +173,7 @@ function itemEditor(item) {
       <div class="img-edit">
         <div id="vis">${itemVisual(it, "thumb ie-img")}</div>
         <div>
-          <label class="btn btn-ghost">📷 Rasm yuklash<input type="file" accept="image/*" id="img" hidden></label>
+          <label class="btn btn-ghost">📷 Rasm yuklash<input type="file" accept="image/*" id="img" class="file-overlay"></label>
           <button class="btn btn-ghost" id="rmImg" ${it.img ? "" : "hidden"}>Rasmni o'chirish</button>
           <label class="field"><span>Emoji (rasm bo'lmasa)</span><input type="text" id="emoji" value="${esc(it.emoji || "")}" maxlength="4"></label>
         </div>
@@ -307,7 +307,7 @@ function catEditor() {
     m.querySelector("#cl").innerHTML = cats.map((x, i) => `
       <div class="cat-card">
         <label class="cat-pic" title="Bo'lim rasmi" style="${x.hero || x.bg ? `background-image:url('${esc(x.hero || x.bg)}')` : ""}">
-          ${x.hero || x.bg ? "" : "📷"}<input type="file" accept="image/*" data-pic="${i}" hidden>
+          ${x.hero || x.bg ? "" : "📷"}<input type="file" accept="image/*" data-pic="${i}" class="file-overlay">
         </label>
         <div class="cat-fields">
           <div class="cat-row">
