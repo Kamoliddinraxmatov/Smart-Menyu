@@ -108,6 +108,10 @@ function tableWaiterId(t) {
   if (active.length) return active[active.length - 1].waiterId || active[0].waiterId;
   return t.waiterId || ui.me?.id;
 }
+// qo'ng'iroqcha faqat buyurtmani olgan ofitsiantda yonadi ("Barcha stollar" tanlangan bo'lsa ham)
+function myReady() {
+  return Object.values(S.orders).filter((o) => o.status === "ready" && o.waiterId === ui.me?.id);
+}
 function readyForMe() {
   return Object.values(S.orders)
     .filter((o) => o.status === "ready" && (ui.filter === "all" || o.waiterId === ui.me?.id))
@@ -135,7 +139,7 @@ function topbar(extra = "") {
   const r = cfg().restaurant;
   if (ui.guest) return guestBar();
   const me = meW();
-  const ready = readyForMe().length;
+  const ready = myReady().length;
   return `
   <header class="topbar">
     <div class="brand">${logoHtml(r)}<div><b>${esc(r.name)}</b><small>${esc(r.slogan || "")}</small></div></div>
@@ -1194,7 +1198,7 @@ store.on((evt) => {
   if (evt.type === "order" && !evt.local && evt.order.status === "ready" && evt.prev && evt.prev.status !== "ready") {
     const o = evt.order;
     const mine = o.waiterId === ui.me?.id;
-    if (ui.me && (mine || ui.filter === "all")) {
+    if (ui.me && mine) {
       chime("ready");
       vibrate([300, 120, 300, 120, 300]);
       toast(`<b>✓ ${ST(esc(o.tableNo))}</b> ${L("buyurtmasi tayyor! Oshxonadan olib chiqing.", "заказ готов! Заберите на кухне.", "order is ready! Pick it up from the kitchen.")}`, { kind: "ready", timeout: 9000, onClick: () => openTable(o.tableId) });
@@ -1216,7 +1220,7 @@ store.on((evt) => {
   if (ui.view === "table" && app.querySelector("#grid")) {
     // Menyu ochiq: qidiruv maydonini buzmaslik uchun faqat kerakli qismlarni yangilaymiz
     const pill = app.querySelector("[data-act=show-ready] b");
-    if (pill) { const n = readyForMe().length; pill.textContent = n; pill.parentElement.classList.toggle("on", !!n); }
+    if (pill) { const n = myReady().length; pill.textContent = n; pill.parentElement.classList.toggle("on", !!n); }
     const conn = app.querySelector(".conn");
     if (conn) conn.outerHTML = connBadge(S.online);
     renderCart();
