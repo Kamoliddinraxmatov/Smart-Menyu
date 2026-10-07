@@ -534,3 +534,8 @@ body.lux {
 .tap-actions .btn { width: 100%; flex: none; order: 0 !important; }
 /* nimani olib borish kerak — sariq rangda */
 .ready-what { display: block; color: #FACC15; font-weight: 700; margin-top: 2px; }
+/* tayyor buyurtma olib borilmaguncha qo'ng'iroqcha qizil yonib, qimirlab turadi (ovozsiz) */
+.ready-pill.on { background: #DC2626; border-color: #DC2626; color: #fff; animation: redGlow 1.2s ease-in-out infinite; }
+.ready-pill.on .bell { display: inline-block; transform-origin: 50% 10%; animation: bellShake 1.2s ease-in-out infinite; }
+@keyframes bellShake { 0%, 50%, 100% { transform: rotate(0); } 10% { transform: rotate(18deg); } 20% { transform: rotate(-16deg); } 30% { transform: rotate(12deg); } 40% { transform: rotate(-8deg); } }
+@keyframes redGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.7); } 50% { box-shadow: 0 0 0 8px rgba(220,38,38,0); } }

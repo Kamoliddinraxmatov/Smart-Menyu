@@ -142,7 +142,7 @@ function topbar(extra = "") {
     ${extra}
     <div class="top-right">
       ${connBadge(S.online)}
-      <button class="ready-pill ${ready ? "on" : ""}" data-act="show-ready" title="${L("Tayyor buyurtmalar", "Готовые заказы", "Ready orders")}">🔔 <b>${ready}</b></button>
+      <button class="ready-pill ${ready ? "on" : ""}" data-act="show-ready" title="${L("Tayyor buyurtmalar", "Готовые заказы", "Ready orders")}"><span class="bell">🔔</span> <b>${ready}</b></button>
       <button class="me-chip" data-act="me"><span class="avatar">${esc(initials(me))}</span><span class="me-name">${esc(fullName(me))}</span></button>
     </div>
   </header>`;
@@ -1260,11 +1260,3 @@ document.addEventListener("pointerdown", unlockAudio, { once: true });
 render();
 registerSW();
 
-// "Stolga olib kelindi" bosilmaguncha har 40 soniyada ofitsiantga eslatma signal
-setInterval(() => {
-  if (ui.guest || !ui.me) return;
-  const waiting = readyForMe().filter((o) => Date.now() - (o.readyAt || 0) > 35000);
-  if (!waiting.length) return;
-  chime("ready");
-  vibrate([300, 120, 300]);
-}, 40000);
