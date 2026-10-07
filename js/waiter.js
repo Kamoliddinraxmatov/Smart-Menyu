@@ -90,6 +90,7 @@ function tableState(tid) {
   if (os.some((o) => o.status === "ready")) return { key: "ready", label: "Tayyor ✓", orders: os };
   if (os.some((o) => o.status === "cooking")) return { key: "cooking", label: "Tayyorlanmoqda", orders: os };
   if (os.some((o) => o.status === "new")) return { key: "new", label: "Oshxonaga yuborildi", orders: os };
+  if (os.every((o) => o.status === "served")) return { key: "served", label: "🍽 Taom stolda", orders: os };
   return { key: "busy", label: "Band", orders: os };
 }
 function tableWaiterId(t) {
@@ -113,6 +114,7 @@ function render() {
   if (ui.guest) saveGuest(null);
   if (!ui.me || !meW()) return renderLogin();
   if (ui.view === "table" && tableById(ui.tableId)) return renderTable();
+  if (ui.view === "history") return renderHistory();
   ui.view = "tables";
   renderTables();
 }
@@ -338,8 +340,8 @@ function renderTables() {
   const zones = [...new Set(tables.map((t) => t.zone || "Zal"))];
   const ready = readyForMe();
   const calls = callsForMe();
-  const counts = { free: 0, busy: 0, ready: 0 };
-  tables.forEach((t) => { const k = tableState(t.id).key; if (k === "free") counts.free++; else if (k === "ready") counts.ready++; else counts.busy++; });
+  const counts = { free: 0, busy: 0, ready: 0, served: 0 };
+  tables.forEach((t) => { const k = tableState(t.id).key; if (k === "free") counts.free++; else if (k === "ready") counts.ready++; else if (k === "served") counts.served++; else counts.busy++; });
 
   app.innerHTML = `
   ${topbar()}
@@ -351,7 +353,7 @@ function renderTables() {
         ${ready.map((o) => `
           <div class="ready-item">
             <div><span class="check">✓</span><b>Stol ${esc(o.tableNo)}</b> buyurtmasi tayyor <small>#${esc(shortNo(o))} · ${ago(o.readyAt)} oldin · ${esc(o.waiterName)}</small></div>
-            <button class="btn btn-ok" data-served="${esc(o.id)}">Olib chiqdim</button>
+            <button class="btn btn-ok" data-served="${esc(o.id)}">🍽 Stolga olib kelindi</button>
           </div>`).join("")}
       </section>` : ""}
     ${calls.length ? `
@@ -371,6 +373,7 @@ function renderTables() {
         <span><i class="dot free"></i>Bo'sh ${counts.free}</span>
         <span><i class="dot busy"></i>Band ${counts.busy}</span>
         <span><i class="dot ready"></i>Tayyor ${counts.ready}</span>
+        <span><i class="dot served"></i>Stolda ${counts.served}</span>
       </div>
     </div>
     ${zones.map((z) => `
@@ -384,6 +387,81 @@ function renderTables() {
   app.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { ui.filter = b.dataset.filter; render(); }));
   app.querySelectorAll("[data-table]").forEach((b) => b.addEventListener("click", () => openTable(b.dataset.table)));
   app.querySelectorAll("[data-callok]").forEach((b) => b.addEventListener("click", () => { store.setCall(b.dataset.callok, null); render(); }));
+}
+
+// ---------- Ofitsiantning xizmat tarixi ----------
+// Har yakunlangan stol (bir vaqtda yopilgan cheklar) bitta yozuv bo'ladi; arxiv kanaldan yuklanadi va yig'ilib boradi
+function myVisits() {
+  const me = meW();
+  const all = { ...S.sales };
+  Object.values(S.orders).forEach((o) => {
+    if (o.status !== "closed" || all[o.id]) return;
+    const sum = orderTotal(o);
+    all[o.id] = { id: o.id, at: o.closedAt || o.createdAt, createdAt: o.createdAt, tableNo: o.tableNo, zone: o.zone || "", waiterId: o.waiterId, guests: o.guests || 0, pay: o.pay || "naqd", sum, svc: Math.round(sum * (o.serviceRate || 0) / 100), items: o.items.map((it) => [it.name + (it.opts ? ` (${it.opts})` : ""), it.qty, it.price]) };
+  });
+  const visits = {};
+  Object.values(all).filter((x) => x.waiterId === me.id).forEach((x) => {
+    const k = `${x.tableNo}|${x.at}`;
+    const v = visits[k] || (visits[k] = { k, tableNo: x.tableNo, zone: x.zone, at: x.at, start: x.createdAt || x.at, guests: 0, pay: x.pay, sum: 0, svc: 0, items: {} });
+    v.start = Math.min(v.start, x.createdAt || x.at);
+    v.guests = Math.max(v.guests, x.guests || 0);
+    v.sum += x.sum; v.svc += x.svc;
+    (x.items || []).forEach(([n, q]) => { v.items[n] = (v.items[n] || 0) + q; });
+  });
+  return Object.values(visits).sort((a, b) => b.at - a.at);
+}
+function openHistory() {
+  store.loadSales();
+  ui.view = "history";
+  ui.histPeriod = ui.histPeriod || "today";
+  render();
+  window.scrollTo(0, 0);
+}
+function renderHistory() {
+  const me = meW();
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const from = { today: start.getTime(), week: start.getTime() - 6 * 86400000, all: 0 }[ui.histPeriod] ?? 0;
+  const list = myVisits().filter((v) => v.at >= from);
+  const total = list.reduce((s, v) => s + v.sum + v.svc, 0);
+  const svc = list.reduce((s, v) => s + v.svc, 0);
+  const guests = list.reduce((s, v) => s + (v.guests || 0), 0);
+  const dayName = (ts) => { const d = new Date(ts); const t0 = start.getTime(); return ts >= t0 ? "Bugun" : ts >= t0 - 86400000 ? "Kecha" : d.toLocaleDateString("ru-RU"); };
+  const groups = {};
+  list.forEach((v) => (groups[dayName(v.at)] = groups[dayName(v.at)] || []).push(v));
+  const payName = { naqd: "💵 Naqd", karta: "💳 Karta", click: "📱 Click/Payme" };
+  const mins = (ms) => Math.max(1, Math.round(ms / 60000));
+  app.innerHTML = `
+  ${topbar()}
+  <main class="tables-view hist-view">
+    <div class="hist-head">
+      <button class="icon-btn" data-act="back" title="Orqaga">←</button>
+      <div><h2>Xizmat tarixim</h2><small class="muted">${esc(fullName(me))}</small></div>
+    </div>
+    <div class="seg hist-seg">
+      ${[["today", "Bugun"], ["week", "7 kun"], ["all", "Hammasi"]].map(([k, l]) => `<button class="${ui.histPeriod === k ? "on" : ""}" data-hp="${k}">${l}</button>`).join("")}
+    </div>
+    <div class="tv-stats hist-stats">
+      <span><b>${list.length}</b><small>xizmat qilingan stol</small></span>
+      <span><b>${guests}</b><small>mijoz</small></span>
+      <span><b>${money(total, cur())}</b><small>savdo</small></span>
+      <span><b>${money(svc, cur())}</b><small>xizmat haqi</small></span>
+    </div>
+    ${list.length ? Object.entries(groups).map(([d, vs]) => `
+      <h3 class="zone">${esc(d)}</h3>
+      <div class="hist-list">${vs.map((v) => `
+        <details class="hist-item">
+          <summary>
+            <span class="hi-no">${esc(v.tableNo)}</span>
+            <span class="hi-main"><b>Stol ${esc(v.tableNo)}</b><small>${v.zone ? `${esc(v.zone)} · ` : ""}${clock(v.start)} – ${clock(v.at)} · ${mins(v.at - v.start)} daq${v.guests ? ` · 👤 ${v.guests}` : ""}</small></span>
+            <span class="hi-sum"><b>${money(v.sum + v.svc, cur())}</b><small>${payName[v.pay] || esc(v.pay)}</small></span>
+          </summary>
+          <ul>${Object.entries(v.items).map(([n, q]) => `<li><span>${q} × ${esc(n)}</span></li>`).join("")}</ul>
+        </details>`).join("")}
+      </div>`).join("") : `<div class="empty"><span class="big">📜</span>${S.salesLoaded || ui.histPeriod === "today" ? "Bu davrda yakunlangan stol yo'q." : "Tarix yuklanmoqda…"}</div>`}
+  </main>`;
+  bindCommon();
+  app.querySelector("[data-act=back]").addEventListener("click", () => { ui.view = "tables"; render(); });
+  app.querySelectorAll("[data-hp]").forEach((b) => b.addEventListener("click", () => { ui.histPeriod = b.dataset.hp; render(); }));
 }
 
 function helloHtml() {
@@ -404,6 +482,7 @@ function helloHtml() {
         <span><b>${closedToday.length}</b><small>bugun yopilgan chek</small></span>
         <span><b>${money(sales, cur())}</b><small>bugungi savdom</small></span>
         <span><b>${money(tips, cur())}</b><small>xizmat haqi</small></span>
+        <button class="tv-hist" data-act="history"><b>📜</b><small>Xizmat tarixim</small></button>
       </div>
     </section>`;
 }
@@ -418,7 +497,7 @@ function tableCard(t) {
   <button class="table-card st-${st.key}" data-table="${esc(t.id)}">
     <div class="tc-top"><span class="tc-no">${esc(t.no)}</span><span class="tc-seats">👤 ${esc(t.seats || "")}</span></div>
     <div class="tc-status">${st.label}</div>
-    ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${since ? ago(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
+    ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${ago(Math.max(...st.orders.map((o) => o.servedAt || 0)))} oldin berildi` : since ? ago(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
     <div class="tc-waiter">${esc(fullName(w) || "—")}</div>
     ${S.calls[t.id] ? `<span class="tc-call">${S.calls[t.id].type === "bill" ? "🧾 Hisob" : "🙋 Chaqiryapti"}</span>` : ""}
     ${draft ? `<span class="tc-draft">${draft} ta savatda</span>` : ""}
@@ -780,7 +859,7 @@ function renderCart() {
             <div class="ticket">
               <div class="tk-head"><b>#${esc(shortNo(o))}</b><span class="badge b-${o.status}">${ui.guest ? T("st_" + o.status) : statusLabel(o.status)}</span><small>${clock(o.createdAt)}</small></div>
               <ul>${o.items.map((it) => `<li class="${it.done ? "done" : ""}"><span>${it.qty} × ${esc(ui.guest ? cartName(it) : it.name)}${it.opts ? ` <i class="tk-opts">(${esc(optsText(it))})</i>` : ""}</span><span>${money(it.qty * it.price, cur())}</span></li>`).join("")}</ul>
-              ${ui.guest ? "" : o.status === "ready" ? `<button class="btn btn-ok btn-block" data-served="${esc(o.id)}">✓ Olib chiqdim</button>` : ""}
+              ${ui.guest ? "" : o.status === "ready" ? `<button class="btn btn-ok btn-block" data-served="${esc(o.id)}">🍽 Stolga olib kelindi</button>` : ""}
               ${!ui.guest && o.status === "new" ? `<button class="link-btn" data-cancel="${esc(o.id)}">Bekor qilish</button>` : ""}
             </div>`).join("")}
         </div>` : ""}
@@ -791,7 +870,9 @@ function renderCart() {
         <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : "Buyurtmani tasdiqlash →"}</button>` : ""}
       ${orders.length ? `
         <div class="sum-row muted"><span>${ui.guest ? T("tableBill") : "Stol hisobi"}</span><b>${money(billSum, cur())}</b></div>
-        ${ui.guest ? "" : `<button class="btn btn-ghost btn-block" data-act="bill">🧾 Hisob va stolni yopish</button>`}` : ""}
+        ${ui.guest ? "" : orders.every((o) => o.status === "served")
+          ? `<button class="btn btn-ok btn-lg btn-block" data-act="bill">✓ Mijoz ketdi · Yakunlash</button>`
+          : `<button class="btn btn-ghost btn-block" data-act="bill">🧾 Hisob va yakunlash</button>`}` : ""}
     </div>`;
 
   fab.innerHTML = ui.guest
@@ -844,7 +925,7 @@ function cartThumb(c) {
 }
 
 function statusLabel(s) {
-  return { new: "Yangi", cooking: "Tayyorlanmoqda", ready: "Tayyor ✓", served: "Berildi", closed: "Yopilgan" }[s] || s;
+  return { new: "Yangi", cooking: "Tayyorlanmoqda", ready: "Tayyor ✓", served: "Stolda 🍽", closed: "Yopilgan" }[s] || s;
 }
 
 function nextNo() {
@@ -915,7 +996,7 @@ function markServed(id) {
   const o = S.orders[id];
   if (!o) return;
   store.updateOrder(id, { status: "served", servedAt: Date.now() });
-  toast(`Stol ${esc(o.tableNo)}: taom mijozga berildi`, { kind: "ok" });
+  toast(`Stol ${esc(o.tableNo)}: taom stolga olib kelindi`, { kind: "ok" });
 }
 
 function billLines(orders) {
@@ -990,7 +1071,7 @@ function billModal(t) {
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" data-act="print">🖨 Chek</button>
-      <button class="btn btn-ok btn-lg" id="close">✓ To'landi, stolni yopish</button>
+      <button class="btn btn-ok btn-lg" id="close">✓ To'landi · Yakunlandi</button>
     </div>`, {
     onMount(m, close) {
       let pay = "naqd";
@@ -1023,7 +1104,7 @@ function billModal(t) {
         });
         if (S.calls[t.id]) store.setCall(t.id, null);
         close();
-        toast(`Stol ${esc(t.no)} yopildi · ${money(total, cur())}`, { kind: "ok" });
+        toast(`Stol ${esc(t.no)} yakunlandi va bo'shadi · ${money(total, cur())} · tarixingizga yozildi`, { kind: "ok", timeout: 5000 });
         ui.view = "tables";
         render();
       });
@@ -1114,7 +1195,7 @@ function showReadyList() {
       ${list.length ? list.map((o) => `
         <div class="ready-item">
           <div><span class="check">✓</span><b>Stol ${esc(o.tableNo)}</b> <small>#${esc(shortNo(o))} · ${o.items.map((i) => `${i.qty}× ${esc(i.name)}`).join(", ")}</small></div>
-          <button class="btn btn-ok" data-served="${esc(o.id)}" data-close>Olib chiqdim</button>
+          <button class="btn btn-ok" data-served="${esc(o.id)}" data-close>🍽 Stolga olib kelindi</button>
         </div>`).join("") : `<div class="empty"><span class="big">🍽️</span>Hozircha tayyor buyurtma yo'q</div>`}
     </div>`, {
     onMount(m) { m.querySelectorAll("[data-served]").forEach((b) => b.addEventListener("click", () => markServed(b.dataset.served))); }
@@ -1128,10 +1209,12 @@ function meMenu() {
     <div class="modal-body">
       <p class="muted">Restoran: <b>${esc(cfg().restaurant.name)}</b></p>
       <p class="muted">Sizga biriktirilgan stollar: <b>${cfg().tables.filter((t) => t.waiterId === me.id).map((t) => esc(t.no)).join(", ") || "yo'q"}</b></p>
+      <button class="btn btn-ghost btn-block" data-act="history">📜 Xizmat tarixim</button>
       <button class="btn btn-ghost btn-block" data-act="sound">🔊 Ovozni sinash</button>
     </div>
     <div class="modal-actions"><button class="btn btn-danger" data-act="logout">Chiqish</button></div>`, {
     onMount(m, close) {
+      m.querySelector("[data-act=history]").addEventListener("click", () => { close(); openHistory(); });
       m.querySelector("[data-act=sound]").addEventListener("click", () => { unlockAudio(); chime("ready"); vibrate(); });
       m.querySelector("[data-act=logout]").addEventListener("click", () => { saveMe(null); close(); ui.view = "tables"; render(); });
     }
@@ -1141,6 +1224,7 @@ function meMenu() {
 function bindCommon() {
   app.querySelector("[data-act=show-ready]")?.addEventListener("click", showReadyList);
   app.querySelector("[data-act=me]")?.addEventListener("click", meMenu);
+  app.querySelector(".tv-hist")?.addEventListener("click", openHistory);
   app.querySelectorAll(".ready-strip [data-served]").forEach((b) => b.addEventListener("click", () => markServed(b.dataset.served)));
 }
 

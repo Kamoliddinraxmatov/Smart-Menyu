@@ -460,3 +460,25 @@ body.lux {
 }
 /* Savat tugmasidagi logo: rang tugma matnidan olinadi */
 .fab-ico { display: inline-block; width: 30px; height: 30px; flex: none; background: currentColor; -webkit-mask: url("../img/cloche.png") center/contain no-repeat; mask: url("../img/cloche.png") center/contain no-repeat; }
+/* Taom stolda holati va xizmat tarixi */
+.dot.served { background: #6AA8FF; }
+.st-served { border-color: rgba(106,168,255,.65) !important; background: linear-gradient(160deg, rgba(106,168,255,.16), var(--surface)); }
+.st-served .tc-status { color: #9CC5FF; }
+.tv-hist { padding: 10px 16px; border-radius: 16px; background: rgba(214,179,112,.12); border: 1px solid rgba(214,179,112,.4); color: var(--text); text-align: left; min-width: 120px; }
+.tv-hist b { display: block; font-size: 22px; line-height: 1.2; }
+.tv-hist small { font-size: 12px; color: var(--gold); font-weight: 700; }
+.hist-head { display: flex; align-items: center; gap: 14px; margin: 6px 0 16px; }
+.hist-head h2 { margin: 0; font-family: var(--serif); font-size: 30px; font-weight: 600; }
+.hist-seg { margin-bottom: 16px; }
+.hist-stats { margin-bottom: 8px; }
+.hist-list { display: grid; gap: 10px; }
+.hist-item { border-radius: 18px; background: rgba(23,20,18,.8); border: 1px solid var(--line); overflow: hidden; }
+.hist-item summary { list-style: none; display: flex; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer; }
+.hist-item summary::-webkit-details-marker { display: none; }
+.hi-no { width: 46px; height: 46px; flex: none; border-radius: 14px; display: grid; place-items: center; background: rgba(214,179,112,.14); color: var(--gold); font: 600 20px var(--serif); }
+.hi-main { flex: 1; min-width: 0; display: grid; }
+.hi-main small, .hi-sum small { color: var(--muted); font-size: 12.5px; }
+.hi-sum { display: grid; text-align: right; }
+.hi-sum b { color: var(--gold); white-space: nowrap; }
+.hist-item ul { margin: 0; padding: 0 16px 14px 76px; list-style: none; display: grid; gap: 4px; color: var(--muted); font-size: 14px; }
+.hist-item[open] { border-color: rgba(214,179,112,.4); }
