@@ -1180,6 +1180,14 @@ store.on((evt) => {
       flashTitle(`✓ ${ST(o.tableNo)} ${L("tayyor", "готов", "ready")}`);
     }
   }
+  // oshpaz "Boshlash"ni bosdi — ofitsiantga xabar
+  if (evt.type === "order" && !evt.local && evt.order.status === "cooking" && evt.prev && evt.prev.status === "new") {
+    const o = evt.order;
+    if (ui.me && (o.waiterId === ui.me.id || ui.filter === "all")) {
+      vibrate([150]);
+      toast(`<b>🍳 ${ST(esc(o.tableNo))}</b> ${L("buyurtmasi tayyorlanmoqda", "заказ готовится", "order is being cooked")}`, { kind: "ok", timeout: 6000, onClick: () => openTable(o.tableId) });
+    }
+  }
   if (evt.type === "config" || evt.type === "stop") ui.menuDirty = true;
   if (evt.type !== "render") return;
   const active = document.activeElement;
