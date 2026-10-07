@@ -200,7 +200,8 @@ export function fileToDataUrl(file, max = 360, quality = 0.78) {
 }
 
 export function registerSW() {
-  if ("serviceWorker" in navigator && location.protocol === "https:") {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  }
+  if (window.MENYU_DEMO) return;
+  try {
+    if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  } catch {}
 }

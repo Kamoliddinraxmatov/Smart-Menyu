@@ -80,7 +80,7 @@ export function createStore(rid) {
     }
   }
 
-  const client = window.mqtt.connect(brokerUrl(), {
+  const client = window.MENYU_DEMO ? localBus() : window.mqtt.connect(brokerUrl(), {
     clientId: `menyu_${rid}_${Math.random().toString(16).slice(2, 10)}`,
     clean: true,
     keepalive: 30,
@@ -254,6 +254,53 @@ export function createStore(rid) {
     client
   };
   return api;
+}
+
+// Namoyish rejimi (internet serversiz): MQTT o'rniga shu qurilmadagi xotira.
+// Bir telefonda ofitsiant, oshxona va admin sahifalari bir-birini ko'radi.
+function localBus() {
+  const KEY = "menyu.demo.bus";
+  const handlers = {};
+  const subs = [];
+  const fire = (ev, ...a) => (handlers[ev] || []).forEach((f) => f(...a));
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch { return {}; } };
+  const match = (filter, topic) => {
+    const f = filter.split("/"), t = topic.split("/");
+    for (let i = 0; i < f.length; i++) {
+      if (f[i] === "#") return true;
+      if (f[i] !== "+" && f[i] !== t[i]) return false;
+    }
+    return f.length === t.length;
+  };
+  const deliver = (topic, text) => { if (subs.some((f) => match(f, topic))) fire("message", topic, { toString: () => text }); };
+  let bc = null;
+  try { bc = new BroadcastChannel(KEY); bc.onmessage = (e) => deliver(e.data.topic, e.data.text); } catch {}
+  window.addEventListener("storage", (e) => {
+    if (e.key !== KEY || bc) return;
+    const prev = JSON.parse(e.oldValue || "{}"), next = JSON.parse(e.newValue || "{}");
+    for (const t of new Set([...Object.keys(prev), ...Object.keys(next)])) if (prev[t] !== next[t]) deliver(t, next[t] || "");
+  });
+  const client = {
+    on(ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); return client; },
+    subscribe(filters, opts, cb) {
+      const list = Array.isArray(filters) ? filters : [filters];
+      subs.push(...list);
+      const all = read();
+      setTimeout(() => {
+        for (const [t, text] of Object.entries(all)) if (list.some((f) => match(f, t))) fire("message", t, { toString: () => text });
+        cb?.(null);
+      }, 0);
+    },
+    publish(topic, text) {
+      const all = read();
+      if (text) all[topic] = text; else delete all[topic];
+      try { localStorage.setItem(KEY, JSON.stringify(all)); } catch {}
+      try { bc?.postMessage({ topic, text }); } catch {}
+    },
+    reconnect() {}
+  };
+  setTimeout(() => fire("connect"), 50);
+  return client;
 }
 
 export function newId() {
