@@ -103,6 +103,13 @@ function tableState(tid) {
   if (os.every((o) => o.status === "served")) return { key: "served", label: L("🍽 Taom stolda", "🍽 Блюда на столе", "🍽 Served"), orders: os };
   return { key: "busy", label: L("Band", "Занят", "Busy"), orders: os };
 }
+// Boshqa ofitsiantning band stoli faqat "Band" bo'lib ko'rinadi (oshxonada/tayyor/stoldaligi ko'rinmaydi)
+function viewState(t) {
+  const st = tableState(t.id);
+  if (st.key === "free" || st.key === "reserved") return st;
+  if (tableWaiterId(t) !== ui.me?.id) return { key: "other", label: L("Band", "Занят", "Busy"), orders: st.orders };
+  return st;
+}
 function tableWaiterId(t) {
   // Stol band bo'lsa — mijozni o'tqazib buyurtma olgan ofitsiant; bo'sh stol hech kimniki emas
   const active = activeOrders(t.id);
@@ -343,7 +350,8 @@ function renderTables() {
   const ready = readyForMe();
   const calls = [];
   const counts = { free: 0, busy: 0, ready: 0, served: 0, reserved: 0 };
-  tables.forEach((t) => { const k = tableState(t.id).key; if (k === "free") counts.free++; else if (k === "reserved") counts.reserved++; else if (k === "ready") counts.ready++; else if (k === "served") counts.served++; else counts.busy++; });
+  counts.other = 0;
+  tables.forEach((t) => { const k = viewState(t).key; if (k === "free") counts.free++; else if (k === "reserved") counts.reserved++; else if (k === "other") counts.other++; else if (k === "ready") counts.ready++; else if (k === "served") counts.served++; else counts.busy++; });
 
   app.innerHTML = `
   ${topbar()}
@@ -374,7 +382,7 @@ function renderTables() {
       </div>
       <div class="legend">
         <span><i class="dot free"></i>${L("Bo'sh", "Свободно", "Free")} ${counts.free}</span>
-        <span class="lg-band"><i class="dot band"></i>${L("Band", "Занято", "Busy")} <b>${counts.busy + counts.ready + counts.served + counts.reserved}</b></span>
+        <span class="lg-band"><i class="dot band"></i>${L("Band", "Занято", "Busy")} <b>${counts.busy + counts.ready + counts.served + counts.reserved + counts.other}</b></span>
         ${counts.reserved ? `<span><i class="dot reserved"></i>${L("Bron", "Бронь", "Reserved")} ${counts.reserved}</span>` : ""}
         <span><i class="dot busy"></i>${L("Oshxonada", "На кухне", "In kitchen")} ${counts.busy}</span>
         <span><i class="dot ready"></i>${L("Tayyor", "Готово", "Ready")} ${counts.ready}</span>
@@ -498,7 +506,7 @@ function helloHtml() {
 }
 
 function tableCard(t) {
-  const st = tableState(t.id);
+  const st = viewState(t);
   const w = waiterById(tableWaiterId(t));
   const total = st.orders.reduce((s, o) => s + orderTotal(o), 0);
   const since = st.orders[0]?.createdAt;
@@ -508,7 +516,7 @@ function tableCard(t) {
     <div class="tc-status">${st.label}</div>
     ${st.key === "reserved" && st.res.note ? `<div class="tc-res">${esc(st.res.note)}</div>` : ""}
     ${st.key === "ready" ? `<div class="tc-go">${L("Mijozga olib boring", "Отнесите гостю", "Take it to the guest")}</div>` : ""}
-    ${st.key === "reserved" ? `<div class="tc-meta"><span>${clock(st.res.at)} ${L("da bron qilindi", "— забронирован", "reserved at")}</span></div>` : st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${agoL(Math.max(...st.orders.map((o) => o.servedAt || 0)))} ${L("oldin berildi", "назад подано", "ago served")}` : since ? agoL(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
+    ${st.key === "reserved" ? `<div class="tc-meta"><span>${clock(st.res.at)} ${L("da bron qilindi", "— забронирован", "reserved at")}</span></div>` : st.key !== "free" && st.key !== "other" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${agoL(Math.max(...st.orders.map((o) => o.servedAt || 0)))} ${L("oldin berildi", "назад подано", "ago served")}` : since ? agoL(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
     <div class="tc-waiter">${st.key === "free" ? "&nbsp;" : esc(fullName(w) || st.res?.waiterName || "—")}</div>
   </button>`;
 }
@@ -519,6 +527,7 @@ function tableTap(tid) {
   const st = tableState(tid);
   if (!t) return;
   if (st.key === "free" || st.key === "reserved") return freeTap(t, st);
+  if (viewState(t).key === "other") return toast(`${ST(esc(t.no))}: ${L("bu stolga boshqa ofitsiant xizmat qilmoqda", "этот стол обслуживает другой официант", "another waiter serves this table")} (${esc(fullName(waiterById(tableWaiterId(t))))})`);
   const total = st.orders.reduce((s, o) => s + orderTotal(o), 0);
   modal(`
     <div class="modal-head"><h3>${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
@@ -1251,7 +1260,7 @@ store.on((evt) => {
   // oshpaz "Boshlash"ni bosdi — ofitsiantga xabar
   if (evt.type === "order" && !evt.local && evt.order.status === "cooking" && evt.prev && evt.prev.status === "new") {
     const o = evt.order;
-    if (ui.me && (o.waiterId === ui.me.id || ui.filter === "all")) {
+    if (ui.me && o.waiterId === ui.me.id) {
       vibrate([150]);
       toast(`<b>🍳 ${ST(esc(o.tableNo))}</b> ${L("buyurtmasi tayyorlanmoqda", "заказ готовится", "order is being cooked")}`, { kind: "ok", timeout: 6000, onClick: () => openTable(o.tableId) });
     }

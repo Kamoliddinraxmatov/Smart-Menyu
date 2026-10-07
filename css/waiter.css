@@ -556,3 +556,6 @@ body.lux {
 .res-note { display: block; margin-top: 12px; }
 .res-note small { display: block; color: var(--muted); margin-bottom: 6px; }
 .res-note input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.05); color: var(--text); font-size: 16px; }
+/* boshqa ofitsiantning band stoli */
+.table-card.st-other { border-style: solid; border-color: rgba(255,255,255,.18); opacity: .75; }
+.table-card.st-other .tc-status { color: var(--muted); }
