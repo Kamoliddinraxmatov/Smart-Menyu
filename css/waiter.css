@@ -507,3 +507,16 @@ body.lux {
 
 /* Bo'sh savat: restoran xizmati belgisi (patnis va qo'l) */
 .serve-ico { display: block; width: 84px; height: 84px; margin: 0 auto 12px; background: var(--gold); -webkit-mask: url(../img/serve.png) center / contain no-repeat; mask: url(../img/serve.png) center / contain no-repeat; opacity: .9; }
+
+/* Telefonda oyna tugmalari ekrandan chiqib ketmasin: asosiy tugma tepada, qolganlari ostida to'liq kenglikda */
+.modal-actions .btn { min-width: 0; }
+@media (max-width: 520px) {
+  .modal-actions { flex-wrap: wrap; }
+  .modal-actions .btn { flex: 1 1 100%; white-space: normal; }
+  .modal-actions .btn-lg, .modal-actions .btn-primary, .modal-actions .btn-ok { order: -1; }
+  /* taom oynasida soni tanlagich va "Savatga" bitta qatorda qoladi */
+  .modal-actions:has(.stepper) { flex-wrap: nowrap; }
+  .modal-actions:has(.stepper) .btn { flex: 1 1 auto; order: 0; white-space: nowrap; }
+  .modal-actions:has(.stepper) .btn { padding-left: 12px; padding-right: 12px; font-size: 14px; min-width: 0; }
+  .modal-actions .stepper button { width: 36px; }
+}
