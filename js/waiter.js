@@ -238,7 +238,6 @@ function guestConfirm(t) {
       <ul class="confirm-list">
         ${cart.map((c) => `<li><span><b>${c.qty} ×</b> ${esc(cartName(c))}${optsHtml(c)}${c.note ? `<small>📝 ${esc(noteText(c.note))}</small>` : ""}</span><span>${money(c.price * c.qty, cur())}</span></li>`).join("")}
       </ul>
-      <label class="field"><span>${T("wishes")}</span><input type="text" id="comment" placeholder="${esc(T("wishesPh"))}"></label>
       <div class="sum-row big"><span>${T("total")}</span><b>${money(sum, cur())}</b></div>
     </div>
     <div class="modal-actions">
@@ -258,7 +257,7 @@ function guestConfirm(t) {
           sentBy: "Mijoz",
           byGuest: true,
           guests: activeOrders(t.id)[0]?.guests || Math.min(t.seats || 2, 2),
-          comment: m.querySelector("#comment").value.trim(),
+          comment: "",
           items: cart.map(orderLine),
           status: "new",
           createdAt: Date.now()
