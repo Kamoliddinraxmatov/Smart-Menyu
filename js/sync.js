@@ -31,10 +31,15 @@ function migrate(c) {
   }
   // v3: demo taomlarga porsiya va qo'shimchalar (restoran o'zgartirmagan taomlarga)
   const defs = Object.fromEntries(DEFAULT_CONFIG.items.map((i) => [i.id, i]));
-  out.items = (out.items || []).map((i) => {
+  if ((c.v || 1) < 3) out.items = (out.items || []).map((i) => {
     const d = defs[i.id];
     if (!d || d.name !== i.name || i.variants || i.extras) return i;
     return { ...i, ...(d.variants ? { variants: structuredClone(d.variants) } : {}), ...(d.extras ? { extras: structuredClone(d.extras) } : {}) };
+  });
+  // v4: rasmsiz demo taomlarga (osh, lag'mon, choy...) haqiqiy rasm
+  out.items = (out.items || []).map((i) => {
+    const d = defs[i.id];
+    return d && d.name === i.name && !i.img && d.img ? { ...i, img: d.img } : i;
   });
   return out;
 }

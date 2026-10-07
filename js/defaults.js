@@ -1,7 +1,7 @@
 // Yangi restoran uchun boshlang'ich (demo) sozlamalar.
 // Admin panelda o'zgartirilgan sozlamalar realtime kanal orqali barcha qurilmalarga tarqaladi.
 export const DEFAULT_CONFIG = {
-  v: 3,
+  v: 4,
   updatedAt: 0,
   restaurant: {
     name: "Demo Restoran",
@@ -35,11 +35,11 @@ export const DEFAULT_CONFIG = {
     { id: "h7", cat: "hot", name: "Tovuq chop", desc: "Qarsildoq qobiqdagi tovuq, fri kartoshka va koulslou.", price: 68000, img: "img/m/chicken-chop.jpg", time: 18 },
     { id: "h8", cat: "hot", name: "Tovuq parmijana", desc: "Pishloq ostida pishirilgan qarsildoq tovuq, fri va salat.", price: 79000, img: "img/m/parmigiana.jpg", time: 20 },
     { id: "h9", cat: "hot", name: "Rikottali tovuq rulet", desc: "Rikotta to'ldirilgan tovuq to'shi va kartoshka pyuresi.", price: 72000, img: "img/m/frango.jpg", time: 22 },
-    { id: "i1", cat: "milliy", name: "To'y oshi", desc: "Devzira guruch, qo'y go'shti, sariq sabzi, no'xat va mayiz.", price: 45000, emoji: "🍛", img: "", popular: true, time: 10, variants: [{ id: "half", name: "0,5 porsiya", price: 28000 }, { id: "full", name: "1 porsiya", price: 45000 }], extras: [{ id: "egg", name: "Bedana tuxum", price: 5000 }, { id: "qazi", name: "Qazi", price: 15000 }] },
+    { id: "i1", cat: "milliy", name: "To'y oshi", desc: "Devzira guruch, qo'y go'shti, sariq sabzi, no'xat va mayiz.", price: 45000, emoji: "🍛", img: "img/m/plov.jpg", popular: true, time: 10, variants: [{ id: "half", name: "0,5 porsiya", price: 28000 }, { id: "full", name: "1 porsiya", price: 45000 }], extras: [{ id: "egg", name: "Bedana tuxum", price: 5000 }, { id: "qazi", name: "Qazi", price: 15000 }] },
     { id: "m1", cat: "milliy", name: "Buzoq go'shti jarkop", desc: "Dimlangan sabzavotlar va ko'katlar bilan buzoq go'shti.", price: 69000, img: "img/m/veal-stew.jpg", popular: true, time: 25, weight: "400 g" },
-    { id: "i3", cat: "milliy", name: "Lag'mon", desc: "Qo'lda cho'zilgan xamir, mol go'shti va sabzavotlar.", price: 38000, emoji: "🍜", img: "", time: 15, variants: [{ id: "half", name: "0,5 porsiya", price: 24000 }, { id: "full", name: "1 porsiya", price: 38000 }] },
-    { id: "i2", cat: "milliy", name: "Manti", desc: "Bug'da pishirilgan, qo'y go'shti va piyozli. 5 dona.", price: 35000, emoji: "🥟", img: "", time: 20 },
-    { id: "i14", cat: "milliy", name: "Somsa", desc: "Tandirda pishgan, go'shtli. 1 dona.", price: 9000, emoji: "🥐", img: "", time: 5 },
+    { id: "i3", cat: "milliy", name: "Lag'mon", desc: "Qo'lda cho'zilgan xamir, mol go'shti va sabzavotlar.", price: 38000, emoji: "🍜", img: "img/m/lagman.jpg", time: 15, variants: [{ id: "half", name: "0,5 porsiya", price: 24000 }, { id: "full", name: "1 porsiya", price: 38000 }] },
+    { id: "i2", cat: "milliy", name: "Manti", desc: "Bug'da pishirilgan, qo'y go'shti va piyozli. 5 dona.", price: 35000, emoji: "🥟", img: "img/m/manti.jpg", time: 20 },
+    { id: "i14", cat: "milliy", name: "Somsa", desc: "Tandirda pishgan, go'shtli. 1 dona.", price: 9000, emoji: "🥐", img: "img/m/somsa.jpg", time: 5 },
     { id: "p1", cat: "pasta", name: "Qo'ziqorinli rizotto", desc: "Arborio guruch, yangi qo'ziqorinlar, oq vino va parmezan.", price: 75000, img: "img/m/risotto.jpg", time: 20 },
     { id: "p2", cat: "pasta", name: "Nyokki", desc: "Uy nyokkisi, qaymoqli sous va muskat yong'og'i.", price: 69000, img: "img/m/gnocchi.jpg", time: 15 },
     { id: "p3", cat: "pasta", name: "Baqlajonli lazanya", desc: "Baqlajon, uy sousi va bri pishlog'i.", price: 72000, img: "img/m/lasagna.jpg", time: 20 },
@@ -57,7 +57,7 @@ export const DEFAULT_CONFIG = {
     { id: "r3", cat: "ramen", name: "Tovuqli ramen", desc: "Tovuq sho'rvasi, ko'k piyoz va kunjut.", price: 55000, img: "img/m/ramen1.jpg", time: 12 },
     { id: "d1", cat: "dessert", name: "Shokoladli tort", desc: "Qatlamli shokolad, yong'oq va malinali sous.", price: 42000, img: "img/m/dessert2.jpg", popular: true, time: 5 },
     { id: "d2", cat: "dessert", name: "Malinali granita", desc: "Pishgan sut, greyfrut va dolchin.", price: 38000, img: "img/m/dessert.jpg", time: 5 },
-    { id: "i18", cat: "dessert", name: "Chak-chak", desc: "Asal va yong'oq bilan.", price: 20000, emoji: "🍯", img: "", time: 2 },
+    { id: "i18", cat: "dessert", name: "Chak-chak", desc: "Asal va yong'oq bilan.", price: 20000, emoji: "🍯", img: "img/m/chak-chak.jpg", time: 2 },
     { id: "c1", cat: "cocktail", name: "Negroni", desc: "Jin, qizil vermut va bitter. Klassika.", price: 85000, img: "img/m/negroni.jpg", popular: true, time: 5, weight: "120 ml" },
     { id: "c2", cat: "cocktail", name: "Aperol Spritz", desc: "Aperol, prosekko va soda, apelsin bo'lagi bilan.", price: 79000, img: "img/m/aperol.jpg", time: 4, weight: "250 ml" },
     { id: "c3", cat: "cocktail", name: "Margarita", desc: "Tekila, apelsin likyori va laym sharbati.", price: 82000, img: "img/m/margarita.jpg", time: 4, weight: "150 ml" },
@@ -67,9 +67,9 @@ export const DEFAULT_CONFIG = {
     { id: "w2", cat: "wine", name: "Amarone della Valpolicella", desc: "Qizil quruq, Italiya. Ov go'shti va pishloqlarga. 15,8%.", price: 980000, img: "img/m/amarone.jpg", popular: true, time: 2, weight: "0,75 l", fit: "contain" },
     { id: "w3", cat: "wine", name: "Qizil vino, bokal", desc: "Somelyedan kun vinosi.", price: 65000, img: "img/m/wine-hand.jpg", time: 1, weight: "150 ml" },
     { id: "w4", cat: "wine", name: "Oq vino, bokal", desc: "Salqin oq quruq vino.", price: 65000, img: "img/m/wine-white.jpg", time: 1, weight: "150 ml" },
-    { id: "i15", cat: "drinks", name: "Ko'k choy", desc: "Choynakda, 1 litr.", price: 8000, emoji: "🫖", img: "", time: 2 },
-    { id: "i16", cat: "drinks", name: "Limonli qora choy", desc: "Choynakda, 1 litr.", price: 12000, emoji: "🍋", img: "", time: 2 },
-    { id: "i17", cat: "drinks", name: "Kompot", desc: "Uy kompoti, 1 litr.", price: 15000, emoji: "🥤", img: "", time: 1 }
+    { id: "i15", cat: "drinks", name: "Ko'k choy", desc: "Choynakda, 1 litr.", price: 8000, emoji: "🫖", img: "img/m/kok-choy.jpg", time: 2 },
+    { id: "i16", cat: "drinks", name: "Limonli qora choy", desc: "Choynakda, 1 litr.", price: 12000, emoji: "🍋", img: "img/m/limon-choy.jpg", time: 2 },
+    { id: "i17", cat: "drinks", name: "Kompot", desc: "Uy kompoti, 1 litr.", price: 15000, emoji: "🥤", img: "img/m/kompot.jpg", time: 1 }
   ],
   waiters: [
     { id: "w1", first: "Aziz", last: "Karimov", pin: "1111" },
