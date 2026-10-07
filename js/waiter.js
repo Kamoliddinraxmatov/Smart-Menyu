@@ -103,10 +103,10 @@ function tableState(tid) {
   return { key: "busy", label: L("Band", "Занят", "Busy"), orders: os };
 }
 function tableWaiterId(t) {
-  // Stol band bo'lsa — buyurtmani olgan ofitsiant; bo'sh bo'lsa — stolga biriktirilgan ofitsiant
+  // Stol band bo'lsa — mijozni o'tqazib buyurtma olgan ofitsiant; bo'sh stol hech kimniki emas
   const active = activeOrders(t.id);
   if (active.length) return active[active.length - 1].waiterId || active[0].waiterId;
-  return t.waiterId || ui.me?.id;
+  return "";
 }
 // qo'ng'iroqcha faqat buyurtmani olgan ofitsiantda yonadi ("Barcha stollar" tanlangan bo'lsa ham)
 function myReady() {
@@ -229,7 +229,8 @@ function guestExit() {
 function guestConfirm(t) {
   const cart = getCart(t.id);
   if (!cart.length) return;
-  const w = waiterById(tableWaiterId(t));
+  // bo'sh stol — planshetni mijozga bergan ofitsiant xizmat qiladi
+  const w = waiterById(tableWaiterId(t)) || meW();
   const sum = cart.reduce((s, c) => s + c.price * c.qty, 0);
   modal(`
     <div class="modal-head"><h3>${T("confirmTitle")}</h3><button class="icon-btn" data-close>✕</button></div>
@@ -334,7 +335,8 @@ function pinPad(w) {
 }
 
 function renderTables() {
-  const tables = cfg().tables.filter((t) => ui.filter === "all" || tableWaiterId(t) === ui.me.id);
+  // "Mening stollarim": men xizmat qilayotgan stollar + bo'sh stollar (mijozni istalgan ofitsiant o'tqazishi mumkin)
+  const tables = cfg().tables.filter((t) => ui.filter === "all" || !activeOrders(t.id).length || tableWaiterId(t) === ui.me.id);
   const zones = [...new Set(tables.map((t) => t.zone || "Zal"))];
   const ready = readyForMe();
   const calls = [];
@@ -503,7 +505,7 @@ function tableCard(t) {
     <div class="tc-status">${st.label}</div>
     ${st.key === "ready" ? `<div class="tc-go">${L("Mijozga olib boring", "Отнесите гостю", "Take it to the guest")}</div>` : ""}
     ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${agoL(Math.max(...st.orders.map((o) => o.servedAt || 0)))} ${L("oldin berildi", "назад подано", "ago served")}` : since ? agoL(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
-    <div class="tc-waiter">${esc(fullName(w) || "—")}</div>
+    <div class="tc-waiter">${st.key === "free" ? "&nbsp;" : esc(fullName(w) || "—")}</div>
   </button>`;
 }
 
@@ -543,7 +545,7 @@ function openTable(tid) {
 // ---------- Stol: menyu + savat ----------
 function renderTable() {
   const t = tableById(ui.tableId);
-  const w = waiterById(tableWaiterId(t));
+  const w = waiterById(tableWaiterId(t)) || meW();
   app.innerHTML = `
   ${topbar()}
   <div class="table-view">
@@ -1174,7 +1176,7 @@ function meMenu() {
     <div class="modal-head"><h3>${esc(fullName(me))}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       <p class="muted">${L("Restoran", "Ресторан", "Restaurant")}: <b>${esc(cfg().restaurant.name)}</b></p>
-      <p class="muted">${L("Sizga biriktirilgan stollar", "Ваши столы", "Your tables")}: <b>${cfg().tables.filter((t) => t.waiterId === me.id).map((t) => esc(t.no)).join(", ") || L("yo'q", "нет", "none")}</b></p>
+      <p class="muted">${L("Siz xizmat qilayotgan stollar", "Ваши столы", "Your tables")}: <b>${cfg().tables.filter((t) => activeOrders(t.id).length && tableWaiterId(t) === me.id).map((t) => esc(t.no)).join(", ") || L("yo'q", "нет", "none")}</b></p>
       <button class="btn btn-ghost btn-block" data-act="history">📜 ${L("Xizmat tarixim", "История обслуживания", "Service history")}</button>
       <button class="btn btn-ghost btn-block" data-act="sound">🔊 ${L("Ovozni sinash", "Проверить звук", "Test sound")}</button>
     </div>
