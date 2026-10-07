@@ -437,3 +437,15 @@ body.lux {
 .table-card.st-free { background: rgba(23,20,18,.45); }
 @media (max-width: 700px) { .tv-hello h1 { font-size: 26px; } .tv-stats { display: grid; grid-template-columns: 1fr 1fr; width: 100%; } .tv-stats span { min-width: 0; } }
 .receipt-preview { width: 100%; height: 60vh; border: 0; border-radius: 12px; background: #fff; }
+
+/* Sarlavha varaqlanganda ketadi; bo'limlar qatori ingichka yopishqoq chiziq, pastga varaqlaganda yashirinadi */
+.menu-top { position: relative; top: auto; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; border-bottom: 0; margin-bottom: 0; }
+.menu-pane > .cats { position: sticky; top: 0; z-index: 6; margin: 0 -26px 18px; padding: 8px 26px 12px; background: rgba(13,11,10,.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: transform .25s ease, box-shadow .25s; }
+.menu-pane > .cats.stuck { box-shadow: 0 8px 24px rgba(0,0,0,.45); border-bottom: 1px solid rgba(255,255,255,.05); }
+.menu-pane > .cats.hide { transform: translateY(-110%); box-shadow: none; }
+.menu-pane > .cats .cat:not(.on) { background: rgba(255,255,255,.05); }
+@media (max-width: 900px) {
+  .table-view .topbar, body:has(.table-view) .topbar { position: relative; }
+  .menu-top { top: auto; margin: 0; padding: 0; }
+  .menu-pane > .cats { top: 0; margin: 0 -14px 14px; padding: 8px 14px 10px; }
+}

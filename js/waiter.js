@@ -455,8 +455,8 @@ function renderTable() {
         <div class="langs" id="langs">${LANGS.map((l) => `<button class="${getLang() === l.id ? "on" : ""}" data-lang="${l.id}" title="${l.label}">${l.short}</button>`).join("")}</div>
         <div class="search"><input type="search" id="q" placeholder="${esc(T("search"))}" value="${esc(ui.q)}"></div>
       </div>
-      <nav class="cats" id="cats"></nav>
       </div>
+      <nav class="cats" id="cats"></nav>
       <div id="grid"></div>
     </section>
     <aside class="cart-pane ${ui.cartOpen ? "open" : ""}" id="cartPane"></aside>
@@ -475,6 +475,29 @@ function renderTable() {
   renderGrid();
   renderCart();
   syncTopbarHeight();
+  bindHeadroom();
+}
+
+// Pastga varaqlaganda sarlavha ketadi, faqat taomlar qoladi; yuqoriga surilsa bo'limlar qatori qaytadi
+function bindHeadroom() {
+  const pane = app.querySelector("#menuPane");
+  const cats = app.querySelector("#cats");
+  if (!pane || !cats) return;
+  let last = 0;
+  const onScroll = (y) => {
+    const dy = y - last;
+    if (Math.abs(dy) < 6) return;
+    const past = cats.getBoundingClientRect().top <= (window.innerWidth <= 900 ? 1 : pane.getBoundingClientRect().top + 1);
+    cats.classList.toggle("stuck", past);
+    cats.classList.toggle("hide", past && dy > 0);
+    last = y;
+  };
+  pane.addEventListener("scroll", () => onScroll(pane.scrollTop), { passive: true });
+  if (!window.__headroomWin) {
+    window.__headroomWin = true;
+    window.addEventListener("scroll", () => { const c = app.querySelector("#cats"); if (c && window.innerWidth <= 900) c.__onScroll?.(window.scrollY); }, { passive: true });
+  }
+  cats.__onScroll = onScroll;
 }
 
 // Yopishqoq menyu sarlavhasi topbar ostida turishi uchun uning balandligini CSS'ga beramiz
@@ -518,7 +541,12 @@ function renderCats() {
     ui.cat = b.dataset.cat;
     renderCats(); renderGrid();
     const pane = app.querySelector("#menuPane");
-    if (pane && pane.scrollHeight > pane.clientHeight) pane.scrollTo({ top: 0 }); else window.scrollTo({ top: 0 });
+    // Sarlavha allaqachon ketgan bo'lsa, qaytarmaymiz: yangi bo'lim bo'limlar qatori ostidan boshlanadi
+    const stuck = el.classList.contains("stuck");
+    const head = app.querySelector(".menu-top");
+    if (pane && pane.scrollHeight > pane.clientHeight) pane.scrollTo({ top: stuck && head ? head.offsetTop + head.offsetHeight : 0 });
+    else window.scrollTo({ top: stuck && head ? head.getBoundingClientRect().bottom + window.scrollY : 0 });
+    el.classList.remove("hide");
     b.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
   }));
 }
