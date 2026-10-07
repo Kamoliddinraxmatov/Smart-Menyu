@@ -900,8 +900,9 @@ function renderCart() {
 
   fab.innerHTML = ui.guest
     ? (cartCount ? `${CART_ICON}<b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🍽 ${T("yourOrders")} <span>${T("view")}</span>` : "")
-    : (cartCount ? `${CART_ICON}<b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🍽 ${L("Stol buyurtmalari", "Заказы стола", "Table orders")} <span>${T("view")}</span>` : "");
-  fab.hidden = !cartCount && !orders.length;
+    : (cartCount ? `${CART_ICON}<b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : "");
+  // ofitsiantda pastdagi tugma faqat yangi taom tanlanganda chiqadi (chalg'itmasin)
+  fab.hidden = ui.guest ? !cartCount && !orders.length : !cartCount;
   const hint = app.querySelector("#addHint");
   if (hint) {
     hint.hidden = !orders.length;
