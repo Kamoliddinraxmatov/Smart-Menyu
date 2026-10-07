@@ -1152,7 +1152,7 @@ function printReceipt(opts) {
 }
 
 function showReadyList() {
-  const list = readyForMe();
+  const list = myReady();
   modal(`
     <div class="modal-head"><h3>🔔 ${L("Tayyor buyurtmalar", "Готовые заказы", "Ready orders")}<span class="ready-sub">${L("Mijozga olib boring", "Отнесите гостю", "Take it to the guest")}</span></h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
