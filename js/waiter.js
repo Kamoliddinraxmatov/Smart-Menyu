@@ -380,7 +380,7 @@ function myVisits() {
   Object.values(S.orders).forEach((o) => {
     if (o.status !== "closed" || all[o.id]) return;
     const sum = orderTotal(o);
-    all[o.id] = { id: o.id, at: o.closedAt || o.createdAt, createdAt: o.createdAt, tableNo: o.tableNo, zone: o.zone || "", waiterId: o.waiterId, guests: o.guests || 0, pay: o.pay || "naqd", sum, svc: Math.round(sum * (o.serviceRate || 0) / 100), items: o.items.map((it) => [it.name + (it.opts ? ` (${it.opts})` : ""), it.qty, it.price]) };
+    all[o.id] = { id: o.id, at: o.closedAt || o.createdAt, createdAt: o.createdAt, tableNo: o.tableNo, zone: o.zone || "", waiterId: o.waiterId, guests: o.guests || 0, pay: o.pay || "", sum, svc: Math.round(sum * (o.serviceRate || 0) / 100), items: o.items.map((it) => [it.name + (it.opts ? ` (${it.opts})` : ""), it.qty, it.price]) };
   });
   const visits = {};
   Object.values(all).filter((x) => x.waiterId === me.id).forEach((x) => {
@@ -436,7 +436,7 @@ function renderHistory() {
           <summary>
             <span class="hi-no">${esc(v.tableNo)}</span>
             <span class="hi-main"><b>Stol ${esc(v.tableNo)}</b><small>${v.zone ? `${esc(v.zone)} · ` : ""}${clock(v.start)} – ${clock(v.at)} · ${mins(v.at - v.start)} daq${v.guests ? ` · 👤 ${v.guests}` : ""}</small></span>
-            <span class="hi-sum"><b>${money(v.sum + v.svc, cur())}</b><small>${payName[v.pay] || esc(v.pay)}</small></span>
+            <span class="hi-sum"><b>${money(v.sum + v.svc, cur())}</b><small>${v.pay ? payName[v.pay] || esc(v.pay) : ""}</small></span>
           </summary>
           <ul>${Object.entries(v.items).map(([n, q]) => `<li><span>${q} × ${esc(n)}</span></li>`).join("")}</ul>
         </details>`).join("")}
@@ -824,7 +824,7 @@ function renderCart() {
 
   pane.innerHTML = `
     <div class="cart-head">
-      <h3>${ui.guest ? T("cart") : orders.length ? "➕ Qo'shimcha buyurtma" : "Yangi buyurtma"} <small>${ui.guest ? T("table") : "Stol"} ${esc(t.no)}</small></h3>
+      <h3>${ui.guest ? `${T("cart")} <small>${T("table")} ${esc(t.no)}</small>` : orders.length ? `Stol ${esc(t.no)}` : `Yangi buyurtma <small>Stol ${esc(t.no)}</small>`}</h3>
       <button class="icon-btn cart-close" data-act="close-cart">✕</button>
     </div>
     <div class="cart-scroll">
@@ -835,7 +835,7 @@ function renderCart() {
             <div class="cl-main"><b>${esc(cartName(c))}</b>${optsHtml(c)}${c.note ? `<small class="cl-note">📝 ${esc(noteText(c.note))}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
             <div class="stepper sm"><button data-q="${esc(c.key)}" data-d="-1">−</button><b>${c.qty}</b><button data-q="${esc(c.key)}" data-d="1">+</button></div>
           </li>`).join("")}
-      </ul>` : `<div class="empty small"><span class="big">🧺</span>${ui.guest ? T("emptyCart") : orders.length ? "Menyudan taom tanlang, u shu stolga qo'shimcha bo'lib qo'shiladi" : "Menyudan taom tanlang"}</div>`}
+      </ul>` : `<div class="empty small"><span class="big">🧺</span>${ui.guest ? T("emptyCart") : orders.length ? "Menyudan taom tanlang, u shu stol buyurtmasiga qo'shiladi" : "Menyudan taom tanlang"}</div>`}
 
       ${orders.length ? `
         <div class="tickets">
@@ -851,13 +851,12 @@ function renderCart() {
     </div>
     <div class="cart-foot">
       ${cart.length ? `
-        <div class="sum-row"><span>${ui.guest ? T("newOrder") : orders.length ? "Qo'shimcha buyurtma" : "Yangi buyurtma"}</span><b>${money(cartSum, cur())}</b></div>
-        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : orders.length ? "➕ Qo'shimchani tasdiqlash →" : "Buyurtmani tasdiqlash →"}</button>` : ""}
+        <div class="sum-row"><span>${ui.guest ? T("newOrder") : orders.length ? "Yangi tanlangan taomlar" : "Yangi buyurtma"}</span><b>${money(cartSum, cur())}</b></div>
+        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : orders.length ? "✓ Buyurtmaga qo'shish →" : "Buyurtmani tasdiqlash →"}</button>` : ""}
       ${orders.length ? `
         <div class="sum-row muted"><span>${ui.guest ? T("tableBill") : "Stol hisobi"}</span><b>${money(billSum, cur())}</b></div>
-        ${ui.guest ? "" : orders.every((o) => o.status === "served")
-          ? `<button class="btn btn-ok btn-lg btn-block" data-act="bill">✓ Mijoz ketdi · Yakunlash</button>`
-          : `<button class="btn btn-ghost btn-block" data-act="bill">🧾 Hisob va yakunlash</button>`}` : ""}
+        ${ui.guest ? "" : `<button class="btn btn-info btn-lg btn-block" data-act="add-more">➕ Buyurtma qo'shish</button>
+        <button class="btn btn-ok btn-lg btn-block" data-act="bill">✓ Mijoz ketdi · Yakunlash</button>`}` : ""}
     </div>`;
 
   fab.innerHTML = ui.guest
@@ -878,6 +877,12 @@ function renderCart() {
     renderCart(); refreshCard(c.itemId);
   }));
   pane.querySelector("[data-act=close-cart]").addEventListener("click", () => { ui.cartOpen = false; pane.classList.remove("open"); });
+  // Menyuga qaytib yana taom tanlash: tanlangani shu stol hisobiga qo'shiladi
+  pane.querySelector("[data-act=add-more]")?.addEventListener("click", () => {
+    ui.cartOpen = false; pane.classList.remove("open");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast(`Stol ${esc(t.no)}: menyudan taom tanlang, keyin savatda "Buyurtmaga qo'shish"ni bosing`);
+  });
   pane.querySelector("[data-act=confirm]")?.addEventListener("click", () => (ui.guest ? guestConfirm(t) : confirmOrder(t)));
   pane.querySelector("[data-act=bill]")?.addEventListener("click", () => billModal(t));
   pane.querySelectorAll("[data-served]").forEach((b) => b.addEventListener("click", () => markServed(b.dataset.served)));
@@ -931,7 +936,7 @@ function confirmOrder(t) {
   const sum = cart.reduce((s, c) => s + c.price * c.qty, 0);
   let guests = activeOrders(t.id)[0]?.guests || Math.min(t.seats || 2, 2);
   modal(`
-    <div class="modal-head"><h3>${activeOrders(t.id).length ? "➕ Qo'shimcha buyurtma" : "Buyurtmani tasdiqlang"}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-head"><h3>${activeOrders(t.id).length ? "Buyurtmaga qo'shish" : "Buyurtmani tasdiqlang"}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       <div class="confirm-meta">
         <div><small>Stol</small><b>${esc(t.no)}</b></div>
@@ -974,7 +979,7 @@ function confirmOrder(t) {
         setCart(t.id, []);
         close();
         ui.cartOpen = false;
-        toast(`✓ Stol ${esc(t.no)} ${order.extra ? "qo'shimcha buyurtmasi" : "buyurtmasi"} oshxonaga yuborildi`, { kind: "ok" });
+        toast(`✓ Stol ${esc(t.no)} ${order.extra ? "buyurtmasiga qo'shildi va" : "buyurtmasi"} oshxonaga yuborildi`, { kind: "ok" });
         if (!S.online) toast("Aloqa yo'q: buyurtma aloqa tiklanishi bilan yuboriladi", { kind: "error", timeout: 6000 });
         ui.view = "tables";
         render();
@@ -1009,35 +1014,6 @@ function billModal(t) {
   const total = sub + service;
   const notServed = orders.filter((o) => o.status === "new" || o.status === "cooking" || o.status === "ready").length;
   const w = waiterById(tableWaiterId(t));
-  const guests = orders[0]?.guests || 2;
-  // Hisobni bo'lish: "none" | "equal" | "items"
-  const split = { mode: "none", n: Math.max(2, guests), pick: {} };
-  const pickSum = () => lines.reduce((s, l) => s + (split.pick[l.k] || 0) * l.price, 0);
-  const withService = (x) => x + Math.round(x * rate / 100);
-
-  const splitHtml = () => {
-    if (split.mode === "equal") return `
-      <div class="split-box">
-        <div class="split-row"><span>Necha kishiga bo'linadi?</span><div class="stepper sm"><button data-n="-1">−</button><b>${split.n}</b><button data-n="1">+</button></div></div>
-        <div class="split-each"><small>Har bir kishi to'laydi</small><b>${money(Math.ceil(total / split.n / 100) * 100, cur())}</b></div>
-      </div>`;
-    if (split.mode === "items") {
-      const ps = pickSum();
-      return `
-      <div class="split-box">
-        <p class="muted small">Bir mehmon to'laydigan taomlarni belgilang:</p>
-        <ul class="pick-list">${lines.map((l) => `
-          <li class="${split.pick[l.k] ? "on" : ""}">
-            <span>${esc(l.name)}${l.opts ? ` <small>(${esc(l.opts)})</small>` : ""}<small>${money(l.price, cur())}</small></span>
-            <div class="stepper sm"><button data-pk="${esc(l.k)}" data-d="-1">−</button><b>${split.pick[l.k] || 0}/${l.qty}</b><button data-pk="${esc(l.k)}" data-d="1">+</button></div>
-          </li>`).join("")}</ul>
-        <div class="split-each"><small>Shu mehmon to'laydi${rate ? ` (xizmat ${rate}% bilan)` : ""}</small><b>${money(withService(ps), cur())}</b></div>
-        <button class="btn btn-ghost btn-block" data-act="print-part" ${ps ? "" : "disabled"}>🖨 Shu qism uchun chek</button>
-      </div>`;
-    }
-    return "";
-  };
-
   modal(`
     <div class="modal-head"><h3>Hisob · Stol ${esc(t.no)}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
@@ -1050,54 +1026,23 @@ function billModal(t) {
         <p class="muted small">Ofitsiant: ${esc(fullName(w))} · ${clock()}</p>
       </div>
       ${notServed ? `<p class="warn-note">⚠️ ${notServed} ta chek hali mijozga berilmagan.</p>` : ""}
-      <div class="label">Hisobni bo'lish</div>
-      <div class="seg split-seg" id="splitSeg">
-        <button class="on" data-sm="none">Bitta hisob</button><button data-sm="equal">Teng bo'lish</button><button data-sm="items">Taomlar bo'yicha</button>
-      </div>
-      <div id="splitBox"></div>
-      <div class="label">To'lov turi</div>
-      <div class="seg pay" id="pay">
-        <button class="on" data-p="naqd">💵 Naqd</button><button data-p="karta">💳 Karta</button><button data-p="click">📱 Click/Payme</button>
-      </div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" data-act="print">🖨 Chek</button>
-      <button class="btn btn-ok btn-lg" id="close">✓ To'landi · Yakunlandi</button>
+      <button class="btn btn-ok btn-lg btn-block" id="close">✓ Stolni yopish</button>
     </div>`, {
     onMount(m, close) {
-      let pay = "naqd";
-      const drawSplit = () => {
-        const box = m.querySelector("#splitBox");
-        box.innerHTML = splitHtml();
-        box.querySelectorAll("[data-n]").forEach((b) => b.addEventListener("click", () => { split.n = Math.min(30, Math.max(2, split.n + Number(b.dataset.n))); drawSplit(); }));
-        box.querySelectorAll("[data-pk]").forEach((b) => b.addEventListener("click", () => {
-          const l = lines.find((x) => x.k === b.dataset.pk);
-          split.pick[l.k] = Math.min(l.qty, Math.max(0, (split.pick[l.k] || 0) + Number(b.dataset.d)));
-          drawSplit();
-        }));
-        box.querySelector("[data-act=print-part]")?.addEventListener("click", () => {
-          const part = lines.filter((l) => split.pick[l.k]).map((l) => ({ ...l, qty: split.pick[l.k] }));
-          printReceipt({ t, w, orders, lines: part, pay, title: "Qisman hisob" });
-        });
-      };
-      m.querySelectorAll("[data-sm]").forEach((b) => b.addEventListener("click", () => {
-        split.mode = b.dataset.sm; m.querySelectorAll("[data-sm]").forEach((x) => x.classList.toggle("on", x === b)); drawSplit();
-      }));
-      m.querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => {
-        pay = b.dataset.p; m.querySelectorAll("[data-p]").forEach((x) => x.classList.toggle("on", x === b));
-      }));
-      m.querySelector("[data-act=print]").addEventListener("click", () => printReceipt({ t, w, orders, lines, pay, split: split.mode === "equal" ? split.n : 0 }));
       m.querySelector("#close").addEventListener("click", () => {
         const now = Date.now();
         orders.forEach((o) => {
-          const done = store.updateOrder(o.id, { status: "closed", closedAt: now, servedAt: o.servedAt || now, serviceRate: rate, pay, closedBy: fullName(meW()), split: split.mode === "equal" ? split.n : undefined });
+          const done = store.updateOrder(o.id, { status: "closed", closedAt: now, servedAt: o.servedAt || now, serviceRate: rate, closedBy: fullName(meW()) });
           if (done) store.recordSale(done);
         });
         if (S.calls[t.id]) store.setCall(t.id, null);
         close();
-        toast(`Stol ${esc(t.no)} yakunlandi va bo'shadi · ${money(total, cur())} · tarixingizga yozildi`, { kind: "ok", timeout: 5000 });
+        toast(`Stol ${esc(t.no)} yopildi va bo'shadi · ${money(total, cur())}`, { kind: "ok", timeout: 5000 });
         ui.view = "tables";
         render();
+        showReceipt({ t, w, orders, lines });
       });
     }
   });
@@ -1147,12 +1092,26 @@ function receiptHtml({ t, w, orders, lines, pay, split = 0, title = "" }) {
       ${rate ? `<tr><td>Xizmat ${rate}%</td><td class="r">${m(service)}</td></tr>` : ""}
       <tr class="tot"><td>TO'LOV</td><td class="r">${m(total)}</td></tr>
       ${split > 1 ? `<tr><td>${split} kishiga</td><td class="r">${m(Math.ceil(total / split / 100) * 100)} dan</td></tr>` : ""}
-      <tr><td class="sm">To'lov turi</td><td class="r sm">${esc(payName)}</td></tr>
+      ${pay ? `<tr><td class="sm">To'lov turi</td><td class="r sm">${esc(payName)}</td></tr>` : ""}
     </table>
     <hr>
     <div class="c sm">${esc(r.receiptNote || "Rahmat! Yana kutib qolamiz")}</div>
     <div class="c sm" style="margin-top:4px">Smart Menyu</div>
   </body></html>`;
+}
+
+// Stol yopilgandan keyin chek shakllanadi: ko'rsatamiz, xohlasa chop etadi
+function showReceipt(opts) {
+  const native = window.Capacitor?.isNativePlatform?.();
+  modal(`
+    <div class="modal-head"><h3>🧾 Chek · Stol ${esc(opts.t.no)}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body"><iframe class="receipt-preview" srcdoc="${esc(receiptHtml(opts))}"></iframe></div>
+    <div class="modal-actions">
+      ${native ? "" : `<button class="btn btn-ghost" data-act="print">🖨 Chop etish</button>`}
+      <button class="btn btn-primary btn-lg" data-close>Tayyor</button>
+    </div>`, {
+    onMount(m) { m.querySelector("[data-act=print]")?.addEventListener("click", () => printReceipt(opts)); }
+  });
 }
 
 function printReceipt(opts) {
