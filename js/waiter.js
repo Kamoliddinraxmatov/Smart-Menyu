@@ -370,6 +370,7 @@ function renderTables() {
       </div>
       <div class="legend">
         <span><i class="dot free"></i>${L("Bo'sh", "Свободно", "Free")} ${counts.free}</span>
+        <span class="lg-band"><i class="dot band"></i>${L("Band", "Занято", "Busy")} <b>${counts.busy + counts.ready + counts.served}</b></span>
         <span><i class="dot busy"></i>${L("Oshxonada", "На кухне", "In kitchen")} ${counts.busy}</span>
         <span><i class="dot ready"></i>${L("Tayyor", "Готово", "Ready")} ${counts.ready}</span>
         <span><i class="dot served"></i>${L("Stolda", "На столе", "Served")} ${counts.served}</span>
@@ -500,6 +501,7 @@ function tableCard(t) {
   <button class="table-card st-${st.key}" data-table="${esc(t.id)}">
     <div class="tc-top"><span class="tc-no">${esc(t.no)}</span><span class="tc-seats">👤 ${esc(t.seats || "")}</span></div>
     <div class="tc-status">${st.label}</div>
+    ${st.key === "ready" ? `<div class="tc-go">${L("Mijozga olib boring", "Отнесите гостю", "Take it to the guest")}</div>` : ""}
     ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${agoL(Math.max(...st.orders.map((o) => o.servedAt || 0)))} ${L("oldin berildi", "назад подано", "ago served")}` : since ? agoL(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
     <div class="tc-waiter">${esc(fullName(w) || "—")}</div>
   </button>`;

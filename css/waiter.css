@@ -539,3 +539,11 @@ body.lux {
 .ready-pill.on .bell { display: inline-block; transform-origin: 50% 10%; animation: bellShake 1.2s ease-in-out infinite; }
 @keyframes bellShake { 0%, 50%, 100% { transform: rotate(0); } 10% { transform: rotate(18deg); } 20% { transform: rotate(-16deg); } 30% { transform: rotate(12deg); } 40% { transform: rotate(-8deg); } }
 @keyframes redGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,.7); } 50% { box-shadow: 0 0 0 8px rgba(220,38,38,0); } }
+/* izohda "Band" — jami band stollar (Oshxonada + Tayyor + Stolda) */
+.dot.band { background: #fff; }
+.legend .lg-band { color: var(--text); font-weight: 700; }
+/* tayyor stol kartochkasida qizil eslatma */
+.tc-go { color: #ef4444; font-weight: 800; font-size: 14px; margin-top: 4px; }
+/* izoh yozuvlari bo'linib ketmasin; telefonda kerak bo'lsa keyingi qatorga o'tadi */
+.legend { flex-wrap: wrap; row-gap: 6px; }
+.legend span { white-space: nowrap; }
