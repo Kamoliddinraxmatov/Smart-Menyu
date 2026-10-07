@@ -669,6 +669,7 @@ function dishCard(i, cart) {
   </article>`;
 }
 
+// Bo'lim boshidagi katta rasmli sarlavha olib tashlandi (taom deb bosib yuborishardi); funksiya kerak bo'lsa qoladi
 function heroHtml(c, count) {
   if (!c) return "";
   const pic = c.hero || c.bg;
@@ -705,7 +706,6 @@ function renderGrid() {
   }
   el.innerHTML = sections.map(({ c, list }) => `
     <section class="cat-sec" data-bg="${esc(c.bg || c.hero || "")}">
-      ${heroHtml(c, list.length)}
       <div class="grid-row">${list.map((i) => dishCard(i, cart)).join("")}</div>
     </section>`).join("");
 
