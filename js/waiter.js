@@ -460,7 +460,6 @@ function renderHistory() {
     </div>
     <div class="tv-stats hist-stats">
       <span><b>${list.length}</b><small>${L("xizmat qilingan stol", "обслужено столов", "tables served")}</small></span>
-      <span><b>${guests}</b><small>${L("mijoz", "гостей", "guests")}</small></span>
       <span><b>${money(total, cur())}</b><small>${L("savdo", "продажи", "sales")}</small></span>
       <span><b>${money(svc, cur())}</b><small>${L("xizmat haqi", "обслуживание", "service")}</small></span>
     </div>
@@ -470,8 +469,8 @@ function renderHistory() {
         <details class="hist-item">
           <summary>
             <span class="hi-no">${esc(v.tableNo)}</span>
-            <span class="hi-main"><b>${ST(esc(v.tableNo))}</b><small>${v.zone ? `${esc(v.zone)} · ` : ""}${clock(v.start)} – ${clock(v.at)} · ${mins(v.at - v.start)} ${L("daq", "мин", "min")}${v.guests ? ` · 👤 ${v.guests}` : ""}</small></span>
-            <span class="hi-sum"><b>${money(v.sum + v.svc, cur())}</b><small>${v.pay ? payName[v.pay] || esc(v.pay) : ""}</small></span>
+            <span class="hi-main"><b>${ST(esc(v.tableNo))}</b><small>${v.zone ? `${esc(v.zone)} · ` : ""}${clock(v.start)} – ${clock(v.at)} · ${mins(v.at - v.start)} ${L("daq", "мин", "min")}</small></span>
+            <span class="hi-sum"><b>${money(v.sum + v.svc, cur())}</b></span>
           </summary>
           <ul>${Object.entries(v.items).map(([n, q]) => `<li><span>${q} × ${esc(n)}</span></li>`).join("")}</ul>
         </details>`).join("")}
