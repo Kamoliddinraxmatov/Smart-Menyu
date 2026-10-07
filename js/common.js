@@ -178,24 +178,113 @@ export function connBadge(online) {
   return `<span class="conn ${online ? "on" : "off"}" title="${online ? "Ulangan" : "Aloqa yo'q, qayta ulanmoqda"}"><i></i>${online ? "Onlayn" : "Aloqa yo'q"}</span>`;
 }
 
-// Rasmni kichraytirib dataURL qilish (logo va taom rasmlari uchun)
-export function fileToDataUrl(file, max = 360, quality = 0.78) {
+// Faylni rasm sifatida o'qish. blob: emas, data: ishlatamiz: ba'zi ilova ichidagi oynalar blob: rasmlarni bloklaydi
+export function loadImageFile(file) {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const k = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(img.width * k);
-      c.height = Math.round(img.height * k);
-      const ctx = c.getContext("2d");
-      ctx.drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      const png = file.type === "image/png" || file.type === "image/svg+xml";
-      resolve(c.toDataURL(png ? "image/png" : "image/jpeg", quality));
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error("read"));
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("decode"));
+      img.src = fr.result;
     };
-    img.onerror = reject;
-    img.src = url;
+    fr.readAsDataURL(file);
+  });
+}
+
+// Rasmni kichraytirib dataURL qilish (logo va bo'lim rasmlari uchun)
+export async function fileToDataUrl(file, max = 360, quality = 0.78) {
+  const img = await loadImageFile(file);
+  const k = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * k);
+  c.height = Math.round(img.height * k);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  const png = file.type === "image/png" || file.type === "image/svg+xml";
+  return c.toDataURL(png ? "image/png" : "image/jpeg", quality);
+}
+
+// Rasmni qirqish oynasi: ramka ichida suring, kattalashtiring (ikki barmoq yoki polzunok), "Qirqish" bosing.
+// Natija: ratio nisbatdagi JPEG dataURL; bekor qilinsa null.
+export async function cropImage(file, { ratio = 4 / 3, outW = 800, quality = 0.75, title = "Rasmni qirqish" } = {}) {
+  let img;
+  try { img = await loadImageFile(file); }
+  catch { toast("Bu rasmni ochib bo'lmadi. JPG yoki PNG rasm tanlang.", { kind: "error", timeout: 5000 }); return null; }
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    modal(`
+      <div class="modal-head"><h3>${title}</h3><button class="icon-btn" data-close>✕</button></div>
+      <div class="modal-body">
+        <div class="crop-stage" style="aspect-ratio:${ratio}"><img class="crop-img" alt="" draggable="false"><div class="crop-grid"></div></div>
+        <div class="crop-zoom"><span>−</span><input type="range" id="cz" min="1" max="4" step="0.01" value="1"><span>+</span></div>
+        <p class="muted small center">Rasmni barmoq bilan suring, kattalashtirish uchun polzunokni yoki ikki barmoqni ishlating.</p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" data-close>Bekor qilish</button>
+        <button class="btn btn-primary btn-lg" id="cropOk">✂ Qirqish</button>
+      </div>`, {
+      wide: true,
+      onMount(m, close) {
+        // Fon bosilib yopilsa ham natija qaytsin
+        m.parentElement.addEventListener("click", (e) => { if (e.target === m.parentElement) finish(null); });
+        const stage = m.querySelector(".crop-stage");
+        const el = m.querySelector(".crop-img");
+        const zr = m.querySelector("#cz");
+        el.src = img.src;
+        let W = 0, H = 0, base = 1, z = 1, x = 0, y = 0;
+        const s = () => base * z;
+        const clamp = () => {
+          x = Math.min(0, Math.max(W - img.width * s(), x));
+          y = Math.min(0, Math.max(H - img.height * s(), y));
+        };
+        const paint = () => { clamp(); el.style.width = img.width * s() + "px"; el.style.height = img.height * s() + "px"; el.style.transform = `translate(${x}px, ${y}px)`; };
+        const zoomTo = (nz, cx = W / 2, cy = H / 2) => {
+          nz = Math.min(4, Math.max(1, nz));
+          const px = (cx - x) / s(), py = (cy - y) / s();
+          z = nz; x = cx - px * s(); y = cy - py * s();
+          zr.value = z; paint();
+        };
+        const layout = () => {
+          const r = stage.getBoundingClientRect();
+          const px = W ? (W / 2 - x) / s() : img.width / 2, py = H ? (H / 2 - y) / s() : img.height / 2;
+          W = r.width; H = r.height; base = Math.max(W / img.width, H / img.height);
+          x = W / 2 - px * s(); y = H / 2 - py * s(); paint();
+        };
+        requestAnimationFrame(layout);
+        window.addEventListener("resize", layout);
+        zr.addEventListener("input", () => zoomTo(Number(zr.value)));
+        const pts = new Map();
+        let pinch = null;
+        stage.addEventListener("pointerdown", (e) => { stage.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = null; });
+        stage.addEventListener("pointermove", (e) => {
+          const p = pts.get(e.pointerId); if (!p) return;
+          if (pts.size === 1) { x += e.clientX - p.x; y += e.clientY - p.y; pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); paint(); return; }
+          pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          const [a, b] = [...pts.values()];
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          const r = stage.getBoundingClientRect();
+          const cx = (a.x + b.x) / 2 - r.left, cy = (a.y + b.y) / 2 - r.top;
+          if (pinch) zoomTo(pinch.z * d / pinch.d, cx, cy); else pinch = { d, z };
+        });
+        const up = (e) => { pts.delete(e.pointerId); pinch = null; };
+        stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+        stage.addEventListener("wheel", (e) => { e.preventDefault(); const r = stage.getBoundingClientRect(); zoomTo(z * (e.deltaY < 0 ? 1.08 : 0.93), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+        m.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => { window.removeEventListener("resize", layout); finish(null); }));
+        m.querySelector("#cropOk").addEventListener("click", () => {
+          const outH = Math.round(outW / ratio);
+          const c = document.createElement("canvas");
+          c.width = outW; c.height = outH;
+          const ctx = c.getContext("2d");
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(img, -x / s(), -y / s(), W / s(), H / s(), 0, 0, outW, outH);
+          window.removeEventListener("resize", layout);
+          finish(c.toDataURL("image/jpeg", quality));
+          close();
+        });
+      }
+    });
   });
 }
 

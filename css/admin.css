@@ -186,3 +186,12 @@ h3.mt { margin-top: 18px; }
 .bar { grid-template-columns: 150px minmax(0, 1fr) auto; }
 .tbl td { white-space: nowrap; }
 @media (max-width: 1100px) and (min-width: 901px) { .kpis { grid-template-columns: 1fr 1fr; } }
+/* Rasmni qirqish oynasi */
+.crop-stage { position: relative; width: 100%; overflow: hidden; border-radius: 16px; background: #000; touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.crop-stage:active { cursor: grabbing; }
+.crop-img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; pointer-events: none; }
+.crop-grid { position: absolute; inset: 0; pointer-events: none; border: 2px solid rgba(214,179,112,.9); border-radius: 16px;
+  background-image: linear-gradient(rgba(255,255,255,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.25) 1px, transparent 1px);
+  background-size: 33.333% 33.333%; background-position: -1px -1px; }
+.crop-zoom { display: flex; align-items: center; gap: 12px; margin: 16px 4px 8px; font-size: 22px; color: var(--gold); }
+.crop-zoom input { flex: 1; accent-color: var(--gold); }

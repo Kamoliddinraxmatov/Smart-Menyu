@@ -2,7 +2,7 @@
 import { createStore, newId } from "./sync.js";
 import {
   getRid, esc, money, fullName, initials, clock, orderTotal, applyBrand, logoHtml, itemVisual,
-  toast, modal, confirmBox, connBadge, fileToDataUrl, link, registerSW
+  toast, modal, confirmBox, connBadge, fileToDataUrl, cropImage, link, registerSW
 } from "./common.js";
 import { itemTr, catTr } from "./i18n.js";
 
@@ -128,7 +128,8 @@ function tabBrand(c) {
   c.querySelector("#adminPin").addEventListener("change", (e) => { mutate((x) => { x.adminPin = e.target.value.trim(); }, "Admin PIN saqlandi"); ui.unlocked = true; sessionStorage.setItem(`menyu.admin.${rid}`, "1"); });
   c.querySelector("#logo").addEventListener("change", async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    const url = await fileToDataUrl(f, 256, 0.85);
+    let url;
+    try { url = await fileToDataUrl(f, 256, 0.85); } catch { return toast("Bu rasmni ochib bo'lmadi. JPG yoki PNG tanlang.", { kind: "error" }); }
     mutate((x) => { x.restaurant.logo = url; }, "Logo saqlandi");
     render();
   });
@@ -225,8 +226,10 @@ function itemEditor(item) {
     onMount(m, close) {
       const $ = (s) => m.querySelector(s);
       $("#img").addEventListener("change", async (e) => {
-        const f = e.target.files[0]; if (!f) return;
-        it.img = await fileToDataUrl(f, 560, 0.72);
+        const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+        const url = await cropImage(f, { ratio: 4 / 3, outW: 800, quality: 0.74, title: "Taom rasmini qirqish" });
+        if (!url) return;
+        it.img = url; delete it.fit;
         $("#vis").innerHTML = itemVisual(it, "thumb ie-img"); $("#rmImg").hidden = false;
       });
       const vars = structuredClone(it.variants || []);
@@ -330,9 +333,11 @@ function catEditor() {
     }));
     m.querySelectorAll("[data-adult]").forEach((cb) => cb.addEventListener("change", () => { cats[cb.dataset.adult].adult = cb.checked; }));
     m.querySelectorAll("[data-pic]").forEach((inp) => inp.addEventListener("change", async () => {
-      const f = inp.files[0]; if (!f) return;
+      const f = inp.files[0]; inp.value = ""; if (!f) return;
       const x = cats[inp.dataset.pic];
-      x.hero = await fileToDataUrl(f, 720, 0.72);
+      const url = await cropImage(f, { ratio: 16 / 9, outW: 960, quality: 0.72, title: "Bo'lim rasmini qirqish" });
+      if (!url) return;
+      x.hero = url;
       x.bg = await blurredDataUrl(x.hero);
       draw(m);
     }));
