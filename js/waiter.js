@@ -273,7 +273,7 @@ function guestConfirm(t) {
           createdAt: Date.now()
         });
         setCart(t.id, []);
-        ui.sentFor = t.id;
+        ui.sentFor = t.id; ui.sentAt = Date.now();
         close();
         ui.cartOpen = false;
         renderCart();
@@ -927,7 +927,7 @@ function renderCart() {
             <div class="cl-main"><b>${esc(cartName(c))}</b>${optsHtml(c)}${c.note ? `<small class="cl-note">📝 ${esc(noteText(c.note))}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
             <div class="stepper sm"><button data-q="${esc(c.key)}" data-d="-1">−</button><b>${c.qty}</b><button data-q="${esc(c.key)}" data-d="1">+</button></div>
           </li>`).join("")}
-      </ul>` : `<div class="empty small"><i class="serve-ico${ui.guest && ui.sentFor === t.id ? " sent" : ""}" aria-hidden="true"></i>${ui.guest ? T("emptyCart") : orders.length ? L("Menyudan taom tanlang, u shu stol buyurtmasiga qo'shiladi", "Выберите блюдо в меню, оно добавится к заказу стола", "Pick a dish from the menu, it will be added to this table's order") : L("Menyudan taom tanlang", "Выберите блюдо в меню", "Pick a dish from the menu")}</div>`}
+      </ul>` : `<div class="empty small"><i class="serve-ico${ui.guest && ui.sentFor === t.id ? " sent" : ""}"${ui.guest && ui.sentFor === t.id ? ` style="animation-delay:-${Math.min(Date.now() - ui.sentAt, 2600)}ms"` : ""} aria-hidden="true"></i>${ui.guest ? T("emptyCart") : orders.length ? L("Menyudan taom tanlang, u shu stol buyurtmasiga qo'shiladi", "Выберите блюдо в меню, оно добавится к заказу стола", "Pick a dish from the menu, it will be added to this table's order") : L("Menyudan taom tanlang", "Выберите блюдо в меню", "Pick a dish from the menu")}</div>`}
 
       ${orders.length ? `
         <div class="tickets">

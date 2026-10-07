@@ -507,7 +507,8 @@ body.lux {
 
 /* Bo'sh savat: restoran xizmati belgisi (patnis va qo'l) */
 .serve-ico { display: block; width: 116px; height: 116px; margin: 0 auto 12px; background: var(--gold); -webkit-mask: url(../img/serve.png) center / contain no-repeat; mask: url(../img/serve.png) center / contain no-repeat; opacity: .9; }
-.serve-ico.sent { background: #2ecc71; opacity: 1; }
+.serve-ico.sent { opacity: 1; animation: sentGreen 2.6s ease forwards; }
+@keyframes sentGreen { 0%, 25% { background: var(--gold); } 100% { background: #2ecc71; } }
 
 /* Telefonda oyna tugmalari ekrandan chiqib ketmasin: asosiy tugma tepada, qolganlari ostida to'liq kenglikda */
 .modal-actions .btn { min-width: 0; }
