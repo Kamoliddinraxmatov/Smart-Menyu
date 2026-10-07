@@ -370,7 +370,7 @@ function renderTables() {
       </div>
       <div class="legend">
         <span><i class="dot free"></i>${L("Bo'sh", "Свободно", "Free")} ${counts.free}</span>
-        <span><i class="dot busy"></i>${L("Band", "Занято", "Busy")} ${counts.busy}</span>
+        <span><i class="dot busy"></i>${L("Oshxonada", "На кухне", "In kitchen")} ${counts.busy}</span>
         <span><i class="dot ready"></i>${L("Tayyor", "Готово", "Ready")} ${counts.ready}</span>
         <span><i class="dot served"></i>${L("Stolda", "На столе", "Served")} ${counts.served}</span>
       </div>
