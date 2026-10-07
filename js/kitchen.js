@@ -107,17 +107,18 @@ function renderStart() {
 
 function boardActive(list) {
   if (!list.length) return `<div class="kempty"><span>👨‍🍳</span><h2>Hozircha buyurtma yo'q</h2><p>Ofitsiant buyurtmani tasdiqlashi bilan shu yerda paydo bo'ladi.</p></div>`;
-  return list.map(ticket).join("");
+  // kelish tartibida: 1-navbat — eng birinchi kelgan buyurtma
+  return list.map((o, i) => ticket(o, i + 1)).join("");
 }
 
-function ticket(o) {
+function ticket(o, q) {
   const done = o.items.filter((i) => i.done).length;
   return `
   <article class="kt st-${o.status} ${late(o)} ${ui.fresh.has(o.id) ? "fresh" : ""}" data-id="${esc(o.id)}">
     <header class="kt-head">
       <div class="kt-table"><small>STOL</small><b>${esc(o.tableNo)}</b>${o.extra ? `<em class="kt-extra">+ qo'shimcha</em>` : ""}</div>
       <div class="kt-info">
-        ${o.status === "new" ? `<span class="kt-flag">YANGI</span>` : ""}
+        <span class="kt-row">${o.status === "new" ? `<span class="kt-flag">YANGI</span>` : ""}${q ? `<span class="kt-queue">№ ${q}</span>` : ""}</span>
         <span class="kt-no">#${esc(shortNo(o))} · ${clock(o.createdAt)}${o.guests ? ` · 👤${o.guests}` : ""}</span>
         <span class="kt-waiter">🧑‍💼 ${esc(o.waiterName || "")}${o.byGuest ? " · 📱 Mijoz o'zi" : ""}</span>
       </div>
