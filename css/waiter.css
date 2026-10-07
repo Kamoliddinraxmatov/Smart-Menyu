@@ -482,3 +482,25 @@ body.lux {
 .hi-sum b { color: var(--gold); white-space: nowrap; }
 .hist-item ul { margin: 0; padding: 0 16px 14px 76px; list-style: none; display: grid; gap: 4px; color: var(--muted); font-size: 14px; }
 .hist-item[open] { border-color: rgba(214,179,112,.4); }
+
+/* Mijoz planshetida faqat ofitsiant rejimiga qaytish */
+.guest-bar .g-lock { opacity: 1; padding: 10px 16px; border-radius: 99px; font-weight: 700; font-size: 14px; background: rgba(255,255,255,.06); color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+@media (max-width: 720px) { .guest-bar .top-right { width: auto; } .guest-bar { flex-wrap: nowrap; } .guest-bar .g-lock { padding: 8px 12px; font-size: 13px; } }
+
+/* Stolga qaytish va qo'shimcha buyurtma */
+.to-tables { padding: 10px 16px; font-weight: 700; white-space: nowrap; }
+.add-hint { margin: 0 0 12px; padding: 12px 16px; border-radius: 16px; background: rgba(214,179,112,.12); border: 1px solid rgba(214,179,112,.35); color: var(--text); font-size: 14px; line-height: 1.4; }
+.add-hint b { color: var(--gold); }
+.add-hint span { color: var(--muted); }
+.tc-add { display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 800; background: rgba(214,179,112,.16); color: var(--gold); border: 1px solid rgba(214,179,112,.35); }
+
+/* Telefonda stollar birinchi ekranda ko'rinsin: statistika ixcham bir qatorda */
+@media (max-width: 720px) {
+  .tv-hello { margin-bottom: 14px; gap: 10px; }
+  .tv-hello h1 { font-size: 24px; }
+  .tv-stats { display: flex; flex-wrap: nowrap; overflow-x: auto; width: 100%; gap: 8px; scrollbar-width: none; }
+  .tv-stats::-webkit-scrollbar { display: none; }
+  .tv-stats span, .tv-stats .tv-hist { min-width: 0; flex: 0 0 auto; padding: 8px 12px; border-radius: 12px; }
+  .tv-stats b, .tv-hist b { font-size: 16px; line-height: 1.2; }
+  .tv-stats small { font-size: 11px; white-space: nowrap; }
+}

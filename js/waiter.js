@@ -147,30 +147,14 @@ function guestBar() {
   </header>`;
 }
 
+// Mijoz planshetida faqat ofitsiantga qaytish tugmasi (PIN bilan)
 function guestActs() {
-  const call = S.calls[ui.guest];
-  const w = call?.type === "waiter", b = call?.type === "bill";
-  return `
-    <button class="g-btn ${w ? "sent" : ""}" data-call="waiter">${w ? T("waiterComing") : T("callWaiter")}</button>
-    <button class="g-btn ${b ? "sent" : ""}" data-call="bill">${b ? T("billComing") : T("askBill")}</button>
-    <button class="icon-btn g-lock" data-act="guest-exit" title="Ofitsiant uchun">🔒</button>`;
+  return `<button class="g-lock" data-act="guest-exit" title="Ofitsiant uchun">${T("waiterMode")}</button>`;
 }
 
 function bindGuestActs() {
   const box = app.querySelector("#guestActs");
   if (!box) return;
-  box.querySelectorAll("[data-call]").forEach((b) => b.addEventListener("click", () => {
-    unlockAudio();
-    const type = b.dataset.call;
-    const t = tableById(ui.guest);
-    if (S.calls[t.id]?.type === type) { store.setCall(t.id, null); toast(T("callCancelled")); }
-    else {
-      store.setCall(t.id, { type, at: Date.now(), tableNo: t.no, waiterId: tableWaiterId(t) || "" });
-      toast(type === "bill" ? T("billAsked") : T("called"), { kind: "ok" });
-    }
-    box.innerHTML = guestActs();
-    bindGuestActs();
-  }));
   box.querySelector("[data-act=guest-exit]").addEventListener("click", guestExit);
 }
 
@@ -499,6 +483,7 @@ function tableCard(t) {
     ${st.key !== "free" ? `<div class="tc-meta"><b>${money(total, cur())}</b><span>${st.key === "served" ? `${ago(Math.max(...st.orders.map((o) => o.servedAt || 0)))} oldin berildi` : since ? ago(since) : ""}</span></div>` : `<div class="tc-meta"><span>&nbsp;</span></div>`}
     <div class="tc-waiter">${esc(fullName(w) || "—")}</div>
     ${S.calls[t.id] ? `<span class="tc-call">${S.calls[t.id].type === "bill" ? "🧾 Hisob" : "🙋 Chaqiryapti"}</span>` : ""}
+    ${st.key !== "free" ? `<span class="tc-add">➕ Qo'shish</span>` : ""}
     ${draft ? `<span class="tc-draft">${draft} ta savatda</span>` : ""}
   </button>`;
 }
@@ -524,7 +509,7 @@ function renderTable() {
     <section class="menu-pane" id="menuPane">
       <div class="menu-top">
       <div class="menu-head">
-        ${ui.guest ? "" : `<button class="icon-btn" data-act="back" title="Orqaga">←</button>`}
+        ${ui.guest ? "" : `<button class="btn btn-ghost to-tables" data-act="back" title="Barcha stollar">← Stollar</button>`}
         <div class="mh-title">${ui.guest
           ? `<h2>${T("menu")}</h2><small>${T("yourWaiter")}: <b>${esc(fullName(w) || "—")}</b></small>`
           : `<h2>Stol ${esc(t.no)}</h2><small>${esc(t.zone || "")} · Ofitsiant: <b>${esc(fullName(w) || "—")}</b></small>`}</div>
@@ -533,6 +518,7 @@ function renderTable() {
         <div class="search"><input type="search" id="q" placeholder="${esc(T("search"))}" value="${esc(ui.q)}"></div>
       </div>
       </div>
+      ${ui.guest ? "" : `<div class="add-hint" id="addHint" hidden></div>`}
       <nav class="cats" id="cats"></nav>
       <div id="grid"></div>
     </section>
@@ -838,7 +824,7 @@ function renderCart() {
 
   pane.innerHTML = `
     <div class="cart-head">
-      <h3>${ui.guest ? T("cart") : "Yangi buyurtma"} <small>${ui.guest ? T("table") : "Stol"} ${esc(t.no)}</small></h3>
+      <h3>${ui.guest ? T("cart") : orders.length ? "➕ Qo'shimcha buyurtma" : "Yangi buyurtma"} <small>${ui.guest ? T("table") : "Stol"} ${esc(t.no)}</small></h3>
       <button class="icon-btn cart-close" data-act="close-cart">✕</button>
     </div>
     <div class="cart-scroll">
@@ -849,7 +835,7 @@ function renderCart() {
             <div class="cl-main"><b>${esc(cartName(c))}</b>${optsHtml(c)}${c.note ? `<small class="cl-note">📝 ${esc(noteText(c.note))}</small>` : ""}<small>${money(c.price * c.qty, cur())}</small></div>
             <div class="stepper sm"><button data-q="${esc(c.key)}" data-d="-1">−</button><b>${c.qty}</b><button data-q="${esc(c.key)}" data-d="1">+</button></div>
           </li>`).join("")}
-      </ul>` : `<div class="empty small"><span class="big">🧺</span>${ui.guest ? T("emptyCart") : "Menyudan taom tanlang"}</div>`}
+      </ul>` : `<div class="empty small"><span class="big">🧺</span>${ui.guest ? T("emptyCart") : orders.length ? "Menyudan taom tanlang, u shu stolga qo'shimcha bo'lib qo'shiladi" : "Menyudan taom tanlang"}</div>`}
 
       ${orders.length ? `
         <div class="tickets">
@@ -865,8 +851,8 @@ function renderCart() {
     </div>
     <div class="cart-foot">
       ${cart.length ? `
-        <div class="sum-row"><span>${ui.guest ? T("newOrder") : "Yangi buyurtma"}</span><b>${money(cartSum, cur())}</b></div>
-        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : "Buyurtmani tasdiqlash →"}</button>` : ""}
+        <div class="sum-row"><span>${ui.guest ? T("newOrder") : orders.length ? "Qo'shimcha buyurtma" : "Yangi buyurtma"}</span><b>${money(cartSum, cur())}</b></div>
+        <button class="btn btn-primary btn-lg btn-block" data-act="confirm">${ui.guest ? T("placeOrder") : orders.length ? "➕ Qo'shimchani tasdiqlash →" : "Buyurtmani tasdiqlash →"}</button>` : ""}
       ${orders.length ? `
         <div class="sum-row muted"><span>${ui.guest ? T("tableBill") : "Stol hisobi"}</span><b>${money(billSum, cur())}</b></div>
         ${ui.guest ? "" : orders.every((o) => o.status === "served")
@@ -878,6 +864,11 @@ function renderCart() {
     ? (cartCount ? `${CART_ICON}<b>${cartCount} ${T("pcs")}</b> · ${money(cartSum, cur())} <span>${T("view")}</span>` : orders.length ? `🧾 ${T("tableBill")} · ${money(billSum, cur())} <span>${T("view")}</span>` : "")
     : (cartCount ? `${CART_ICON}<b>${cartCount} ta</b> · ${money(cartSum, cur())} <span>Ko'rish →</span>` : orders.length ? `🧾 Stol hisobi · ${money(billSum, cur())} <span>Ko'rish →</span>` : "");
   fab.hidden = !cartCount && !orders.length;
+  const hint = app.querySelector("#addHint");
+  if (hint) {
+    hint.hidden = !orders.length;
+    hint.innerHTML = orders.length ? `<b>➕ Stolda ${orders.length} ta buyurtma bor (${money(billSum, cur())}).</b> <span>Mijoz yana nimadir so'rasa, taomni tanlang va tasdiqlang: u shu stolga qo'shiladi.</span>` : "";
+  }
 
   pane.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => {
     const list = getCart(t.id);
@@ -940,7 +931,7 @@ function confirmOrder(t) {
   const sum = cart.reduce((s, c) => s + c.price * c.qty, 0);
   let guests = activeOrders(t.id)[0]?.guests || Math.min(t.seats || 2, 2);
   modal(`
-    <div class="modal-head"><h3>Buyurtmani tasdiqlang</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-head"><h3>${activeOrders(t.id).length ? "➕ Qo'shimcha buyurtma" : "Buyurtmani tasdiqlang"}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       <div class="confirm-meta">
         <div><small>Stol</small><b>${esc(t.no)}</b></div>
@@ -978,11 +969,12 @@ function confirmOrder(t) {
           status: "new",
           createdAt: Date.now()
         };
+        if (activeOrders(t.id).length) order.extra = true;
         store.putOrder(order);
         setCart(t.id, []);
         close();
         ui.cartOpen = false;
-        toast(`✓ Stol ${esc(t.no)} buyurtmasi oshxonaga yuborildi`, { kind: "ok" });
+        toast(`✓ Stol ${esc(t.no)} ${order.extra ? "qo'shimcha buyurtmasi" : "buyurtmasi"} oshxonaga yuborildi`, { kind: "ok" });
         if (!S.online) toast("Aloqa yo'q: buyurtma aloqa tiklanishi bilan yuboriladi", { kind: "error", timeout: 6000 });
         ui.view = "tables";
         render();

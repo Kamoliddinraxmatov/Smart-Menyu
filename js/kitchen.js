@@ -115,7 +115,7 @@ function ticket(o) {
   return `
   <article class="kt st-${o.status} ${late(o)} ${ui.fresh.has(o.id) ? "fresh" : ""}" data-id="${esc(o.id)}">
     <header class="kt-head">
-      <div class="kt-table"><small>STOL</small><b>${esc(o.tableNo)}</b></div>
+      <div class="kt-table"><small>STOL</small><b>${esc(o.tableNo)}</b>${o.extra ? `<em class="kt-extra">+ qo'shimcha</em>` : ""}</div>
       <div class="kt-info">
         ${o.status === "new" ? `<span class="kt-flag">YANGI</span>` : ""}
         <span class="kt-no">#${esc(shortNo(o))} · ${clock(o.createdAt)}${o.guests ? ` · 👤${o.guests}` : ""}</span>
