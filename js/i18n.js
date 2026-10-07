@@ -31,7 +31,7 @@ const STR = {
   called: { uz: "✓ Ofitsiant chaqirildi. Hozir keladi.", ru: "✓ Официант вызван. Сейчас подойдёт.", en: "✓ Your waiter has been called." },
   billAsked: { uz: "✓ Hisob so'raldi. Ofitsiant hozir olib keladi.", ru: "✓ Счёт запрошен. Официант сейчас принесёт.", en: "✓ Bill requested. Your waiter will bring it." },
   callCancelled: { uz: "Chaqiruv bekor qilindi", ru: "Вызов отменён", en: "Call cancelled" },
-  cart: { uz: "Savatingiz", ru: "Ваш заказ", en: "Your order" },
+  cart: { uz: "Buyurtmangiz", ru: "Ваш заказ", en: "Your order" },
   emptyCart: { uz: "Menyudan taom tanlang", ru: "Выберите блюда из меню", en: "Choose dishes from the menu" },
   yourOrders: { uz: "Buyurtmalaringiz", ru: "Ваши заказы", en: "Your orders" },
   newOrder: { uz: "Yangi buyurtma", ru: "Новый заказ", en: "New order" },
