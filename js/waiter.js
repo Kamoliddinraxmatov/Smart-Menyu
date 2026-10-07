@@ -1259,3 +1259,12 @@ document.addEventListener("pointerdown", unlockAudio, { once: true });
 
 render();
 registerSW();
+
+// "Stolga olib kelindi" bosilmaguncha har 40 soniyada ofitsiantga eslatma signal
+setInterval(() => {
+  if (ui.guest || !ui.me) return;
+  const waiting = readyForMe().filter((o) => Date.now() - (o.readyAt || 0) > 35000);
+  if (!waiting.length) return;
+  chime("ready");
+  vibrate([300, 120, 300]);
+}, 40000);
