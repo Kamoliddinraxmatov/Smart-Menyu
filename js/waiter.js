@@ -539,7 +539,7 @@ function dishCard(i, cart) {
   const stop = !!S.stop[i.id];
   const img = i.img
     ? `<div class="dish-img ${i.fit === "contain" ? "contain" : ""}" style="background-image:url('${esc(i.img)}')">`
-    : `<div class="dish-img emoji"><span>${esc(i.emoji || "🍽️")}</span>`;
+    : `<div class="dish-img emoji"><span class="dish-emo">${esc(i.emoji || "🍽️")}</span>`;
   const minPrice = i.variants?.length ? Math.min(...i.variants.map((v) => Number(v.price) || 0)) : i.price;
   const priceTxt = (i.variants?.length > 1 && new Set(i.variants.map((v) => v.price)).size > 1 ? (getLang() === "uz" ? "" : T("from") + " ") : "") + money(minPrice, cur()).replace(` ${cur()}`, "");
   const fromSuffix = i.variants?.length > 1 && new Set(i.variants.map((v) => v.price)).size > 1 && getLang() === "uz" ? " dan" : "";

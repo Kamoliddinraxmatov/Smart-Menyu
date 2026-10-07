@@ -219,7 +219,7 @@ body.lux {
 .dish-img::after { content: ""; position: absolute; inset: auto 0 0 0; height: 40%; background: linear-gradient(0deg, rgba(10,8,7,.55), transparent); pointer-events: none; }
 .dish-img.contain::after { display: none; }
 .dish-img.emoji { display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #3a2e25 0%, #1a1512 70%); }
-.dish-img.emoji span { font-size: 92px; filter: drop-shadow(0 12px 18px rgba(0,0,0,.5)); }
+.dish-img.emoji .dish-emo { font-size: 92px; filter: drop-shadow(0 12px 18px rgba(0,0,0,.5)); }
 .dish-pop { position: absolute; top: 12px; left: 12px; z-index: 1; background: rgba(10,8,7,.7); backdrop-filter: blur(6px); color: var(--gold); font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 99px; letter-spacing: .08em; text-transform: uppercase; border: 1px solid rgba(214,179,112,.35); }
 .dish-qty { position: absolute; top: 12px; right: 12px; z-index: 1; background: var(--gold); color: #1a1208; min-width: 32px; height: 32px; border-radius: 99px; display: grid; place-items: center; font-weight: 800; font-size: 15px; }
 .dish-body { padding: 16px 18px 18px; display: flex; flex-direction: column; flex: 1; }
