@@ -112,10 +112,9 @@ function tableWaiterId(t) {
 function myReady() {
   return Object.values(S.orders).filter((o) => o.status === "ready" && o.waiterId === ui.me?.id);
 }
+// tayyor buyurtmalar faqat uni olgan ofitsiantga ko'rinadi
 function readyForMe() {
-  return Object.values(S.orders)
-    .filter((o) => o.status === "ready" && (ui.filter === "all" || o.waiterId === ui.me?.id))
-    .sort((a, b) => (a.readyAt || 0) - (b.readyAt || 0));
+  return myReady().sort((a, b) => (a.readyAt || 0) - (b.readyAt || 0));
 }
 
 // ---------- Ko'rinishlar ----------
