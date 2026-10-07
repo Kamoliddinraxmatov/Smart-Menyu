@@ -543,7 +543,7 @@ function freeTap(t, st) {
     <div class="modal-head"><h3>${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       ${res
-        ? `<p class="tap-status">🔖 ${L("Bron qilingan", "Забронирован", "Reserved")}${res.note ? ` · <b>${esc(res.note)}</b>` : ""}</p><p class="muted small">${esc(res.waiterName || "")} · ${clock(res.at)}</p>`
+        ? `<p class="tap-status">🔖 ${L("Bron qilingan", "Забронирован", "Reserved")}${res.note ? ` · <b>${esc(res.note)}</b>` : ""}</p><p class="muted small">${esc(res.waiterName || "")} · ${clock(res.at)}</p>${res.waiterId !== ui.me?.id ? `<p class="muted small">${L("Bronni faqat uni qilgan ofitsiant yoki admin bekor qila oladi.", "Отменить бронь может только её автор или админ.", "Only the waiter who made it or an admin can cancel it.")}</p>` : ""}`
         : `<p class="tap-status">${L("Bo'sh stol", "Свободный стол", "Free table")}</p>
            <label class="res-note"><small>${L("Bron uchun izoh (ixtiyoriy): mijoz ismi, vaqti", "Комментарий к брони (необязательно): имя, время", "Reservation note (optional): name, time")}</small>
            <input id="resNote" maxlength="60" placeholder="${L("Masalan: Alisher, 19:30", "Например: Алишер, 19:30", "e.g. Alisher, 7:30 pm")}"></label>`}
@@ -551,7 +551,7 @@ function freeTap(t, st) {
     <div class="modal-actions tap-actions">
       <button class="btn btn-info btn-lg btn-block" id="tapOrder">🍽 ${res ? L("Mijoz keldi · Buyurtma", "Гость пришёл · Заказ", "Guest arrived · Order") : L("Buyurtma berish", "Принять заказ", "Take order")}</button>
       ${res
-        ? `<button class="btn btn-ghost btn-lg btn-block" id="tapUnres">✕ ${L("Bronni bekor qilish", "Отменить бронь", "Cancel reservation")}</button>`
+        ? (res.waiterId !== ui.me?.id ? "" : `<button class="btn btn-ghost btn-lg btn-block" id="tapUnres">✕ ${L("Bronni bekor qilish", "Отменить бронь", "Cancel reservation")}</button>`)
         : `<button class="btn btn-res btn-lg btn-block" id="tapRes">🔖 ${L("Bron qilish", "Забронировать", "Reserve")}</button>`}
     </div>`, {
     onMount(m, close) {

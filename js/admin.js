@@ -431,19 +431,19 @@ function tabTables(c) {
   const ws = cfg().waiters;
   c.innerHTML = `
   <div class="page-head row-between">
-    <div><h1>Stollar</h1><p>Har bir stolga ofitsiant biriktiring. Shu stoldan tushgan buyurtma avtomatik o'sha ofitsiantga yoziladi va tayyor bo'lganda unga xabar boradi.</p></div>
+    <div><h1>Stollar</h1><p>Stol mijozni o'tqazib buyurtma olgan ofitsiantniki bo'ladi. Bu yerda ofitsiantlar qilgan bronlarni ko'rish va bekor qilish mumkin.</p></div>
     <button class="btn btn-primary" id="add">+ Stol qo'shish</button>
   </div>
   <div class="card">
     <table class="tbl">
-      <thead><tr><th>Stol</th><th>Joy (zal)</th><th>O'rinlar</th><th>Ofitsiant</th><th></th></tr></thead>
+      <thead><tr><th>Stol</th><th>Joy (zal)</th><th>O'rinlar</th><th>Bron</th><th></th></tr></thead>
       <tbody>
         ${cfg().tables.map((t, i) => `
           <tr>
             <td><input type="text" data-i="${i}" data-k="no" value="${esc(t.no)}" class="in-no"></td>
             <td><input type="text" data-i="${i}" data-k="zone" value="${esc(t.zone || "")}"></td>
             <td><input type="number" data-i="${i}" data-k="seats" value="${esc(t.seats || "")}" class="in-seats"></td>
-            <td><select data-i="${i}" data-k="waiterId"><option value="">— biriktirilmagan —</option>${ws.map((w) => `<option value="${esc(w.id)}" ${w.id === t.waiterId ? "selected" : ""}>${esc(fullName(w))}</option>`).join("")}</select></td>
+            <td>${S.reserves?.[t.id] ? `<span class="res-tag">🔖 ${esc(S.reserves[t.id].waiterName || "")} · ${clock(S.reserves[t.id].at)}${S.reserves[t.id].note ? ` · ${esc(S.reserves[t.id].note)}` : ""}</span> <button class="btn btn-ghost btn-sm" data-unres="${esc(t.id)}">Bekor qilish</button>` : `<span class="muted">—</span>`}</td>
             <td><button class="icon-btn" data-del="${i}">🗑</button></td>
           </tr>`).join("")}
       </tbody>
@@ -451,6 +451,10 @@ function tabTables(c) {
   </div>`;
   c.querySelectorAll("[data-k]").forEach((inp) => inp.addEventListener("change", () => {
     mutate((x) => { const t = x.tables[+inp.dataset.i]; t[inp.dataset.k] = inp.dataset.k === "seats" ? Number(inp.value) : inp.value; }, "Stol saqlandi");
+  }));
+  c.querySelectorAll("[data-unres]").forEach((b) => b.addEventListener("click", async () => {
+    if (!(await confirmBox("Bron bekor qilinsinmi?", "Bekor qilish", { danger: true }))) return;
+    store.setReserve(b.dataset.unres, null); toast("Bron bekor qilindi", { kind: "ok" }); render();
   }));
   c.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
     const t = cfg().tables[+b.dataset.del];

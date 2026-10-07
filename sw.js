@@ -1,5 +1,5 @@
 // Oddiy offline kesh: ilova fayllari internet sekin bo'lsa ham tez ochiladi
-const CACHE = "menyu-v36";
+const CACHE = "menyu-v37";
 const FILES = ["./", "index.html", "waiter.html", "kitchen.html", "admin.html", "css/base.css", "css/waiter.css", "css/kitchen.css", "css/admin.css", "css/home.css",
   "js/common.js", "js/sync.js", "js/defaults.js", "js/i18n.js", "js/waiter.js", "js/kitchen.js", "js/admin.js", "js/home.js", "vendor/mqtt.min.js", "vendor/qrcode.js", "css/lux.css", "img/icon.svg", "img/cloche.png", "img/serve.png", "manifest.webmanifest"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
