@@ -1,13 +1,16 @@
 // Admin panel: restoran brendi, menyu, ofitsiantlar, stollar va hisobot
 import { createStore, newId } from "./sync.js";
+import { activate } from "./license.js";
 import {
   getRid, esc, money, fullName, initials, clock, orderTotal, applyBrand, logoHtml, itemVisual,
   toast, modal, confirmBox, connBadge, fileToDataUrl, cropImage, link, registerSW
 } from "./common.js";
 import { itemTr, catTr } from "./i18n.js";
+import { fixUz, translate } from "./translate.js";
 
-const rid = getRid();
-const store = createStore(rid);
+const ACT = await activate();
+const rid = ACT.rid;
+const store = createStore(rid, ACT);
 const S = store.state;
 const app = document.getElementById("app");
 
@@ -178,8 +181,8 @@ function itemEditor(item) {
           <label class="field"><span>Emoji (rasm bo'lmasa)</span><input type="text" id="emoji" value="${esc(it.emoji || "")}" maxlength="4"></label>
         </div>
       </div>
-      <label class="field"><span>Nomi</span><input type="text" id="name" value="${esc(it.name)}" placeholder="Masalan: To'y oshi"></label>
-      <label class="field"><span>Tavsif</span><input type="text" id="desc" value="${esc(it.desc || "")}"></label>
+      <label class="field"><span>Nomi (o'zbekcha)</span><input type="text" id="name" value="${esc(it.name)}" placeholder="Masalan: To'y oshi"></label>
+      <label class="field"><span>Tavsif (o'zbekcha)</span><input type="text" id="desc" value="${esc(it.desc || "")}"></label>
       <div class="opt-edit">
         <div>
           <div class="oe-head"><b>Porsiya / variantlar</b><small>Mijoz bittasini tanlaydi. Narx shu variant narxi bo'ladi.</small></div>
@@ -192,16 +195,18 @@ function itemEditor(item) {
           <button class="btn btn-ghost btn-sm" id="addEx">+ Qo'shimcha</button>
         </div>
       </div>
-      <details class="tr-box" ${isNew ? "" : "open"}>
-        <summary>🌐 Tarjimalar (mijoz menyuda tilni almashtirsa ko'rinadi)</summary>
-        ${[["ru", "Русский"], ["en", "English"]].map(([l, label]) => {
+      <div class="tr-box">
+        <div class="tr-head"><b>🌐 Boshqa tillar</b><small>Taomni istalgan tilda yozing va o'sha tildagi tugmani bosing: qolgan ikki til o'zi to'ldiriladi. Kerak bo'lsa qo'lda tuzating.</small></div>
+        <div class="tr-row"><b>UZ</b><span class="tr-note">Yuqoridagi nomi va tavsif</span><button class="btn btn-ghost tr-btn" data-tr-from="uz">🌐 Rus va ingliz tiliga</button></div>
+        ${[["ru", "Русский", "🌐 O'zbek va ingliz tiliga"], ["en", "English", "🌐 O'zbek va rus tiliga"]].map(([l, label, btn]) => {
           const tr = itemTr(it, l);
           return `<div class="tr-row"><b>${l.toUpperCase()}</b>
-            <input type="text" id="tr-${l}-name" value="${esc(tr.name)}" placeholder="${label}: nomi">
-            <input type="text" id="tr-${l}-desc" value="${esc(tr.desc)}" placeholder="${label}: tavsif"></div>`;
+            <div class="tr-fields"><input type="text" id="tr-${l}-name" value="${esc(tr.name)}" placeholder="${label}: nomi">
+            <input type="text" id="tr-${l}-desc" value="${esc(tr.desc)}" placeholder="${label}: tavsif"></div>
+            <button class="btn btn-ghost tr-btn" data-tr-from="${l}">${btn}</button></div>`;
         }).join("")}
         <p class="hint">Bo'sh qoldirilsa, o'zbekcha nomi ko'rinadi.</p>
-      </details>
+      </div>
       <div class="row2">
         <label class="field"><span>Narxi (${esc(cur())})</span><input type="number" id="price" min="0" step="500" value="${esc(it.price)}"></label>
         <label class="field"><span>Kategoriya</span><select id="cat">${cfg().categories.map((x) => `<option value="${esc(x.id)}" ${x.id === it.cat ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>
@@ -251,7 +256,31 @@ function itemEditor(item) {
       $("#addVar").addEventListener("click", () => { vars.push({ id: "v" + newId(), name: "", price: Number($("#price").value) || 0 }); drawOpts("#vars", vars, "Masalan: 0,5 porsiya"); });
       $("#addEx").addEventListener("click", () => { exs.push({ id: "e" + newId(), name: "", price: 0 }); drawOpts("#exs", exs, "Masalan: Pishloq"); });
       $("#rmImg").addEventListener("click", () => { it.img = ""; $("#vis").innerHTML = itemVisual(it, "thumb ie-img"); $("#rmImg").hidden = true; });
+      // O'zbekcha matnning imlosini avtomatik tuzatish
+      const fixField = (sel) => { const el = $(sel); const v = fixUz(el.value); if (v !== el.value) { el.value = v; el.classList.add("fixed"); setTimeout(() => el.classList.remove("fixed"), 1200); } };
+      ["#name", "#desc"].forEach((sel) => $(sel).addEventListener("blur", () => fixField(sel)));
+      const fld = (l, k) => (l === "uz" ? $(`#${k}`) : $(`#tr-${l}-${k}`));
+      m.querySelectorAll("[data-tr-from]").forEach((b) => b.addEventListener("click", async () => {
+        const from = b.dataset.trFrom;
+        if (from === "uz") { fixField("#name"); fixField("#desc"); }
+        if (!fld(from, "name").value.trim()) { toast(from === "uz" ? "Avval taom nomini yozing" : `Avval ${from.toUpperCase()} qatoriga nomini yozing`, { kind: "error" }); return; }
+        const txt = b.textContent; b.disabled = true; b.textContent = "⏳ Tarjima qilinmoqda...";
+        try {
+          for (const to of ["uz", "ru", "en"].filter((x) => x !== from)) {
+            const [n, d] = await Promise.all([translate(fld(from, "name").value, to, from), translate(fld(from, "desc").value, to, from)]);
+            fld(to, "name").value = to === "uz" ? fixUz(n) : n;
+            fld(to, "desc").value = to === "uz" ? fixUz(d) : d;
+          }
+          b.textContent = "✓ Tayyor";
+        } catch {
+          toast("Tarjima uchun internet kerak. Keyinroq qayta bosing.", { kind: "error", timeout: 5000 });
+          b.textContent = txt;
+        }
+        b.disabled = false;
+        setTimeout(() => { if (b.textContent === "✓ Tayyor") b.textContent = txt; }, 2000);
+      }));
       $("#ok").addEventListener("click", () => {
+        fixField("#name"); fixField("#desc");
         Object.assign(it, {
           name: $("#name").value.trim(), desc: $("#desc").value.trim(), price: Number($("#price").value) || 0,
           cat: $("#cat").value, time: Number($("#time").value) || 0, weight: $("#weight").value.trim(), emoji: $("#emoji").value.trim(),
@@ -350,10 +379,23 @@ function catEditor() {
   };
   modal(`
     <div class="modal-head"><h3>Bo'limlar</h3><button class="icon-btn" data-close>✕</button></div>
-    <div class="modal-body"><p class="muted small">Rasm bo'lim sarlavhasida va menyu fonida (xira holda) ko'rinadi.</p><div id="cl"></div><button class="btn btn-ghost btn-block" id="addc">+ Bo'lim qo'shish</button></div>
+    <div class="modal-body"><p class="muted small">Rasm bo'lim sarlavhasida va menyu fonida (xira holda) ko'rinadi.</p><button class="btn btn-ghost tr-btn cat-trall" id="trall">🌐 Bo'limlarni rus va ingliz tiliga tarjima qilish</button><div id="cl"></div><button class="btn btn-ghost btn-block" id="addc">+ Bo'lim qo'shish</button></div>
     <div class="modal-actions"><button class="btn btn-primary" id="ok">Saqlash</button></div>`, { wide: true,
     onMount(m, close) {
       draw(m);
+      m.querySelector("#trall").addEventListener("click", async (e) => {
+        const b = e.currentTarget, txt = b.textContent;
+        b.disabled = true; b.textContent = "⏳ Tarjima qilinmoqda...";
+        try {
+          for (const x of cats) {
+            x.name = fixUz(x.name); x.tagline = fixUz(x.tagline || "");
+            x.tr = x.tr || {};
+            for (const l of ["ru", "en"]) x.tr[l] = { name: await translate(x.name, l), tagline: await translate(x.tagline, l) };
+          }
+          draw(m); toast("Tarjima tayyor. Tekshirib, \"Saqlash\"ni bosing.", { kind: "ok" });
+        } catch { toast("Tarjima uchun internet kerak.", { kind: "error" }); }
+        b.disabled = false; b.textContent = txt;
+      });
       m.querySelector("#addc").addEventListener("click", () => { cats.push({ id: "c" + newId(), name: "Yangi kategoriya", emoji: "🍽️" }); draw(m); });
       m.querySelector("#ok").addEventListener("click", () => { mutate((x) => { x.categories = cats.filter((y) => y.name.trim()); }, "Kategoriyalar saqlandi"); close(); render(); });
     }

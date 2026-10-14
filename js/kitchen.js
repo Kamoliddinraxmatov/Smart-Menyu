@@ -1,12 +1,14 @@
 // Oshxona ekrani (KDS): buyurtmalar realtime tushadi, oshpaz "Boshlash" va "Tayyor" tugmalarini bosadi
 import { createStore } from "./sync.js";
+import { activate } from "./license.js";
 import {
   getRid, esc, fullName, clock, shortNo, applyBrand, logoHtml,
   unlockAudio, chime, keepAwake, toast, modal, connBadge, registerSW, link
 } from "./common.js";
 
-const rid = getRid();
-const store = createStore(rid);
+const ACT = await activate();
+const rid = ACT.rid;
+const store = createStore(rid, ACT);
 const S = store.state;
 const app = document.getElementById("app");
 

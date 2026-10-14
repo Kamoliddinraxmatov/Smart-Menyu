@@ -1,6 +1,9 @@
-# Har safar main'ga yangi kod tushganda Smart Menyu Android ilovasini (APK) yig'adi
-# va uni Releases bo'limiga qo'yadi. Doimiy yuklab olish havolasi:
+# Har safar main'ga yangi kod tushganda ikki Android ilovani (APK) yig'adi va Releases bo'limiga qo'yadi:
+#   SmartMenyu.apk       restoran planshetlari uchun (ofitsiant, oshxona, boshqaruv)
+#   SmartMenyuEgasi.apk  faqat egasi uchun (restoranlarga obuna berish, planshetlarni tasdiqlash)
+# Doimiy havolalar:
 # https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyu.apk
+# https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyuEgasi.apk
 name: Android APK
 
 on:
@@ -34,6 +37,11 @@ jobs:
         run: |
           mkdir -p app/www
           cp -r index.html waiter.html kitchen.html admin.html manifest.webmanifest css js img vendor app/www/
+          # Egasi ilovasi restoran planshetiga kirmaydi
+          rm -f app/www/js/owner.js app/www/css/owner.css
+          mkdir -p app-owner/www
+          cp -r css js img vendor app-owner/www/
+          cp owner.html app-owner/www/index.html
 
       - name: Capacitor o'rnatish
         working-directory: app
@@ -57,16 +65,31 @@ jobs:
           ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk ../../SmartMenyu.apk
 
+      - name: Egasi ilovasi
+        working-directory: app-owner
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx capacitor-assets generate --android --iconBackgroundColor '#D6B370' --iconBackgroundColorDark '#D6B370' --splashBackgroundColor '#0D0B0A' --splashBackgroundColorDark '#0D0B0A' || true
+          npx cap sync android
+          cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../../SmartMenyuEgasi.apk
+
       - uses: actions/upload-artifact@v4
         with:
           name: SmartMenyu-apk
-          path: SmartMenyu.apk
+          path: |
+            SmartMenyu.apk
+            SmartMenyuEgasi.apk
 
       - name: Release'ga qo'yish
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: Smart Menyu 1.0.${{ github.run_number }}
-          body: "Android ilova. Telefonda yuklab oling va o'rnating (noma'lum manbalardan o'rnatishga ruxsat bering)."
-          files: SmartMenyu.apk
+          body: "SmartMenyu.apk: restoran planshetlari uchun. SmartMenyuEgasi.apk: faqat egasi uchun. Yuklab oling va o'rnating (noma'lum manbalardan o'rnatishga ruxsat bering)."
+          files: |
+            SmartMenyu.apk
+            SmartMenyuEgasi.apk
           make_latest: true

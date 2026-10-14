@@ -1,9 +1,12 @@
-// Bosh sahifa: restoran tanlash va ilovalarni ochish
+// Bosh sahifa: restoran ma'lumoti va ilovalarni ochish (yangi restoranni faqat egasi ochadi)
 import { createStore } from "./sync.js";
+import { activate, leaveDemo, daysLeft } from "./license.js";
+import { prettyId } from "./crypto.js";
 import { getRid, esc, link, applyBrand, logoHtml, connBadge, modal, toast, registerSW } from "./common.js";
 
-const rid = getRid();
-const store = createStore(rid);
+const ACT = await activate();
+const rid = ACT.rid;
+const store = createStore(rid, ACT);
 const S = store.state;
 const app = document.getElementById("app");
 
@@ -23,7 +26,9 @@ function render() {
         <small>Restoran</small>
         <h1>${esc(r.name)}</h1>
         <p>${esc(r.slogan || "")}</p>
-        <p class="h-code">Kod: <b class="code">${esc(rid)}</b> · <button class="link" id="switch">Boshqa restoran</button></p>
+        ${ACT.demo
+          ? `<p class="h-code">Namoyish rejimi · <button class="link" id="activate">Restoranimni ulash</button></p>`
+          : `<p class="h-code">Kod: <b class="code">${esc(rid)}</b> · Planshet: <b class="code">${prettyId(ACT.dev.id)}</b> · Obuna: <b>${daysLeft(ACT.watcher?.lic || ACT.lic)} kun</b></p>`}
       </div>
     </section>
     <section class="h-apps">
@@ -40,7 +45,7 @@ function render() {
     <section class="h-feats">
       ${[
         ["📱", "Mijoz rejimi", "Planshet stolda qoladi, mijoz o'zi tanlaydi"],
-        ["🙋", "Chaqiruv", "Ofitsiant va hisobni bir tugmada chaqirish"],
+        ["🔒", "Xavfsiz", "Har restoran ma'lumoti o'z kaliti bilan shifrlangan"],
         ["🌐", "3 til", "O'zbek, rus va ingliz tillarida menyu"],
         ["⚡", "Realtime", "Oshxona va ofitsiant bir soniyada xabardor"]
       ].map(([i, b, t]) => `<div class="h-feat"><span>${i}</span><b>${b}</b><small>${t}</small></div>`).join("")}
@@ -53,60 +58,10 @@ function render() {
         <li>Oshpaz <b>Boshlash</b>, keyin <b>Tayyor</b> tugmasini bosadi.</li>
         <li>Stolga biriktirilgan ofitsiantning planshetiga <b>"Stol N tayyor ✓"</b> xabari ovoz va tebranish bilan keladi.</li>
       </ol>
-      <button class="btn btn-primary" id="new">+ Yangi restoran ochish</button>
     </section>
     <footer class="h-foot">Smart Menyu © ${new Date().getFullYear()} · Restoranlar uchun elektron menyu</footer>
   </div>`;
-  app.querySelector("#switch").addEventListener("click", switchRest);
-  app.querySelector("#new").addEventListener("click", newRest);
-}
-
-function go(code) {
-  location.href = `index.html?r=${encodeURIComponent(code)}`;
-}
-
-function switchRest() {
-  modal(`
-    <div class="modal-head"><h3>Restoran kodi</h3><button class="icon-btn" data-close>✕</button></div>
-    <div class="modal-body"><label class="field"><span>Kodni kiriting</span><input type="text" id="code" placeholder="masalan: demo"></label></div>
-    <div class="modal-actions"><button class="btn btn-primary" id="ok">Ulanish</button></div>`, {
-    onMount(m) { m.querySelector("#ok").addEventListener("click", () => { const v = m.querySelector("#code").value.trim().toLowerCase(); if (v) go(v); }); }
-  });
-}
-
-function slug(s) {
-  const map = { "o'": "o", "g'": "g", "sh": "sh", "ch": "ch", "ʻ": "", "’": "", "'": "" };
-  let x = s.toLowerCase();
-  for (const [k, v] of Object.entries(map)) x = x.split(k).join(v);
-  return x.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "restoran";
-}
-
-function newRest() {
-  modal(`
-    <div class="modal-head"><h3>Yangi restoran</h3><button class="icon-btn" data-close>✕</button></div>
-    <div class="modal-body">
-      <label class="field"><span>Restoran nomi</span><input type="text" id="name" placeholder="Masalan: Rayhon"></label>
-      <p class="muted small">Restoranga alohida kod beriladi. Keyin admin panelda logo, menyu, ofitsiant va stollarni kiritasiz.</p>
-    </div>
-    <div class="modal-actions"><button class="btn btn-primary" id="ok">Yaratish</button></div>`, {
-    onMount(m) {
-      m.querySelector("#ok").addEventListener("click", () => {
-        const name = m.querySelector("#name").value.trim();
-        if (!name) { toast("Nomini kiriting", { kind: "error" }); return; }
-        const code = `${slug(name)}-${Math.random().toString(36).slice(2, 6)}`;
-        // Yangi restoran demo menyu bilan boshlanadi; nomini darhol saqlaymiz
-        const s2 = createStoreFor(code);
-        const c = structuredClone(S.config);
-        c.restaurant = { ...c.restaurant, name, logo: "", slogan: "" };
-        c.adminPin = "";
-        setTimeout(() => { s2.saveConfig(c); setTimeout(() => { location.href = `admin.html?r=${encodeURIComponent(code)}&owner=1`; }, 800); }, 600);
-      });
-    }
-  });
-}
-
-function createStoreFor(code) {
-  return createStore(code);
+  app.querySelector("#activate")?.addEventListener("click", leaveDemo);
 }
 
 store.on((e) => { if (e.type === "render" && !document.querySelector(".modal-back")) render(); });

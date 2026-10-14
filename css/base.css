@@ -138,3 +138,45 @@ label.field > span { display: block; font-size: 13px; font-weight: 600; color: v
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 8px; }
 .btn-sm { height: 36px; padding: 0 12px; font-size: 13px; }
+
+/* Faollashtirish va obuna qulf ekrani (barcha sahifalarda) */
+#lic-screen {
+  position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 20px; overflow: auto;
+  background: radial-gradient(1200px 600px at 50% -10%, rgba(214, 179, 112, .16), transparent 60%), #0D0B0A;
+  color: #F5F0E8; font-family: var(--font);
+}
+.lic-card { width: min(460px, 100%); text-align: center; display: grid; gap: 14px; }
+.lic-brand { display: flex; align-items: center; justify-content: center; gap: 10px; color: #D6B370; font-size: 18px; letter-spacing: .02em; }
+.lic-brand img { width: 34px; height: 34px; }
+.lic-card h1 { margin: 6px 0 0; font-family: "Playfair Display", Georgia, serif; font-size: 28px; font-weight: 600; }
+.lic-card p { margin: 0; color: #A69C91; font-size: 16px; line-height: 1.5; }
+.lic-ico { font-size: 54px; line-height: 1; margin-top: 10px; }
+.lic-spin { animation: licPulse 1.6s ease-in-out infinite; }
+@keyframes licPulse { 50% { transform: scale(.9); opacity: .6; } }
+.lic-field { display: grid; gap: 6px; text-align: left; }
+.lic-field span { color: #A69C91; font-size: 14px; }
+.lic-field input {
+  height: 56px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .14); background: #171412; color: #F5F0E8;
+  padding: 0 16px; font-size: 19px; outline: none;
+}
+.lic-field input:focus { border-color: #D6B370; }
+.lic-btn {
+  height: 58px; border-radius: 14px; background: linear-gradient(180deg, #E2C384, #C9A35C); color: #1A140C; font-size: 18px; font-weight: 700;
+  box-shadow: 0 10px 30px rgba(214, 179, 112, .25);
+}
+.lic-btn:active { transform: translateY(1px); }
+.lic-link { color: #D6B370; font-size: 15px; padding: 10px; text-decoration: underline; text-underline-offset: 3px; }
+.lic-meta { font-size: 15px !important; }
+.lic-meta.on { color: #4ADE80 !important; } .lic-meta.off { color: #F59E0B !important; }
+.lic-code { font-family: ui-monospace, Menlo, monospace; letter-spacing: .08em; color: #F5F0E8; font-size: 17px; }
+.lic-err { color: #F87171 !important; }
+.lic-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lic-box > div { background: #171412; border: 1px solid rgba(255, 255, 255, .09); border-radius: 14px; padding: 14px; display: grid; gap: 4px; }
+.lic-box small { color: #A69C91; }
+.lic-box b { font-size: 17px; word-break: break-all; }
+.lic-phone { display: block; padding: 16px; border-radius: 14px; background: rgba(214, 179, 112, .14); color: #D6B370; font-size: 20px; font-weight: 700; text-decoration: none; }
+.lic-warn { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9000; background: #3A2A0C; color: #FCD58A; border: 1px solid #8A6A2A;
+  padding: 12px 18px; border-radius: 14px; font-size: 15px; box-shadow: 0 10px 30px rgba(0,0,0,.4); max-width: calc(100% - 32px); display: flex; gap: 12px; align-items: center; }
+.lic-warn button { color: #FCD58A; font-size: 20px; padding: 0 4px; }
+.demo-badge { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 8000; background: rgba(214, 179, 112, .9); color: #1A140C; font-size: 12px; font-weight: 800;
+  letter-spacing: .12em; padding: 3px 10px; border-radius: 999px; pointer-events: none; }

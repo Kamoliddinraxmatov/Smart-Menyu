@@ -1,0 +1,10 @@
+{
+  "appId": "uz.smartmenyu.egasi",
+  "appName": "Smart Menyu Egasi",
+  "webDir": "www",
+  "backgroundColor": "#0D0B0A",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0D0B0A"
+  }
+}

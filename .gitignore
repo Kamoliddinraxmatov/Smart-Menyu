@@ -1,2 +1,5 @@
 .DS_Store
 node_modules/
+app-owner/node_modules/
+app-owner/www/
+app-owner/android/

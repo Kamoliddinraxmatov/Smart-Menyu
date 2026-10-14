@@ -10,15 +10,10 @@
 //   <base>/reserves/<tableId> stol oldindan band (bron): { at, waiterId, waiterName, note }
 //   <base>/sales/<sana>/<id> yopilgan chekning ixcham nusxasi (hisobot uchun, faqat admin o'qiydi)
 import { DEFAULT_CONFIG } from "./defaults.js";
+import { brokerUrl, V2 } from "./license.js";
+import { seal, open } from "./crypto.js";
 
-const PREFIX = "menyuuz/v1";
-const DEFAULT_BROKER = "wss://broker.emqx.io:8084/mqtt";
-
-function brokerUrl() {
-  const q = new URLSearchParams(location.search).get("broker");
-  if (q) { try { localStorage.setItem("menyu.broker", q); } catch {} return q; }
-  try { return localStorage.getItem("menyu.broker") || DEFAULT_BROKER; } catch { return DEFAULT_BROKER; }
-}
+const PREFIX = "menyuuz/v1"; // namoyish (demo) restorani: shifrlanmagan
 
 // Eski (v1) demo menyuni yangi dizayndagi menyuga almashtirish.
 // Restoran o'z taomlarini qo'shgan bo'lsa, menyusiga tegilmaydi.
@@ -52,9 +47,13 @@ function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
-export function createStore(rid) {
-  const base = `${PREFIX}/${rid}`;
-  const cacheKey = `menyu.cache.${rid}`;
+// opts.key: restoranning AES kaliti (faollashtirilgan planshetda). Bo'lsa, barcha ma'lumotlar shifrlanadi
+//           va <v2>/<rid>/... mavzulariga yoziladi. Bo'lmasa (namoyish), eski ochiq <v1> mavzulari.
+// opts.watcher: ruxsatnoma o'zgarishini kuzatuvchi (license.js)
+export function createStore(rid, opts = {}) {
+  const key = opts.key || null;
+  const base = key ? `${V2}/${rid}` : `${PREFIX}/${rid}`;
+  const cacheKey = key ? `menyu.cache2.${rid}` : `menyu.cache.${rid}`;
   const cached = load(cacheKey, null);
 
   const state = {
@@ -101,7 +100,9 @@ export function createStore(rid) {
   client.on("connect", () => {
     state.online = true;
     seen = new Set();
-    client.subscribe([`${base}/config`, `${base}/stop`, `${base}/orders/+`, `${base}/calls/+`, `${base}/reserves/+`], { qos: 1 }, (err) => {
+    const topics = [`${base}/config`, `${base}/stop`, `${base}/orders/+`, `${base}/calls/+`, `${base}/reserves/+`];
+    if (opts.watcher) topics.push(`${base}/lic`);
+    client.subscribe(topics, { qos: 1 }, (err) => {
       if (err) return;
       setTimeout(() => {
         if (!seen || !state.online) return;
@@ -120,8 +121,19 @@ export function createStore(rid) {
   }
   client.on("error", (e) => console.warn("MQTT:", e?.message || e));
 
+  // Shifrni ochish asinxron: xabarlar kelgan tartibda ishlanishi uchun navbat
+  let inbox = Promise.resolve();
   client.on("message", (topic, payload) => {
     const text = payload.toString();
+    inbox = inbox.then(() => receive(topic, text)).catch((e) => console.warn("xabar:", e?.message || e));
+  });
+
+  async function receive(topic, raw) {
+    if (topic === `${base}/lic`) { await opts.watcher?.handle(raw); return; }
+    let text = raw;
+    if (key && raw) {
+      try { text = await open(key, raw, topic); } catch { return; } // kaliti yo'q yoki soxta xabar
+    }
     let data = null;
     if (text) { try { data = JSON.parse(text); } catch { return; } }
 
@@ -176,10 +188,17 @@ export function createStore(rid) {
       state.orders[id] = data;
       changed({ type: "order", order: data, prev });
     }
-  });
+  }
 
+  // Yuborish ham navbat bilan: shifrlash tugagach, yozilgan tartibda ketadi
+  let outbox = Promise.resolve();
   function publish(topic, obj) {
-    client.publish(topic, obj == null ? "" : JSON.stringify(obj), { qos: 1, retain: true });
+    const text = obj == null ? "" : JSON.stringify(obj);
+    outbox = outbox.then(async () => {
+      const body = key && text ? await seal(key, text, topic) : text;
+      client.publish(topic, body, { qos: 1, retain: true });
+    }).catch((e) => console.warn("yuborish:", e?.message || e));
+    return outbox;
   }
 
   const api = {
@@ -273,6 +292,9 @@ export function createStore(rid) {
     },
 
     reconnect() { client.reconnect(); },
+    // Navbatdagi barcha xabarlar yuborilgach ulanishni yopish
+    close() { return outbox.then(() => new Promise((r) => (client.end ? client.end(false, {}, r) : r()))); },
+    flush() { return outbox; },
     client
   };
   return api;

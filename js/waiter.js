@@ -1,12 +1,14 @@
 // Ofitsiant (menyu) planshet ilovasi
 import { createStore, newId } from "./sync.js";
+import { activate } from "./license.js";
 import {
   getRid, esc, money, fullName, initials, ago, clock, shortNo, orderTotal, applyBrand, logoHtml, itemVisual,
   unlockAudio, chime, vibrate, keepAwake, toast, modal, confirmBox, connBadge, registerSW, link
 } from "./common.js";
 import { LANGS, t as T, setLang, getLang, itemName, itemDesc, catName, catTagline, weightText, noteLabel, optName } from "./i18n.js";
 
-const rid = getRid();
+const ACT = await activate();
+const rid = ACT.rid;
 try { setLang(localStorage.getItem("menyu.lang") || "uz"); } catch { setLang("uz"); }
 // Ofitsiant ekranidagi yozuvlar ham tanlangan tilda: L("o'zbekcha", "русский", "english")
 const L = (uz, ru, en) => ({ ru, en })[getLang()] ?? uz;
@@ -17,7 +19,7 @@ const agoL = (ts) => {
   return `${Math.floor(m / 60)} ${L("soat", "ч", "h")} ${m % 60} ${L("daq", "мин", "min")}`;
 };
 const ST = (t) => `${L("Stol", "Стол", "Table")} ${t}`;
-const store = createStore(rid);
+const store = createStore(rid, ACT);
 const S = store.state;
 const app = document.getElementById("app");
 
