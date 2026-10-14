@@ -91,6 +91,7 @@ export function unlockAudio() {
     if (audioCtx.state === "suspended") audioCtx.resume();
   } catch {}
 }
+export const audioReady = () => !!audioCtx && audioCtx.state === "running";
 export function chime(kind = "new") {
   if (!audioCtx) return;
   const notes = kind === "ready" ? [784, 988, 1319] : kind === "error" ? [300, 200] : [660, 880, 660, 880];
@@ -228,7 +229,7 @@ export async function cropImage(file, { ratio = 4 / 3, outW = 800, quality = 0.7
       wide: true,
       onMount(m, close) {
         // Fon bosilib yopilsa ham natija qaytsin
-        m.parentElement.addEventListener("click", (e) => { if (e.target === m.parentElement) finish(null); });
+        m.parentElement.addEventListener("click", (e) => { if (e.target === m.parentElement) { window.removeEventListener("resize", layout); finish(null); } });
         const stage = m.querySelector(".crop-stage");
         const el = m.querySelector(".crop-img");
         const zr = m.querySelector("#cz");
@@ -298,4 +299,25 @@ export function registerSW() {
       navigator.serviceWorker.register("sw.js").then((r) => r.update()).catch(() => {});
     }
   } catch {}
+}
+
+// Faylni saqlash: brauzerda yuklab olish, Android ilovada esa "Ulashish" oynasi (Telegram, Drive, Fayllar...)
+export async function saveFile(name, text, mime = "text/plain") {
+  const P = window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins;
+  if (P?.Filesystem && P?.Share) {
+    try {
+      const r = await P.Filesystem.writeFile({ path: name, data: text, directory: "CACHE", encoding: "utf8" });
+      await P.Share.share({ title: name, files: [r.uri] });
+      return true;
+    } catch (e) {
+      if (!/cancel/i.test(String(e?.message || e))) toast("Faylni saqlab bo'lmadi", { kind: "error" });
+      return false;
+    }
+  }
+  const url = URL.createObjectURL(new Blob([text], { type: mime }));
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  return true;
 }

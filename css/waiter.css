@@ -112,7 +112,7 @@ body.lux {
 .tables-title { font-family: var(--serif); font-size: 30px; font-weight: 600; margin: 4px 0 14px; }
 .tables-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .seg { display: inline-flex; background: rgba(255,255,255,.05); border: 1px solid var(--line); padding: 4px; border-radius: 14px; gap: 2px; }
-.seg button { padding: 9px 16px; border-radius: 10px; font-weight: 600; color: var(--muted); font-size: 14px; }
+.seg button { padding: 11px 18px; min-height: 42px; border-radius: 10px; font-weight: 600; color: var(--muted); font-size: 14px; }
 .seg button.on { background: var(--gold); color: #1a1208; }
 .legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -260,7 +260,7 @@ body.lux {
 .stepper { display: inline-flex; align-items: center; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 99px; }
 .stepper button { width: 44px; height: 44px; font-size: 20px; font-weight: 500; color: var(--text); }
 .stepper b { min-width: 28px; text-align: center; }
-.stepper.sm button { width: 34px; height: 34px; font-size: 17px; }
+.stepper.sm button { width: 42px; height: 42px; font-size: 18px; }
 .empty.small { padding: 34px 10px; }
 .empty .big { font-size: 40px; }
 .tickets { margin-top: 20px; }
@@ -271,7 +271,7 @@ body.lux {
 .ticket ul { list-style: none; margin: 0 0 6px; padding: 0; font-size: 13px; }
 .ticket li { display: flex; justify-content: space-between; padding: 2px 0; }
 .ticket li.done span:first-child { text-decoration: line-through; color: var(--muted); }
-.link-btn { color: #ff8a80; font-size: 13px; font-weight: 600; padding: 4px 0; }
+.link-btn { color: #ff8a80; font-size: 14px; font-weight: 600; padding: 12px 4px; min-height: 44px; }
 .cart-foot { padding: 14px 20px 20px; border-top: 1px solid var(--line); display: grid; gap: 10px; background: rgba(0,0,0,.25); padding-bottom: max(20px, env(safe-area-inset-bottom)); }
 .cart-foot:empty { display: none; }
 .sum-row { display: flex; justify-content: space-between; align-items: baseline; }
@@ -381,7 +381,7 @@ body.lux {
   .guest-bar .g-btn { flex: 1; padding: 10px 8px; font-size: 13px; white-space: normal; }
 }
 .langs { display: inline-flex; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 99px; padding: 3px; flex: none; }
-.langs button { padding: 7px 11px; border-radius: 99px; font-size: 12px; font-weight: 800; letter-spacing: .06em; color: var(--muted); }
+.langs button { padding: 10px 13px; min-height: 40px; border-radius: 99px; font-size: 13px; font-weight: 800; letter-spacing: .06em; color: var(--muted); }
 .langs button.on { background: var(--gold); color: #1a1208; }
 .menu-head .mh-title { margin-right: auto; }
 .menu-head .search { margin-left: 0; }

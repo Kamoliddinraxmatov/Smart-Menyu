@@ -193,3 +193,5 @@ body.kds {
 .kt-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
 .kt-row .kt-flag { margin: 0; }
 .kt-queue { display: inline-flex; align-items: center; padding: 2px 12px; border-radius: 10px; background: var(--gold); color: #1a1408; font-size: 24px; font-weight: 900; line-height: 1.15; }
+.ksound-warn { background: #7A1F1F; color: #FFE4E4; text-align: center; padding: 12px 16px; font-size: 18px; font-weight: 700; animation: kwarn 1.4s ease-in-out infinite; }
+@keyframes kwarn { 50% { background: #9B2828; } }

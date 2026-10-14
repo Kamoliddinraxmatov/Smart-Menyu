@@ -40,6 +40,24 @@ function migrate(c) {
   return out;
 }
 
+// Buyurtma holatlari tartibi: birlashtirishda holat orqaga qaytmaydi
+const RANK = { new: 0, cooking: 1, ready: 2, served: 3, closed: 4 };
+const STAMPS = ["startedAt", "readyAt", "servedAt", "closedAt", "closedBy", "serviceRate"];
+const body = (o) => { if (!o) return ""; const { rev, base, dev, updatedAt, ...x } = o; return JSON.stringify(x, Object.keys(x).sort()); };
+const same = (a, b) => body(a) === body(b);
+const vid = (o) => `${o.rev || 0}:${o.dev || ""}`; // versiya belgisi
+function mergeOrder(a, b) {
+  // Ikkala qurilmada bir xil natija chiqishi uchun tartib: rev, vaqt, qurilma belgisi
+  const key = (o) => [o.rev || 0, o.updatedAt || 0, o.dev || ""];
+  const ka = key(a), kb = key(b);
+  const bFirst = kb[0] !== ka[0] ? kb[0] > ka[0] : kb[1] !== ka[1] ? kb[1] > ka[1] : kb[2] > ka[2];
+  const [hi, lo] = bFirst ? [b, a] : [a, b];
+  const out = { ...hi };
+  if ((RANK[lo.status] ?? 0) > (RANK[hi.status] ?? 0)) out.status = lo.status;
+  for (const k of STAMPS) if (out[k] == null && lo[k] != null) out[k] = lo[k];
+  return out;
+}
+
 function load(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
 }
@@ -68,6 +86,14 @@ export function createStore(rid, opts = {}) {
     salesLoaded: false,
     configLoaded: !!cached?.config
   };
+
+  // Yuborilmagan buyurtmalar (internet yo'q paytda): sahifa qayta ochilsa ham yo'qolmaydi
+  const outKey = `menyu.outbox.${key ? "2." : ""}${rid}`;
+  const outbox = load(outKey, {});
+  const saveOut = () => save(outKey, outbox);
+  // Har qurilmaning qisqa belgisi: bir vaqtda qilingan o'zgarishlarni bir xil tartibda birlashtirish uchun
+  let dev = "";
+  try { dev = localStorage.getItem("menyu.dev") || Math.random().toString(36).slice(2, 6); localStorage.setItem("menyu.dev", dev); } catch { dev = "x"; }
 
   const listeners = new Set();
   let notifyQueued = false;
@@ -108,12 +134,16 @@ export function createStore(rid, opts = {}) {
         if (!seen || !state.online) return;
         let removed = false;
         for (const id of Object.keys(state.orders)) {
-          if (!seen.has(id) && Date.now() - (state.orders[id].updatedAt || 0) > 15000) { delete state.orders[id]; removed = true; }
+          if (!seen.has(id) && !(id in outbox) && Date.now() - (state.orders[id].updatedAt || 0) > 15000) { delete state.orders[id]; removed = true; }
         }
         seen = null;
         if (removed) changed({ type: "order-removed" });
+        // Namoyish restoranida serverda sozlama bo'lmasa, standart menyu bilan ishlaymiz
+        if (!key && !state.configLoaded) { state.configLoaded = true; changed({ type: "config" }); }
       }, 5000);
     });
+    // Internet yo'q paytda qilingan buyurtmalarni qayta yuborish
+    for (const [id, o] of Object.entries(outbox)) sendOrder(id, o);
     changed({ type: "online" });
   });
   for (const ev of ["close", "offline"]) {
@@ -138,7 +168,9 @@ export function createStore(rid, opts = {}) {
     if (text) { try { data = JSON.parse(text); } catch { return; } }
 
     if (topic === `${base}/config`) {
-      if (data && (data.updatedAt || 0) >= (state.config.updatedAt || 0)) {
+      // Versiya raqami bo'yicha: planshet soati noto'g'ri bo'lsa ham yangi sozlama eskisini bosmaydi
+      const cv = state.config.ver || 0, dv = data?.ver || 0;
+      if (data && (dv > cv || (dv === cv && (data.updatedAt || 0) >= (state.config.updatedAt || 0)))) {
         state.config = migrate({ ...structuredClone(DEFAULT_CONFIG), v: 1, ...data });
         state.configLoaded = true;
         changed({ type: "config" });
@@ -180,25 +212,43 @@ export function createStore(rid, opts = {}) {
       if (seen) seen.add(id);
       const prev = state.orders[id];
       if (!data) {
-        if (prev) { delete state.orders[id]; changed({ type: "order-removed", id }); }
+        if (prev) { delete state.orders[id]; changed({ type: "order-removed", id, prev }); }
         return;
       }
-      // Eski versiyani yangisi ustiga yozmaslik
-      if (prev && (prev.rev || 0) > (data.rev || 0)) return;
-      state.orders[id] = data;
-      changed({ type: "order", order: data, prev });
+      if (id in outbox) {
+        const mine = outbox[id];
+        // Server bizning so'nggi o'zgarishimizni oldi
+        if (mine && mine.rev === data.rev && mine.dev === data.dev) { delete outbox[id]; saveOut(); }
+      }
+      const accept = () => { state.orders[id] = data; changed({ type: "order", order: data, prev }); };
+      // Oddiy holat: o'zgarish biz ko'rgan oxirgi versiyadan qilingan
+      if (!prev || data.base === vid(prev)) return accept();
+      if (data.base === undefined || prev.base === undefined) { if ((prev.rev || 0) <= (data.rev || 0)) accept(); return; }
+      if (same(prev, data)) return;
+      // Ikki planshet bir vaqtda (yoki internetsiz) o'zgartirgan: holatni orqaga qaytarmasdan birlashtiramiz
+      const merged = mergeOrder(prev, data);
+      if (same(merged, data)) return accept();
+      if (same(merged, prev) && (data.rev || 0) <= (prev.rev || 0)) return; // bizdagi versiya to'liqroq va yangiroq
+      merged.rev = Math.max(prev.rev || 0, data.rev || 0);
+      api.putOrder(merged);
     }
   }
 
   // Yuborish ham navbat bilan: shifrlash tugagach, yozilgan tartibda ketadi
-  let outbox = Promise.resolve();
-  function publish(topic, obj) {
+  let sending = Promise.resolve();
+  function publish(topic, obj, onAck) {
     const text = obj == null ? "" : JSON.stringify(obj);
-    outbox = outbox.then(async () => {
+    sending = sending.then(async () => {
       const body = key && text ? await seal(key, text, topic) : text;
-      client.publish(topic, body, { qos: 1, retain: true });
+      client.publish(topic, body, { qos: 1, retain: true }, (err) => { if (!err) onAck?.(); });
     }).catch((e) => console.warn("yuborish:", e?.message || e));
-    return outbox;
+    return sending;
+  }
+  // Buyurtmani yuborish; server qabul qilgach "yuborilmagan"lar ro'yxatidan chiqadi
+  function sendOrder(id, o) {
+    publish(`${base}/orders/${id}`, o, () => {
+      if (id in outbox && (outbox[id] === o || (outbox[id] && o && outbox[id].rev === o.rev))) { delete outbox[id]; saveOut(); }
+    });
   }
 
   const api = {
@@ -206,6 +256,7 @@ export function createStore(rid, opts = {}) {
     on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
 
     saveConfig(config) {
+      config.ver = Math.max(config.ver || 0, state.config.ver || 0) + 1;
       config.updatedAt = Date.now();
       state.config = config;
       state.configLoaded = true;
@@ -222,11 +273,16 @@ export function createStore(rid, opts = {}) {
     },
 
     putOrder(order) {
-      order.rev = (order.rev || 0) + 1;
-      order.updatedAt = Date.now();
       const prev = state.orders[order.id];
+      const from = Math.max(order.rev || 0, prev?.rev || 0);
+      order.base = prev ? vid(prev) : "0:";
+      order.rev = from + 1;
+      order.dev = dev;
+      order.updatedAt = Date.now();
       state.orders[order.id] = order;
-      publish(`${base}/orders/${order.id}`, order);
+      outbox[order.id] = order;
+      saveOut();
+      sendOrder(order.id, order);
       changed({ type: "order", order, prev, local: true });
       return order;
     },
@@ -279,7 +335,9 @@ export function createStore(rid, opts = {}) {
 
     removeOrder(id) {
       delete state.orders[id];
-      publish(`${base}/orders/${id}`, null);
+      outbox[id] = null;
+      saveOut();
+      sendOrder(id, null);
       changed({ type: "order-removed", id });
     },
 
@@ -293,8 +351,9 @@ export function createStore(rid, opts = {}) {
 
     reconnect() { client.reconnect(); },
     // Navbatdagi barcha xabarlar yuborilgach ulanishni yopish
-    close() { return outbox.then(() => new Promise((r) => (client.end ? client.end(false, {}, r) : r()))); },
-    flush() { return outbox; },
+    close() { return sending.then(() => new Promise((r) => (client.end ? client.end(false, {}, r) : r()))); },
+    flush() { return sending; },
+    pending() { return Object.keys(outbox).length; },
     client
   };
   return api;

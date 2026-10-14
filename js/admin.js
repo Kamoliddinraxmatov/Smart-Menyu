@@ -2,7 +2,7 @@
 import { createStore, newId } from "./sync.js";
 import { activate } from "./license.js";
 import {
-  getRid, esc, money, fullName, initials, clock, orderTotal, applyBrand, logoHtml, itemVisual,
+  getRid, saveFile, esc, money, fullName, initials, clock, orderTotal, applyBrand, logoHtml, itemVisual,
   toast, modal, confirmBox, connBadge, fileToDataUrl, cropImage, link, registerSW
 } from "./common.js";
 import { itemTr, catTr } from "./i18n.js";
@@ -18,18 +18,29 @@ const ui = { tab: new URLSearchParams(location.search).has("owner") ? "brand" : 
 const cfg = () => S.config;
 const cur = () => cfg().restaurant.currency || "so'm";
 
+// O'zgarishlar navbati: 0,4 soniyada bir marta saqlanadi. Shu orada boshqa qurilmadan yangi sozlama
+// kelsa ham, bizning o'zgarishlarimiz o'sha yangisining ustiga qo'llanadi (hech narsa yo'qolmaydi).
 let saveTimer = null;
-function save(c = cfg(), msg = "Saqlandi") {
+const pendingFns = [];
+let pendingMsg = "Saqlandi";
+function save(_c, msg = "Saqlandi") {
+  pendingMsg = msg;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    store.saveConfig(structuredClone(c));
-    toast(`✓ ${msg}`, { kind: "ok", timeout: 1500 });
+    if (!S.configLoaded) return;
+    const c = structuredClone(S.config);
+    for (const fn of pendingFns.splice(0)) fn(c);
+    store.saveConfig(c);
+    toast(`✓ ${pendingMsg}`, { kind: "ok", timeout: 1500 });
   }, 400);
 }
+
 function mutate(fn, msg) {
+  if (!S.configLoaded) { toast("Ma'lumotlar hali yuklanmadi. Internetni tekshiring.", { kind: "error" }); return; }
   const c = structuredClone(cfg());
   fn(c);
   S.config = c;            // darhol ko'rsatish uchun
+  pendingFns.push(fn);
   save(c, msg);
 }
 
@@ -47,6 +58,11 @@ const TABS = [
 function render() {
   applyBrand(cfg().restaurant);
   document.title = `${cfg().restaurant.name} · Admin`;
+  // Restoran sozlamalari serverdan kelmaguncha boshqaruvni ochmaymiz (aks holda namoyish menyusi ustiga yozilib ketishi mumkin)
+  if (!S.configLoaded) {
+    app.innerHTML = `<div class="adm-loading"><div class="lic-ico lic-spin">⏳</div><h2>Restoran ma'lumotlari yuklanmoqda...</h2><p>${S.online ? "Bir oz kuting." : "Internet yo'q. Planshet internetga ulanishi bilan davom etadi."}</p></div>`;
+    return;
+  }
   if (cfg().adminPin && !ui.unlocked) return renderLock();
   const r = cfg().restaurant;
   app.innerHTML = `
@@ -397,7 +413,7 @@ function catEditor() {
         b.disabled = false; b.textContent = txt;
       });
       m.querySelector("#addc").addEventListener("click", () => { cats.push({ id: "c" + newId(), name: "Yangi kategoriya", emoji: "🍽️" }); draw(m); });
-      m.querySelector("#ok").addEventListener("click", () => { mutate((x) => { x.categories = cats.filter((y) => y.name.trim()); }, "Kategoriyalar saqlandi"); close(); render(); });
+      m.querySelector("#ok").addEventListener("click", () => { mutate((x) => { x.categories = cats.map((y) => ({ ...y, name: y.name.trim() || "Bo'lim" })); }, "Kategoriyalar saqlandi"); close(); render(); });
     }
   });
 }
@@ -482,26 +498,30 @@ function tabTables(c) {
       <tbody>
         ${cfg().tables.map((t, i) => `
           <tr>
-            <td><input type="text" data-i="${i}" data-k="no" value="${esc(t.no)}" class="in-no"></td>
-            <td><input type="text" data-i="${i}" data-k="zone" value="${esc(t.zone || "")}"></td>
-            <td><input type="number" data-i="${i}" data-k="seats" value="${esc(t.seats || "")}" class="in-seats"></td>
+            <td><input type="text" data-i="${esc(t.id)}" data-k="no" value="${esc(t.no)}" class="in-no"></td>
+            <td><input type="text" data-i="${esc(t.id)}" data-k="zone" value="${esc(t.zone || "")}"></td>
+            <td><input type="number" data-i="${esc(t.id)}" data-k="seats" value="${esc(t.seats || "")}" class="in-seats"></td>
             <td>${S.reserves?.[t.id] ? `<span class="res-tag">🔖 ${esc(S.reserves[t.id].waiterName || "")} · ${clock(S.reserves[t.id].at)}${S.reserves[t.id].note ? ` · ${esc(S.reserves[t.id].note)}` : ""}</span> <button class="btn btn-ghost btn-sm" data-unres="${esc(t.id)}">Bekor qilish</button>` : `<span class="muted">—</span>`}</td>
-            <td><button class="icon-btn" data-del="${i}">🗑</button></td>
+            <td><button class="icon-btn" data-del="${esc(t.id)}">🗑</button></td>
           </tr>`).join("")}
       </tbody>
     </table>
   </div>`;
   c.querySelectorAll("[data-k]").forEach((inp) => inp.addEventListener("change", () => {
-    mutate((x) => { const t = x.tables[+inp.dataset.i]; t[inp.dataset.k] = inp.dataset.k === "seats" ? Number(inp.value) : inp.value; }, "Stol saqlandi");
+    mutate((x) => { const t = x.tables.find((y) => y.id === inp.dataset.i); if (t) t[inp.dataset.k] = inp.dataset.k === "seats" ? Number(inp.value) : inp.value; }, "Stol saqlandi");
   }));
   c.querySelectorAll("[data-unres]").forEach((b) => b.addEventListener("click", async () => {
     if (!(await confirmBox("Bron bekor qilinsinmi?", "Bekor qilish", { danger: true }))) return;
     store.setReserve(b.dataset.unres, null); toast("Bron bekor qilindi", { kind: "ok" }); render();
   }));
   c.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
-    const t = cfg().tables[+b.dataset.del];
+    const t = cfg().tables.find((y) => y.id === b.dataset.del);
+    if (!t) return;
+    if (Object.values(S.orders).some((o) => o.tableId === t.id && o.status !== "closed")) {
+      toast(`Stol ${esc(t.no)} hozir band. Avval ofitsiant stolni yopsin.`, { kind: "error", timeout: 5000 }); return;
+    }
     if (!(await confirmBox(`Stol ${esc(t.no)} o'chirilsinmi?`, "O'chirish", { danger: true }))) return;
-    mutate((x) => { x.tables.splice(+b.dataset.del, 1); }, "Stol o'chirildi"); render();
+    mutate((x) => { x.tables = x.tables.filter((y) => y.id !== t.id); }, "Stol o'chirildi"); render();
   }));
   c.querySelector("#add").addEventListener("click", () => {
     const nums = cfg().tables.map((t) => parseInt(t.no, 10)).filter((n) => !isNaN(n));
@@ -644,45 +664,25 @@ function tabReport(c) {
 
 // Excel to'g'ri ochishi uchun: UTF-8 BOM va ";" ajratuvchi
 function downloadCsv(filename, rows) {
-  if (window.Capacitor?.isNativePlatform?.()) {
-    toast("Ilovada fayl yuklab olish keyingi versiyada. Hozircha hisobotni brauzerdagi admin paneldan yuklab oling.", { kind: "error", timeout: 7000 });
-    return;
-  }
-  const cell = (v) => { const t = String(v ?? ""); return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  // Formulaga o'xshagan katakchalar (=, +, -, @) Excel'da formula bo'lib ishlamasin
+  const cell = (v) => { let t = String(v ?? ""); if (/^[=+\-@]/.test(t) && typeof v !== "number") t = "'" + t; return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
   const csv = "\ufeff" + rows.map((r) => r.map(cell).join(";")).join("\r\n");
-  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-  const a = document.createElement("a");
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-  toast("✓ Fayl yuklab olindi: " + esc(filename), { kind: "ok" });
+  saveFile(filename, csv, "text/csv;charset=utf-8");
 }
 
 // ---------- Qurilmalar ----------
 function tabDevices(c) {
-  const base = location.href.replace(/admin\.html.*$/, "");
-  const links = [
-    ["🧑‍💼", "Ofitsiant planshetlari", "waiter.html", "Har bir ofitsiant planshetida shu havolani oching va ismini tanlasin."],
-    ["👨‍🍳", "Oshxona ekrani", "kitchen.html", "Oshxonadagi planshet yoki televizorda oching."],
-    ["⚙️", "Admin panel", "admin.html", "Menyu, narx va stollarni boshqarish."]
-  ];
   c.innerHTML = `
-  <div class="page-head"><h1>Qurilmalarni ulash</h1><p>Restoran kodi: <b class="code">${esc(rid)}</b>. Barcha qurilmalar shu kod orqali bir-biriga ulanadi.</p></div>
-  <div class="dev-grid">
-    ${links.map(([ic, name, page, hint]) => {
-      const url = base + link(page, rid);
-      return `<div class="card dev">
-        <div class="dev-ic">${ic}</div><h3>${name}</h3><p class="muted">${hint}</p>
-        <img class="qr" alt="QR" src="${qrSrc(url)}">
-        <div class="url">${esc(url)}</div>
-        <div class="dev-actions"><button class="btn btn-ghost" data-copy="${esc(url)}">📋 Nusxa olish</button><a class="btn btn-primary" href="${esc(url)}" target="_blank">Ochish</a></div>
-      </div>`;
-    }).join("")}
-  </div>
-`;
-  c.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText(b.dataset.copy); toast("Nusxa olindi", { kind: "ok" }); } catch { prompt("Havola:", b.dataset.copy); }
-  }));
+  <div class="page-head"><h1>Yangi planshet qo'shish</h1><p>Har bir planshet (ofitsiant, oshxona yoki boshqaruv) Smart Menyu tomonidan tasdiqlanadi.</p></div>
+  <div class="card dev-steps">
+    <ol>
+      <li>Planshetga <b>Smart Menyu</b> ilovasini o'rnating.</li>
+      <li>Ilovani oching va restoran kodini kiriting: <b class="code big-code">${esc(rid)}</b></li>
+      <li>Planshet ekranida chiqqan <b>planshet kodini</b> Smart Menyu'ga ayting. Tasdiqlangach ilova o'zi ochiladi.</li>
+      <li>Planshetda kerakli bo'limni tanlang: <b>Ofitsiant</b>, <b>Oshxona ekrani</b> yoki <b>Boshqaruv</b>.</li>
+    </ol>
+    <p class="muted">Bu planshet: <b class="code">${esc(ACT.dev ? ACT.dev.id.slice(0, 4) + "-" + ACT.dev.id.slice(4) : "namoyish")}</b>${ACT.lic ? ` · Obuna: <b>${new Date(ACT.watcher?.lic?.until || ACT.lic.until).toLocaleDateString("ru-RU")}</b> gacha` : ""}</p>
+  </div>`;
 }
 
 store.on((evt) => {

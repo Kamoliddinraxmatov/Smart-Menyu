@@ -3,7 +3,7 @@ import { createStore } from "./sync.js";
 import { activate } from "./license.js";
 import {
   getRid, esc, fullName, clock, shortNo, applyBrand, logoHtml,
-  unlockAudio, chime, keepAwake, toast, modal, connBadge, registerSW, link
+  unlockAudio, audioReady, chime, keepAwake, toast, modal, connBadge, registerSW, link
 } from "./common.js";
 
 const ACT = await activate();
@@ -15,6 +15,8 @@ const app = document.getElementById("app");
 const WARN_MIN = 10;   // shu daqiqadan keyin sariq
 const LATE_MIN = 20;   // shu daqiqadan keyin qizil
 
+const known = new Set(Object.keys(S.orders)); // ekranda allaqachon bo'lgan buyurtmalar
+let lastChime = 0;
 const ui = {
   started: sessionStorage.getItem("menyu.kds.started") === "1",
   tab: "active",       // active | ready
@@ -72,6 +74,7 @@ function render() {
       <span class="kclock" id="kclock">${clock()}</span>
     </div>
   </header>
+  ${ui.sound && !audioReady() ? `<div class="ksound-warn">🔇 Ovozli signal o'chiq. Yoqish uchun ekranning istalgan joyiga bir marta bosing.</div>` : ""}
   <div class="kmain ${ui.allDay && ui.tab === "active" ? "with-side" : ""}">
     <section class="kboard" id="board">${ui.tab === "active" ? boardActive(list) : boardReady()}</section>
     ${ui.allDay && ui.tab === "active" ? `<aside class="allday">${allDay(list)}</aside>` : ""}
@@ -240,14 +243,19 @@ const portionText = (opts) => (!opts ? "1 porsiya" : /porsiya/i.test(opts) ? opt
 
 // ---------- Realtime ----------
 store.on((evt) => {
-  if (evt.type === "order" && !evt.local && evt.order.status === "new" && !evt.prev) {
-    // Faqat haqiqatan yangi (oxirgi 2 daqiqada yuborilgan) buyurtma uchun signal
-    if (Date.now() - evt.order.createdAt < 120000) {
-      ui.fresh.add(evt.order.id);
-      setTimeout(() => { ui.fresh.delete(evt.order.id); }, 8000);
-      if (ui.sound && ui.started) chime("new");
-      if (ui.started) toast(`🔔 Yangi buyurtma: <b>Stol ${esc(evt.order.tableNo)}</b> · ${esc(evt.order.waiterName || "")}`, { timeout: 5000 });
-    }
+  if (evt.type === "order" && !evt.local && evt.order.status === "new" && !known.has(evt.order.id)) {
+    // Bu ekran hali ko'rmagan buyurtma (internet uzilgan paytda kelganlari ham): signal
+    known.add(evt.order.id);
+    ui.fresh.add(evt.order.id);
+    setTimeout(() => { ui.fresh.delete(evt.order.id); }, 8000);
+    if (ui.sound && ui.started && Date.now() - lastChime > 1500) { lastChime = Date.now(); chime("new"); }
+    if (ui.started) toast(`🔔 Yangi buyurtma: <b>Stol ${esc(evt.order.tableNo)}</b> · ${esc(evt.order.waiterName || "")}`, { timeout: 5000 });
+  }
+  if (evt.type === "order") known.add(evt.order.id);
+  // Ofitsiant buyurtmani bekor qildi: oshpaz bilsin
+  if (evt.type === "order-removed" && !evt.local && evt.prev && ["new", "cooking"].includes(evt.prev.status) && ui.started) {
+    if (ui.sound) chime("error");
+    toast(`❌ <b>Stol ${esc(evt.prev.tableNo)}</b>: buyurtma #${esc(shortNo(evt.prev))} bekor qilindi`, { kind: "error", timeout: 10000 });
   }
   if (evt.type === "render" && !document.querySelector(".modal-back")) render();
   if (evt.type === "render" && document.querySelector(".modal-back")) {
@@ -273,7 +281,8 @@ setInterval(() => {
 
 // Signal faqat yangi buyurtma kelganda bir marta chalinadi (takroriy eslatma yo'q — oshpazni bezovta qilmasin)
 
-document.addEventListener("pointerdown", unlockAudio);
+// Sahifa qayta yuklangach brauzer ovozni bloklaydi: birinchi bosishda yoqamiz
+document.addEventListener("pointerdown", () => { const was = audioReady(); unlockAudio(); keepAwake(); if (!was) setTimeout(render, 100); });
 store.cleanup();
 render();
 registerSW();

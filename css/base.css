@@ -112,6 +112,7 @@ label.field > span { display: block; font-size: 13px; font-weight: 600; color: v
   display: grid; place-items: center; padding: 16px; opacity: 0; transition: opacity .2s;
 }
 .modal-back.show { opacity: 1; }
+.modal-back:not(.show) { pointer-events: none; } /* yopilayotgan oynani ikkinchi marta bosib bo'lmaydi */
 .modal {
   background: var(--surface); border-radius: 20px; width: min(460px, 100%); max-height: calc(100vh - 32px);
   display: flex; flex-direction: column; box-shadow: var(--shadow-lg); overflow: hidden;

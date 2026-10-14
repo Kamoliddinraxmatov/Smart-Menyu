@@ -11,7 +11,7 @@ import {
   passKey, open, seal, importSignKey, sign, newEphemeral, wrapFor, genDataKey, importDataKey,
   prettyId, fingerprint, kvGet, kvSet, kvDel, b64, rand
 } from "./crypto.js";
-import { esc, money, modal, toast, confirmBox, fileToDataUrl, registerSW } from "./common.js";
+import { esc, money, modal, toast, confirmBox, fileToDataUrl, registerSW, saveFile } from "./common.js";
 
 const app = document.getElementById("app");
 const DAY = 86400000;
@@ -645,10 +645,7 @@ function renderSettings() {
   });
   $("#exp").addEventListener("click", async () => {
     const text = await seal(keys.state, JSON.stringify(S), "backup");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([text], { type: "application/octet-stream" }));
-    a.download = `smart-menyu-zaxira-${fmtDate(Date.now())}.smz`;
-    a.click();
+    saveFile(`smart-menyu-zaxira-${fmtDate(Date.now())}.smz`, text, "application/octet-stream");
   });
   $("#imp").addEventListener("change", async (e) => {
     const f = e.target.files[0]; if (!f) return;

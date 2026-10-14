@@ -98,7 +98,7 @@ function activeOrders(tid) {
 }
 function tableState(tid) {
   const os = activeOrders(tid);
-  if (!os.length && S.reserves?.[tid]) return { key: "reserved", label: `🔖 ${L("Bron", "Бронь", "Reserved")}`, orders: os, res: S.reserves[tid] };
+  if (!os.length && S.reserves?.[tid] && Date.now() - (S.reserves[tid].at || 0) < 24 * 3600 * 1000) return { key: "reserved", label: `🔖 ${L("Bron", "Бронь", "Reserved")}`, orders: os, res: S.reserves[tid] };
   if (!os.length) return { key: "free", label: L("Bo'sh", "Свободен", "Free"), orders: os };
   if (os.some((o) => o.status === "ready")) return { key: "ready", label: L("Tayyor ✓", "Готово ✓", "Ready ✓"), orders: os };
   if (os.some((o) => o.status === "cooking")) return { key: "cooking", label: L("Tayyorlanmoqda", "Готовится", "Cooking"), orders: os };
@@ -236,9 +236,21 @@ function guestExit() {
   });
 }
 
+// Savatdagi tugagan (stop-list) taomlarni olib tashlash. Qolgan savatni qaytaradi.
+function dropStopped(t) {
+  const cart = getCart(t.id);
+  const gone = cart.filter((c) => S.stop?.[c.itemId] || !cfg().items.some((i) => i.id === c.itemId));
+  if (!gone.length) return cart;
+  const left = cart.filter((c) => !gone.includes(c));
+  setCart(t.id, left);
+  toast(`${L("Tugagan taomlar savatdan olib tashlandi", "Закончившиеся блюда убраны из корзины", "Unavailable dishes were removed")}: <b>${gone.map((c) => esc(cartName(c))).join(", ")}</b>`, { kind: "error", timeout: 6000 });
+  renderCart();
+  return left;
+}
+
 // Mijoz o'zi buyurtma beradi: oddiy tasdiqlash oynasi
 function guestConfirm(t) {
-  const cart = getCart(t.id);
+  const cart = dropStopped(t);
   if (!cart.length) return;
   // bo'sh stol — planshetni mijozga bergan ofitsiant xizmat qiladi
   const w = waiterById(tableWaiterId(t)) || meW();
@@ -256,7 +268,10 @@ function guestConfirm(t) {
       <button class="btn btn-primary btn-lg" id="send">${T("send")}</button>
     </div>`, {
     onMount(m, close) {
+      let sent = false;
       m.querySelector("#send").addEventListener("click", () => {
+        if (sent) return; // ikki marta bosilsa, ikki marta yubormaslik
+        sent = true;
         if (S.reserves?.[t.id]) store.setReserve(t.id, null);
         store.putOrder({
           id: newId(),
@@ -530,7 +545,7 @@ function tableTap(tid) {
   const st = tableState(tid);
   if (!t) return;
   if (st.key === "free" || st.key === "reserved") return freeTap(t, st);
-  if (viewState(t).key === "other") return toast(`${ST(esc(t.no))}: ${L("bu stolga boshqa ofitsiant xizmat qilmoqda", "этот стол обслуживает другой официант", "another waiter serves this table")} (${esc(fullName(waiterById(tableWaiterId(t))))})`);
+  if (viewState(t).key === "other") return takeOver(t);
   const total = st.orders.reduce((s, o) => s + orderTotal(o), 0);
   modal(`
     <div class="modal-head"><h3>${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
@@ -544,6 +559,30 @@ function tableTap(tid) {
     onMount(m, close) {
       m.querySelector("#tapAdd").addEventListener("click", () => { close(); openTable(tid); });
       m.querySelector("#tapClose").addEventListener("click", () => { close(); billModal(t); });
+    }
+  });
+}
+
+// Boshqa ofitsiantning stoli (u ketgan yoki o'chirilgan bo'lishi mumkin): o'ziga olish
+function takeOver(t) {
+  const other = waiterById(tableWaiterId(t));
+  const name = esc(fullName(other) || L("boshqa ofitsiant", "другой официант", "another waiter"));
+  modal(`
+    <div class="modal-head"><h3>${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body"><p class="tap-status">${L(`Bu stolga <b>${name}</b> xizmat qilmoqda.`, `Этот стол обслуживает <b>${name}</b>.`, `This table is served by <b>${name}</b>.`)}</p>
+      <p class="muted">${L("Agar u ishda bo'lmasa, stolni o'zingizga olishingiz mumkin. Keyin tayyor xabarlari sizga keladi.", "Если его нет на смене, вы можете забрать стол себе. Уведомления о готовности будут приходить вам.", "If they are not on shift, you can take the table over. Ready alerts will come to you.")}</p></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>${L("Bekor qilish", "Отмена", "Cancel")}</button>
+      <button class="btn btn-primary btn-lg" id="take">${L("Stolni o'zimga olish", "Забрать стол себе", "Take over the table")}</button>
+    </div>`, {
+    onMount(m, close) {
+      m.querySelector("#take").addEventListener("click", () => {
+        const me = meW();
+        for (const o of activeOrders(t.id)) store.updateOrder(o.id, { waiterId: me.id, waiterName: fullName(me) });
+        close();
+        toast(`✓ ${ST(esc(t.no))}: ${L("endi sizning stolingiz", "теперь ваш стол", "now your table")}`, { kind: "ok" });
+        setTimeout(() => tableTap(t.id), 250);
+      });
     }
   });
 }
@@ -1025,7 +1064,7 @@ function nextNo() {
 
 // Ofitsiant tasdiqlashi bilan buyurtma darhol oshxonaga ketadi (alohida oyna yo'q)
 function confirmOrder(t) {
-  const cart = getCart(t.id);
+  const cart = dropStopped(t);
   if (!cart.length) return;
   const me = meW();
   const active = activeOrders(t.id);
@@ -1100,7 +1139,9 @@ function billModal(t) {
       <button class="btn btn-ok btn-lg btn-block" id="close">✓ ${L("Stolni yopish", "Закрыть стол", "Close table")}</button>
     </div>`, {
     onMount(m, close) {
-      m.querySelector("#close").addEventListener("click", () => {
+      m.querySelector("#close").addEventListener("click", async () => {
+        const cooking = orders.filter((o) => o.status === "new" || o.status === "cooking").length;
+        if (cooking && !(await confirmBox(L(`Oshxonada hali ${cooking} ta buyurtma tayyorlanmoqda. Stol baribir yopilsinmi?`, `На кухне ещё готовится заказов: ${cooking}. Всё равно закрыть стол?`, `${cooking} order(s) are still cooking. Close the table anyway?`), L("Ha, yopish", "Да, закрыть", "Yes, close"), { danger: true }))) return;
         const now = Date.now();
         orders.forEach((o) => {
           const done = store.updateOrder(o.id, { status: "closed", closedAt: now, servedAt: o.servedAt || now, serviceRate: rate, closedBy: fullName(meW()) });
@@ -1169,14 +1210,48 @@ function receiptHtml({ t, w, orders, lines, pay, split = 0, title = "" }) {
   </body></html>`;
 }
 
+// Termoprinter uchun oddiy matnli chek (58 mm: 32 belgi, 80 mm: 48 belgi)
+function receiptText({ t, w, orders, lines }) {
+  const r = cfg().restaurant;
+  const W = String(r.receiptWidth || "80") === "58" ? 32 : 48;
+  const c = r.currency || "so'm";
+  const m = (x) => money(x, c);
+  const center = (x) => { x = String(x).slice(0, W); const p = Math.floor((W - x.length) / 2); return " ".repeat(Math.max(0, p)) + x; };
+  const lr = (a, b) => { a = String(a); b = String(b); const sp = W - a.length - b.length; return sp >= 1 ? a + " ".repeat(sp) + b : `${a}\n${" ".repeat(Math.max(0, W - b.length))}${b}`; };
+  const line = "-".repeat(W);
+  const sub = lines.reduce((s, l) => s + l.qty * l.price, 0);
+  const rate = Number(r.service) || 0;
+  const service = Math.round(sub * rate / 100);
+  const d = new Date();
+  const dt = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()} ${clock()}`;
+  const out = [center(r.name || ""), r.address && center(r.address), r.phone && center(r.phone), line,
+    lr("Stol", t.no), lr("Ofitsiant", fullName(w) || ""), lr("Chek", orders.map((o) => "#" + shortNo(o)).join(",")), lr("Sana", dt), line];
+  for (const l of lines) {
+    out.push(l.name + (l.opts ? ` (${l.opts})` : ""));
+    out.push(lr(`  ${l.qty} x ${m(l.price)}`, m(l.qty * l.price)));
+  }
+  out.push(line, lr("Jami", m(sub)));
+  if (rate) out.push(lr(`Xizmat ${rate}%`, m(service)));
+  out.push(lr("TO'LOV", m(sub + service)), line, center(r.receiptNote || "Rahmat! Yana kutib qolamiz"), center("Smart Menyu"), "", "", "");
+  return out.filter((x, i) => typeof x === "string" && (x !== "" || i >= out.length - 3)).join("\n");
+}
+
+// Android ilovada: RawBT ilovasi orqali Bluetooth/USB termoprinterga yuborish
+function printNative(opts) {
+  const text = receiptText(opts);
+  try { location.href = "rawbt:" + encodeURIComponent(text); }
+  catch { toast("Printer ilovasi (RawBT) topilmadi", { kind: "error" }); }
+}
+
 // Stol yopilgandan keyin chek shakllanadi: ko'rsatamiz, xohlasa chop etadi
 function showReceipt(opts) {
   const native = window.Capacitor?.isNativePlatform?.();
   modal(`
     <div class="modal-head"><h3>🧾 ${L("Chek", "Чек", "Receipt")} · ${ST(esc(opts.t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
-    <div class="modal-body"><iframe class="receipt-preview" srcdoc="${esc(receiptHtml(opts))}"></iframe></div>
+    <div class="modal-body"><iframe class="receipt-preview" srcdoc="${esc(receiptHtml(opts))}"></iframe>
+      ${native ? `<p class="muted small">${L("Termoprinterga chop etish uchun planshetda RawBT ilovasi o'rnatilgan va printer ulangan bo'lishi kerak.", "Для печати на термопринтере на планшете должно быть приложение RawBT и подключённый принтер.", "Printing needs the RawBT app with a connected thermal printer.")}</p>` : ""}</div>
     <div class="modal-actions">
-      ${native ? "" : `<button class="btn btn-ghost" data-act="print">🖨 ${L("Chop etish", "Печать", "Print")}</button>`}
+      <button class="btn btn-ghost" data-act="print">🖨 ${L("Chop etish", "Печать", "Print")}</button>
       <button class="btn btn-primary btn-lg" data-close>${L("Tayyor", "Готово", "Done")}</button>
     </div>`, {
     onMount(m) { m.querySelector("[data-act=print]")?.addEventListener("click", () => printReceipt(opts)); }
@@ -1185,14 +1260,8 @@ function showReceipt(opts) {
 
 function printReceipt(opts) {
   const html = receiptHtml(opts);
-  // Android ilovasi (APK) ichida brauzer chop etish oynasi yo'q: chekni ko'rsatamiz
-  if (window.Capacitor?.isNativePlatform?.()) {
-    modal(`
-      <div class="modal-head"><h3>🧾 Chek</h3><button class="icon-btn" data-close>✕</button></div>
-      <div class="modal-body"><iframe class="receipt-preview" srcdoc="${esc(html)}"></iframe>
-        <p class="muted small">Termoprinterga to'g'ridan-to'g'ri chop etish ilovaning keyingi versiyasida (Bluetooth printer) qo'shiladi. Hozircha brauzerdagi versiyadan chop etish mumkin.</p></div>`);
-    return;
-  }
+  // Android ilovasi (APK) ichida brauzer chop etish oynasi yo'q: chek RawBT ilovasiga yuboriladi
+  if (window.Capacitor?.isNativePlatform?.()) return printNative(opts);
   const old = document.getElementById("printFrame");
   old?.remove();
   const f = document.createElement("iframe");
@@ -1272,6 +1341,7 @@ store.on((evt) => {
   if (evt.type !== "render") return;
   const active = document.activeElement;
   const typing = active && (active.id === "q" || active.closest?.(".modal"));
+  if (ui.view === "table" && !tableById(ui.tableId)) return render(); // stol admin tomonidan o'chirilgan
   if (ui.view === "table" && app.querySelector("#grid")) {
     // Menyu ochiq: qidiruv maydonini buzmaslik uchun faqat kerakli qismlarni yangilaymiz
     const pill = app.querySelector("[data-act=show-ready] b");
@@ -1290,6 +1360,9 @@ function guestEvent(evt) {
   if (evt.type === "order" && !evt.local && evt.order.tableId === ui.guest && evt.order.status === "ready" && evt.prev?.status !== "ready") {
     chime("ready");
     toast(T("ready"), { kind: "ready", timeout: 7000 });
+  } else if (evt.type === "order" && !evt.local && evt.order.status === "ready" && evt.prev && evt.prev.status !== "ready" && evt.order.waiterId === ui.me?.id) {
+    // Planshet mijozda: ofitsiantning boshqa stoli tayyor. Mijozni chalg'itmaslik uchun faqat tebranish
+    vibrate([120, 80, 120, 80, 120]);
   }
   if (evt.type === "config" || evt.type === "stop") ui.menuDirty = true;
   if (evt.type !== "render") return;
@@ -1300,6 +1373,9 @@ function guestEvent(evt) {
   renderCart();
   if (ui.menuDirty) { ui.menuDirty = false; renderCats(); renderGrid(); }
 }
+
+// Ilova qayta ochilganda ham ekran o'chmasin va ovoz ishlasin (brauzer birinchi bosishni talab qiladi)
+document.addEventListener("pointerdown", () => { unlockAudio(); if (ui.me) keepAwake(); }, { passive: true });
 
 // Mijoz rejimida "orqaga" tugmasi menyudan chiqarmaydi
 window.addEventListener("popstate", () => { if (ui.guest) history.pushState({ guest: 1 }, ""); });
