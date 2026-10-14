@@ -503,7 +503,7 @@ function renderRest(r) {
         <h3>Restoran</h3>
         <div class="ow-row-btns">
           <button class="btn btn-ghost" id="edit">✏️ Ma'lumotlarni tahrirlash</button>
-          <button class="btn btn-ghost" id="brand">🎨 Nomi, logo va rangi</button>
+          <button class="btn btn-ghost" id="brand">🎨 Nomi, logo, chek va PIN</button>
           <button class="btn btn-ghost" id="pin">🔑 Admin PIN'ni tiklash</button>
         </div>
       </section>
@@ -611,7 +611,7 @@ function editInfo(r) {
 
 function editBrand(r) {
   modal(`
-    <div class="modal-head"><h3>Nomi, logo va rangi</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-head"><h3>Restoran sozlamalari</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body"><p class="ow-hint">Yuklanmoqda...</p></div>`, {
     async onMount(m, close) {
       let cfg = null;
@@ -626,7 +626,17 @@ function editBrand(r) {
         <div class="row2">
           <label class="field"><span>Brend rangi</span><input type="color" id="bColor" value="${esc(R.color || "#B4232A")}"></label>
           <label class="field"><span>Xizmat haqi, %</span><input type="number" id="bSvc" min="0" max="30" value="${esc(R.service ?? 0)}"></label>
-        </div>`;
+        </div>
+        <div class="row2">
+          <label class="field"><span>Telefon (chekda)</span><input id="bPhone" type="tel" value="${esc(R.phone || "")}"></label>
+          <label class="field"><span>Valyuta</span><input id="bCur" value="${esc(R.currency || "so'm")}"></label>
+        </div>
+        <label class="field"><span>Manzil (chekda)</span><input id="bAddr" value="${esc(R.address || "")}"></label>
+        <div class="row2">
+          <label class="field"><span>Chek kengligi</span><select id="bW">${["80", "58"].map((w) => `<option value="${w}" ${String(R.receiptWidth || "80") === w ? "selected" : ""}>${w} mm</option>`).join("")}</select></label>
+          <label class="field"><span>Boshqaruv PIN kodi</span><input id="bPin" inputmode="numeric" value="${esc(cfg.adminPin || "")}" placeholder="bo'sh: parolsiz"></label>
+        </div>
+        <label class="field"><span>Chek pastidagi matn</span><input id="bNote" value="${esc(R.receiptNote || "")}" placeholder="Rahmat! Yana kutib qolamiz"></label>`;
       m.insertAdjacentHTML("beforeend", `<div class="modal-actions"><button class="btn btn-ghost" data-close2>Bekor qilish</button><button class="btn btn-primary" id="ok">Saqlash</button></div>`);
       m.querySelector("[data-close2]").addEventListener("click", close);
       m.querySelector("#logo").addEventListener("change", async (e) => {
@@ -634,7 +644,12 @@ function editBrand(r) {
         try { R.logo = await fileToDataUrl(f, 256, 0.85); m.querySelector("#lg").innerHTML = `<img src="${esc(R.logo)}" alt="">`; } catch { toast("Rasmni ochib bo'lmadi", { kind: "error" }); }
       });
       m.querySelector("#ok").addEventListener("click", async () => {
-        Object.assign(R, { name: m.querySelector("#bName").value.trim() || R.name, slogan: m.querySelector("#bSlogan").value.trim(), color: m.querySelector("#bColor").value, service: Number(m.querySelector("#bSvc").value) || 0 });
+        const v = (id) => m.querySelector(id).value.trim();
+        Object.assign(R, {
+          name: v("#bName") || R.name, slogan: v("#bSlogan"), color: m.querySelector("#bColor").value, service: Number(v("#bSvc")) || 0,
+          phone: v("#bPhone"), currency: v("#bCur") || "so'm", address: v("#bAddr"), receiptWidth: m.querySelector("#bW").value, receiptNote: v("#bNote")
+        });
+        cfg.adminPin = v("#bPin").replace(/\D/g, "").slice(0, 8);
         try { await withStore(r, (s) => s.saveConfig(cfg)); } catch { return toast("Aloqa yo'q", { kind: "error" }); }
         if (R.name !== r.name) { r.name = R.name; await publishLicense(r); }
         close(); render(); toast("Saqlandi", { kind: "ok" });
