@@ -10,7 +10,7 @@
 //   <base>/reserves/<tableId> stol oldindan band (bron): { at, waiterId, waiterName, note }
 //   <base>/sales/<sana>/<id> yopilgan chekning ixcham nusxasi (hisobot uchun, faqat admin o'qiydi)
 import { DEFAULT_CONFIG } from "./defaults.js";
-import { brokerUrl, V2 } from "./license.js";
+import { brokerUrl, brokerOpts, V2 } from "./license.js";
 import { seal, open } from "./crypto.js";
 
 const PREFIX = "menyuuz/v1"; // namoyish (demo) restorani: shifrlanmagan
@@ -68,6 +68,7 @@ function save(key, value) {
 // opts.key: restoranning AES kaliti (faollashtirilgan planshetda). Bo'lsa, barcha ma'lumotlar shifrlanadi
 //           va <v2>/<rid>/... mavzulariga yoziladi. Bo'lmasa (namoyish), eski ochiq <v1> mavzulari.
 // opts.watcher: ruxsatnoma o'zgarishini kuzatuvchi (license.js)
+// opts.url / opts.auth: server manzili va login (egasi ilovasi o'z sozlamasidan beradi)
 export function createStore(rid, opts = {}) {
   const key = opts.key || null;
   const base = key ? `${V2}/${rid}` : `${PREFIX}/${rid}`;
@@ -112,7 +113,8 @@ export function createStore(rid, opts = {}) {
     }
   }
 
-  const client = window.MENYU_DEMO ? localBus() : window.mqtt.connect(brokerUrl(), {
+  const client = window.MENYU_DEMO ? localBus() : window.mqtt.connect(opts.url || brokerUrl(!key), {
+    ...(opts.auth || (key ? brokerOpts() : {})),
     clientId: `menyu_${rid}_${Math.random().toString(16).slice(2, 10)}`,
     clean: true,
     keepalive: 30,

@@ -1,0 +1,7 @@
+{$DOMAIN} {
+	# Planshetlar wss://<domen>/mqtt manziliga ulanadi
+	handle /mqtt* {
+		reverse_proxy mqtt:9001
+	}
+	respond "Smart Menyu server ishlayapti" 200
+}

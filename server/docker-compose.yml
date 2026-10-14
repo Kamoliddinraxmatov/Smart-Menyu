@@ -1,0 +1,25 @@
+# Smart Menyu o'z serveri: Mosquitto (MQTT) + Caddy (avtomatik HTTPS sertifikat).
+# Ishga tushirish: README.md ga qarang.
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    restart: always
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./passwd:/mosquitto/config/passwd
+      - ./acl:/mosquitto/config/acl:ro
+      - mqtt-data:/mosquitto/data
+  caddy:
+    image: caddy:2
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+volumes:
+  mqtt-data:
+  caddy-data:

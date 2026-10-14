@@ -17,10 +17,46 @@ export const DEFAULT_BROKER = "wss://broker.emqx.io:8084/mqtt";
 const ACT = "menyu.act";
 const DAY = 86400000;
 
-export function brokerUrl() {
+// Server manzili: ?broker= (sinov uchun) > qo'lda saqlangan > egasi bergan o'z server > umumiy server.
+// Namoyish restorani doim umumiy serverda.
+export function brokerUrl(demo = false) {
   const q = new URLSearchParams(location.search).get("broker");
   if (q) { try { localStorage.setItem("menyu.broker", q); } catch {} return q; }
-  try { return localStorage.getItem("menyu.broker") || localStorage.getItem("menyu.licBroker") || DEFAULT_BROKER; } catch { return DEFAULT_BROKER; }
+  try { return localStorage.getItem("menyu.broker") || (!demo && localStorage.getItem("menyu.licBroker")) || DEFAULT_BROKER; } catch { return DEFAULT_BROKER; }
+}
+
+// O'z serverimizga login/parol (ruxsatnoma bilan keladi)
+export function brokerOpts() {
+  try { const m = JSON.parse(localStorage.getItem("menyu.licMqtt") || "null"); return m?.user ? { username: m.user, password: m.pass } : {}; } catch { return {}; }
+}
+function rememberServer(lic) {
+  try {
+    if (lic.broker) localStorage.setItem("menyu.licBroker", lic.broker); else localStorage.removeItem("menyu.licBroker");
+    if (lic.mqtt) localStorage.setItem("menyu.licMqtt", JSON.stringify(lic.mqtt)); else localStorage.removeItem("menyu.licMqtt");
+  } catch {}
+}
+
+// Yangi planshet: egasi o'z serveriga o'tgan bo'lsa, umumiy serverdagi imzolangan "ko'rsatkich"dan manzilni oladi
+async function findServer() {
+  if (new URLSearchParams(location.search).get("broker") || localStorage.getItem("menyu.licBroker") || !window.mqtt) return;
+  await new Promise((resolve) => {
+    const c = window.mqtt.connect(DEFAULT_BROKER, { clientId: `menyu_ptr_${Math.random().toString(16).slice(2, 8)}`, clean: true, reconnectPeriod: 0, connectTimeout: 6000 });
+    const done = () => { try { c.end(true); } catch {} resolve(); };
+    const t = setTimeout(done, 5000);
+    c.on("error", () => { clearTimeout(t); done(); });
+    c.on("connect", () => c.subscribe(`${V2}/_server`));
+    c.on("message", async (_, payload) => {
+      try {
+        const msg = JSON.parse(payload.toString());
+        pubKey = pubKey || await importVerifyKey(OWNER.pub);
+        if (await verify(pubKey, msg.p, msg.s)) {
+          const ptr = JSON.parse(msg.p);
+          if (ptr.broker) rememberServer(ptr);
+        }
+      } catch {}
+      clearTimeout(t); done();
+    });
+  });
 }
 
 const loadAct = () => { try { return JSON.parse(localStorage.getItem(ACT) || "null"); } catch { return null; } };
@@ -166,7 +202,7 @@ function demo() {
 
 async function ready(rid, r, dev) {
   try { localStorage.setItem("menyu.rid", rid); } catch {}
-  if (r.lic.broker) { try { localStorage.setItem("menyu.licBroker", r.lic.broker); } catch {} }
+  rememberServer(r.lic);
   const key = await importDataKey(r.rawKey);
   return { rid, key, lic: r.lic, dev, demo: false, watcher: makeWatcher(rid, dev, r.lic) };
 }
@@ -184,9 +220,11 @@ function makeWatcher(rid, dev, lic) {
       if (r.state === "ok") {
         const a = loadAct() || {};
         saveAct({ ...a, rid, lic: text });
+        const moved = (r.lic.broker || "") !== (w.lic?.broker || "");
         w.lic = r.lic;
-        if (r.lic.broker) { try { localStorage.setItem("menyu.licBroker", r.lic.broker); } catch {} }
+        rememberServer(r.lic);
         closeScreen();
+        if (moved) setTimeout(() => location.reload(), 500); // egasi serverni o'zgartirdi: yangisiga ulanamiz
         return;
       }
       const a = loadAct() || {};
@@ -254,12 +292,13 @@ function waitForLicense(dev, act) {
       el.querySelector("#licRetry")?.addEventListener("click", () => location.reload());
     };
 
-    const request = () => {
+    const request = async () => {
       client?.end(true);
       let online = false, last = { state: "pending", lic: null };
       waiting(false);
       if (!window.mqtt) { waiting(false); return; }
-      client = window.mqtt.connect(brokerUrl(), { clientId: `menyu_act_${dev.id}_${Math.random().toString(16).slice(2, 6)}`, clean: true, keepalive: 30, reconnectPeriod: 3000 });
+      await findServer();
+      client = window.mqtt.connect(brokerUrl(), { ...brokerOpts(), clientId: `menyu_act_${dev.id}_${Math.random().toString(16).slice(2, 6)}`, clean: true, keepalive: 30, reconnectPeriod: 3000 });
       const base = `${V2}/${rid}`;
       client.on("connect", () => {
         online = true;

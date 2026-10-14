@@ -65,6 +65,7 @@ async function backup() {
   const topic = `${V2}/_owner/${ownerId}/state`;
   client.publish(topic, await seal(keys.state, JSON.stringify(S), topic), { qos: 1, retain: true });
 }
+const authOf = () => (S?.settings?.broker && S.settings.mqttUser ? { username: S.settings.mqttUser, password: S.settings.mqttPass || "" } : {});
 const brokerOf = () => {
   const q = new URLSearchParams(location.search).get("broker");
   return q || S?.settings?.broker || DEFAULT_BROKER;
@@ -150,7 +151,7 @@ function pinScreen(pin, err = "") {
 // ---------- Server bilan aloqa ----------
 function connect() {
   client?.end(true);
-  client = window.mqtt.connect(brokerOf(), { clientId: `menyu_owner_${Math.random().toString(16).slice(2, 10)}`, clean: true, keepalive: 30, reconnectPeriod: 2000 });
+  client = window.mqtt.connect(brokerOf(), { ...authOf(), clientId: `menyu_owner_${Math.random().toString(16).slice(2, 10)}`, clean: true, keepalive: 30, reconnectPeriod: 2000 });
   client.on("connect", () => {
     online = true;
     client.subscribe([`${V2}/_owner/${ownerId}/state`, `${V2}/+/reg/+`, `${V2}/+/lic`], { qos: 1 });
@@ -210,7 +211,10 @@ async function publishLicense(r, save = true) {
     v: 1, rid: r.rid, name: r.name, until: r.until || 0, issued, blocked: !!r.blocked,
     phone: S.settings.phone || "", eph: eph.pub, dev, max: r.max || 5
   };
-  if (S.settings.broker) lic.broker = S.settings.broker;
+  if (S.settings.broker) {
+    lic.broker = S.settings.broker;
+    if (S.settings.mqttUser) lic.mqtt = { user: S.settings.mqttUser, pass: S.settings.mqttPass || "" };
+  }
   const p = JSON.stringify(lic);
   const msg = JSON.stringify({ p, s: await sign(keys.sign, p) });
   r.licIssued = issued;
@@ -218,10 +222,43 @@ async function publishLicense(r, save = true) {
   client?.publish(`${V2}/${r.rid}/lic`, msg, { qos: 1, retain: true });
 }
 
+// Yangi planshetlar egasining serverini topishi uchun umumiy serverga imzolangan "ko'rsatkich"
+async function publishPointer() {
+  const ptr = { broker: S.settings.broker || "", mqtt: S.settings.broker && S.settings.mqttUser ? { user: S.settings.mqttUser, pass: S.settings.mqttPass || "" } : null, issued: Date.now() };
+  const p = JSON.stringify(ptr);
+  const msg = JSON.stringify({ p, s: await sign(keys.sign, p) });
+  const c = window.mqtt.connect(DEFAULT_BROKER, { clientId: `menyu_ownptr_${Math.random().toString(16).slice(2, 8)}`, clean: true, reconnectPeriod: 0, connectTimeout: 8000 });
+  c.on("connect", () => c.publish(`${V2}/_server`, ptr.broker ? msg : "", { qos: 1, retain: true }, () => c.end()));
+  c.on("error", () => c.end(true));
+}
+
+// Server almashganda: restoranlarning (shifrlangan) menyu, buyurtma va hisobotlarini eski serverdan yangisiga ko'chirish
+function moveData(from) {
+  return new Promise((resolve) => {
+    const got = [];
+    const c = window.mqtt.connect(from.url, { ...from.opts, clientId: `menyu_move_${Math.random().toString(16).slice(2, 8)}`, reconnectPeriod: 0, connectTimeout: 8000 });
+    const finish = () => {
+      try { c.end(true); } catch {}
+      const rids = new Set(Object.keys(S.rests));
+      for (const [t, p] of got) {
+        const parts = t.split("/");
+        if (!rids.has(parts[2]) || ["lic", "reg"].includes(parts[3])) continue;
+        client.publish(t, p, { qos: 1, retain: true });
+      }
+      toast(`Ma'lumotlar yangi serverga ko'chirildi`, { kind: "ok" });
+      resolve();
+    };
+    const t = setTimeout(finish, 8000);
+    c.on("connect", () => c.subscribe(`${V2}/#`, { qos: 1 }, () => { clearTimeout(t); setTimeout(finish, 4000); }));
+    c.on("message", (topic, payload, packet) => { if (packet.retain && payload.length) got.push([topic, payload]); });
+    c.on("error", () => { clearTimeout(t); resolve(); });
+  });
+}
+
 // Restoranning menyu va sozlamalarini (shifrlangan) yozish
 async function withStore(r, fn) {
   const key = await importDataKey(r.key);
-  const st = createStore(r.rid, { key });
+  const st = createStore(r.rid, { key, url: brokerOf(), auth: authOf() });
   await new Promise((res) => {
     const t = setTimeout(res, 5000);
     const off = st.on((e) => { if (e.type === "online") setTimeout(() => { clearTimeout(t); off(); res(); }, 1500); });
@@ -258,6 +295,7 @@ function boot() {
   S = loadLocal() || blank();
   stamp();
   connect();
+  if (S.settings.broker) setTimeout(publishPointer, 3000);
   render();
   registerSW();
   setInterval(() => { if (ui.view === "list") render(); }, 60000);
@@ -396,10 +434,16 @@ function addRestaurant() {
 // Eski (shifrlanmagan) restoranning menyusini o'qish
 function readOldConfig(code) {
   return new Promise((res) => {
-    const st = createStore(code);
+    const st = createStore(code, { url: new URLSearchParams(location.search).get("broker") || DEFAULT_BROKER, auth: {} });
     let done = false;
     const finish = (v) => { if (done) return; done = true; setTimeout(() => st.close(), 300); res(v); };
-    st.on((e) => { if (e.type === "config") finish(structuredClone(st.state.config)); });
+    st.on((e) => {
+      if (e.type !== "config" || done) return;
+      const cfg = structuredClone(st.state.config);
+      // Eski ochiq nusxani (PIN kodlar bilan) umumiy serverdan o'chiramiz: endi faqat shifrlangani qoladi
+      st.client.publish(`menyuuz/v1/${code}/config`, "", { qos: 1, retain: true });
+      finish(cfg);
+    });
     setTimeout(() => finish(null), 6000);
   });
 }
@@ -612,7 +656,12 @@ function renderSettings() {
       <section class="ow-sec">
         <h3>Server</h3>
         <p class="ow-hint">Hozir: <b class="ow-mono">${esc(brokerOf())}</b>. O'z serveringizga o'tganda manzilini shu yerga yozing: barcha planshetlar o'zi o'tadi.</p>
-        <label class="field"><input id="broker" value="${esc(S.settings.broker || "")}" placeholder="wss://server.manzil:8084/mqtt"></label>
+        <label class="field"><span>Server manzili</span><input id="broker" value="${esc(S.settings.broker || "")}" placeholder="wss://menyu.domen.uz/mqtt"></label>
+        <div class="row2">
+          <label class="field"><span>Login</span><input id="mUser" value="${esc(S.settings.mqttUser || "")}" placeholder="smartmenyu" autocapitalize="none"></label>
+          <label class="field"><span>Parol</span><input id="mPass" value="${esc(S.settings.mqttPass || "")}" autocapitalize="none"></label>
+        </div>
+        <p class="ow-hint">Bo'sh qoldirilsa, umumiy bepul server ishlatiladi.</p>
         <button class="btn btn-ghost" id="saveBroker">Serverni saqlash</button>
       </section>
       <section class="ow-sec">
@@ -636,11 +685,30 @@ function renderSettings() {
     const v = $("#broker").value.trim();
     if (v && !/^wss?:\/\/.+/.test(v)) return toast("Manzil wss:// bilan boshlanishi kerak", { kind: "error" });
     if (!(await confirmBox("Server o'zgartirilsinmi? Barcha planshetlar yangi serverga o'tadi.", "O'zgartirish"))) return;
-    S.settings.broker = v;
+    // Avval yangi serverga ulanib ko'ramiz: noto'g'ri manzil yoki parol bilan planshetlarni yo'qotmaslik uchun
+    const user = $("#mUser").value.trim(), pass = $("#mPass").value;
+    if (v) {
+      const ok = await new Promise((res) => {
+        const c = window.mqtt.connect(v, { ...(user ? { username: user, password: pass } : {}), clientId: `menyu_test_${Math.random().toString(16).slice(2, 8)}`, reconnectPeriod: 0, connectTimeout: 8000 });
+        const t = setTimeout(() => { c.end(true); res(false); }, 9000);
+        c.on("connect", () => { clearTimeout(t); c.end(true); res(true); });
+        c.on("error", () => { clearTimeout(t); c.end(true); res(false); });
+      });
+      if (!ok) return toast("Bu serverga ulanib bo'lmadi. Manzil, login va parolni tekshiring.", { kind: "error", timeout: 6000 });
+    }
+    // Restoranlar ma'lumotlari (menyu, buyurtmalar) yangi serverga ko'chirilmaydi: menyuni egasi ilovasidan qayta yozamiz
+    const from = { url: brokerOf(), opts: S.settings.broker && S.settings.mqttUser ? { username: S.settings.mqttUser, password: S.settings.mqttPass || "" } : {} };
+    S.settings.broker = v; S.settings.mqttUser = user; S.settings.mqttPass = pass;
     // Planshetlar eski serverda turibdi: ruxsatnomani avval eski serverga yozamiz, ular yangisiga o'tadi
     for (const r of Object.values(S.rests)) await publishLicense(r, false);
     persist();
-    setTimeout(() => { connect(); for (const r of Object.values(S.rests)) publishLicense(r, false); backup(); }, 2500);
+    publishPointer();
+    setTimeout(async () => {
+      connect();
+      await moveData(from);
+      for (const r of Object.values(S.rests)) await publishLicense(r, false);
+      backup();
+    }, 2500);
     toast("Server o'zgartirildi", { kind: "ok" });
   });
   $("#exp").addEventListener("click", async () => {
