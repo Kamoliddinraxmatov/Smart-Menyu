@@ -51,7 +51,9 @@ async function findServer() {
         pubKey = pubKey || await importVerifyKey(OWNER.pub);
         if (await verify(pubKey, msg.p, msg.s)) {
           const ptr = JSON.parse(msg.p);
-          if (ptr.broker) rememberServer(ptr);
+          // Eski ko'rsatkichni qayta yuborib, planshetni eski serverga yo'naltirib bo'lmaydi
+          const last = Number(localStorage.getItem("menyu.ptrIssued") || 0);
+          if (ptr.broker && (ptr.issued || 0) >= last) { rememberServer(ptr); localStorage.setItem("menyu.ptrIssued", String(ptr.issued || 0)); }
         }
       } catch {}
       clearTimeout(t); done();
@@ -59,6 +61,25 @@ async function findServer() {
   });
 }
 
+// Ko'rilgan eng yangi ruxsatnoma: eskisini qayta yuborib (masalan o'chirilgan planshetni) ochib bo'lmaydi
+const MAXI = "menyu.licMax";
+const maxIssued = (rid) => { try { const m = JSON.parse(localStorage.getItem(MAXI) || "null"); return m?.rid === rid ? m.issued || 0 : 0; } catch { return 0; } };
+function noteIssued(rid, lic) {
+  if (!lic || lic.rid !== rid) return;
+  try { if ((lic.issued || 0) > maxIssued(rid)) localStorage.setItem(MAXI, JSON.stringify({ rid, issued: lic.issued })); } catch {}
+}
+// Planshet serverdan ruxsatnomani oxirgi marta qachon olgan. Uzoq vaqt (OFFLINE_DAYS) internetsiz ishlasa,
+// internetga ulanguncha to'xtaydi: shunda o'chirilgan yoki to'xtatilgan planshetni internetdan uzib ishlatib bo'lmaydi.
+const OFFLINE_DAYS = 10;
+const SEEN_AT = "menyu.licSeenAt";
+const markFresh = () => { try { localStorage.setItem(SEEN_AT, String(Date.now())); } catch {} };
+function stale() {
+  try {
+    const t = Number(localStorage.getItem(SEEN_AT) || 0);
+    if (!t) { markFresh(); return false; } // eski versiyadan yangilangan planshet
+    return Date.now() - t > OFFLINE_DAYS * DAY;
+  } catch { return false; }
+}
 const loadAct = () => { try { return JSON.parse(localStorage.getItem(ACT) || "null"); } catch { return null; } };
 const saveAct = (a) => { try { localStorage.setItem(ACT, JSON.stringify(a)); } catch {} };
 
@@ -133,7 +154,8 @@ const STATE_TEXT = {
   expired: ["Obuna muddati tugagan", "Ilovadan foydalanishni davom ettirish uchun obunani uzaytiring."],
   blocked: ["Restoran vaqtincha to'xtatilgan", "Batafsil ma'lumot uchun Smart Menyu bilan bog'laning."],
   bad: ["Ruxsatnoma noto'g'ri", "Smart Menyu bilan bog'laning."],
-  clock: ["Planshet soati noto'g'ri", "Planshet sozlamalarida sana va vaqtni to'g'rilang, keyin \"Qayta tekshirish\"ni bosing."]
+  clock: ["Planshet soati noto'g'ri", "Planshet sozlamalarida sana va vaqtni to'g'rilang, keyin \"Qayta tekshirish\"ni bosing."],
+  offline: ["Internetga ulaning", `Planshet ${OFFLINE_DAYS} kundan beri internetga ulanmagan. Wi-Fi'ni yoqing, keyin "Qayta tekshirish"ni bosing.`]
 };
 export function lockHtml(state, lic, dev) {
   const [h, p] = STATE_TEXT[state] || ["Planshet o'chirilgan", "Bu planshetga ruxsat olib tashlangan. Smart Menyu bilan bog'laning."];
@@ -189,7 +211,7 @@ async function activateInner() {
 
   if (act?.rid && act.lic) {
     const r = await checkLicense(act.lic, act.rid, dev);
-    if (r.state === "ok") return ready(act.rid, r, dev);
+    if (r.state === "ok" && (r.lic.issued || 0) >= maxIssued(act.rid) && !stale()) return ready(act.rid, r, dev);
   }
   if (act?.demo && !act.rid) return demo();
   return waitForLicense(dev, act);
@@ -216,7 +238,9 @@ function makeWatcher(rid, dev, lic) {
       const r = await checkLicense(text, rid, dev);
       if (r.state === "other" || r.state === "bad") return; // begona yoki soxta xabar: e'tiborsiz
       // Eski ruxsatnomani qayta yuborib (masalan to'xtatilgan restoranni) ochib bo'lmaydi
-      if ((r.lic?.issued || 0) < (w.lic?.issued || 0)) return;
+      if ((r.lic?.issued || 0) < Math.max(w.lic?.issued || 0, maxIssued(rid))) return;
+      noteIssued(rid, r.lic);
+      markFresh();
       if (r.state === "ok") {
         const a = loadAct() || {};
         saveAct({ ...a, rid, lic: text });
@@ -231,9 +255,14 @@ function makeWatcher(rid, dev, lic) {
       saveAct({ ...a, rid, lic: text });
       lock(r.state, r.lic || w.lic, dev);
     },
+    // Server bilan aloqa bor: ruxsatnoma o'zgarsa darhol keladi, demak u dolzarb
+    connected: false,
+    online(on) { w.connected = on; if (on) markFresh(); },
     // Muddat ish vaqtida tugasa
     tick() {
+      if (w.connected) markFresh();
       if (w.lic && Date.now() > w.lic.until) lock("expired", w.lic, dev);
+      else if (stale()) lock("offline", w.lic, dev);
     }
   };
   setInterval(() => w.tick(), 60000);
@@ -295,23 +324,30 @@ function waitForLicense(dev, act) {
     const request = async () => {
       client?.end(true);
       let online = false, last = { state: "pending", lic: null };
-      waiting(false);
+      if (act?.lic && act.rid === rid && stale()) { try { last = { state: "offline", lic: JSON.parse(JSON.parse(act.lic).p) }; } catch {} }
+      waiting(false, last.state, last.lic);
       if (!window.mqtt) { waiting(false); return; }
       await findServer();
       client = window.mqtt.connect(brokerUrl(), { ...brokerOpts(), clientId: `menyu_act_${dev.id}_${Math.random().toString(16).slice(2, 6)}`, clean: true, keepalive: 30, reconnectPeriod: 3000 });
       const base = `${V2}/${rid}`;
+      const reqAt = Date.now();
+      const sendReg = () => client?.connected && client.publish(`${base}/reg/${dev.id}`, JSON.stringify({ id: dev.id, pub: dev.pub, name, ua: navigator.userAgent.slice(0, 160), at: reqAt }), { qos: 1, retain: true });
+      // So'rovni vaqti-vaqti bilan qayta yuboramiz (kimdir uni o'chirib yoki buzib qo'ygan bo'lsa ham egasiga yetib boradi)
+      const mine = client;
+      const again = setInterval(() => (client === mine && !mine.disconnecting && !mine.disconnected ? sendReg() : clearInterval(again)), 30000);
       client.on("connect", () => {
         online = true;
         client.subscribe(`${base}/lic`, { qos: 1 });
-        client.publish(`${base}/reg/${dev.id}`, JSON.stringify({ id: dev.id, pub: dev.pub, name, ua: navigator.userAgent.slice(0, 160), at: Date.now() }), { qos: 1, retain: true });
+        sendReg();
         waiting(true, last.state, last.lic);
       });
       client.on("close", () => { if (online) { online = false; waiting(false, last.state, last.lic); } });
-      const minIssued = (() => { try { return JSON.parse(JSON.parse(loadAct()?.lic || "null")?.p || "null")?.issued || 0; } catch { return 0; } })();
+      const minIssued = Math.max(maxIssued(rid), (() => { try { return JSON.parse(JSON.parse(loadAct()?.lic || "null")?.p || "null")?.issued || 0; } catch { return 0; } })());
       client.on("message", async (topic, payload) => {
         const text = payload.toString();
         const r = await checkLicense(text, rid, dev);
         if (r.lic && r.lic.rid === rid && (r.lic.issued || 0) < minIssued) return;
+        if (r.state !== "bad") { noteIssued(rid, r.lic); if (r.lic?.rid === rid) markFresh(); }
         if (r.state === "ok") {
           saveAct({ rid, name, lic: text });
           client.end(true);
@@ -320,7 +356,7 @@ function waitForLicense(dev, act) {
           return;
         }
         if (r.state === "bad") return;
-        if (r.state !== "pending" && r.state !== "other") saveAct({ rid, name, lic: text });
+        if (r.state !== "other") saveAct({ rid, name, lic: text });
         last = r;
         waiting(online, r.state, r.lic);
       });

@@ -39,6 +39,8 @@ jobs:
           cp -r index.html waiter.html kitchen.html admin.html manifest.webmanifest css js img vendor app/www/
           # Egasi ilovasi restoran planshetiga kirmaydi
           rm -f app/www/js/owner.js app/www/css/owner.css
+          # Planshetga faqat egasining ochiq kaliti kerak: shifrlangan maxfiy kalit olib tashlanadi
+          node -e "import('./js/owner-key.js').then(({OWNER:o})=>require('fs').writeFileSync('app/www/js/owner-key.js','export const OWNER = '+JSON.stringify({pub:o.pub})+';\n'))"
           mkdir -p app-owner/www
           cp -r css js img vendor app-owner/www/
           cp owner.html app-owner/www/index.html
@@ -58,6 +60,25 @@ jobs:
         working-directory: app
         run: npx cap sync android
 
+      - name: Egasi ilovasini tayyorlash
+        working-directory: app-owner
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx capacitor-assets generate --android --iconBackgroundColor '#D6B370' --iconBackgroundColorDark '#D6B370' --splashBackgroundColor '#0D0B0A' --splashBackgroundColorDark '#0D0B0A' || true
+          npx cap sync android
+
+      - name: Himoya (debug va zaxira nusxa o'chiriladi)
+        run: |
+          for d in app app-owner; do
+            m=$d/android/app/src/main/AndroidManifest.xml
+            sed -i 's/android:allowBackup="true"/android:allowBackup="false" android:fullBackupContent="false"/' $m
+            grep -q 'allowBackup="false"' $m
+            sed -i 's/buildTypes {/buildTypes {\n        debug { debuggable false }/' $d/android/app/build.gradle
+            grep -q 'debuggable false' $d/android/app/build.gradle
+          done
+
+
       - name: APK yig'ish
         working-directory: app/android
         run: |
@@ -66,13 +87,9 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk ../../SmartMenyu.apk
 
       - name: Egasi ilovasi
-        working-directory: app-owner
+        working-directory: app-owner/android
         run: |
-          npm install --no-audit --no-fund
-          npx cap add android
-          npx capacitor-assets generate --android --iconBackgroundColor '#D6B370' --iconBackgroundColorDark '#D6B370' --splashBackgroundColor '#0D0B0A' --splashBackgroundColorDark '#0D0B0A' || true
-          npx cap sync android
-          cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+          chmod +x gradlew && ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk ../../SmartMenyuEgasi.apk
 
       - uses: actions/upload-artifact@v4

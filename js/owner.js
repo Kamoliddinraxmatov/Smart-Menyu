@@ -8,7 +8,7 @@ import { V2, DEFAULT_BROKER } from "./license.js";
 import { createStore } from "./sync.js";
 import { DEFAULT_CONFIG } from "./defaults.js";
 import {
-  passKey, open, seal, importSignKey, sign, newEphemeral, wrapFor, genDataKey, importDataKey,
+  passKey, open, seal, importSignKey, sign, importVerifyKey, verify, newEphemeral, wrapFor, genDataKey, importDataKey,
   prettyId, fingerprint, kvGet, kvSet, kvDel, b64, rand
 } from "./crypto.js";
 import { esc, money, modal, toast, confirmBox, fileToDataUrl, registerSW, saveFile } from "./common.js";
@@ -23,7 +23,26 @@ let ownerId = "";       // zaxira mavzusi uchun egasining kodi
 let S = null;           // holat
 let client = null;
 let online = false;
-const regs = {};        // kutilayotgan planshetlar: rid -> { id -> reg }
+const regs = Object.create(null); // kutilayotgan planshetlar: rid -> { id -> reg }
+const RID_RE = /^[a-z0-9_-]{3,40}$/;
+const DEV_RE = /^[0-9A-HJKMNP-TV-Z]{8}$/;
+let verifyKey = null;
+// Serverdagi xabar haqiqatan egasining imzosi bilanmi
+async function signed(text) {
+  try {
+    const msg = JSON.parse(text);
+    verifyKey = verifyKey || await importVerifyKey(OWNER.pub);
+    return (await verify(verifyKey, msg.p, msg.s)) ? JSON.parse(msg.p) : null;
+  } catch { return null; }
+}
+// Planshet yuborgan ochiq kalit to'g'ri va uning kodiga mos kelishi shart (aks holda boshqa odam o'z kalitini qo'yib, restoran kalitini olishi mumkin)
+async function validReg(reg, id) {
+  if (!reg || typeof reg !== "object" || reg.id !== id || !reg.pub || reg.pub.kty !== "EC" || reg.pub.crv !== "P-256") return false;
+  try {
+    await crypto.subtle.importKey("jwk", { kty: "EC", crv: "P-256", x: reg.pub.x, y: reg.pub.y }, { name: "ECDH", namedCurve: "P-256" }, true, []);
+    return (await fingerprint(reg.pub)) === id;
+  } catch { return false; }
+}
 const ui = { view: "list", rid: null, q: "", f: "all" };
 
 // ---------- Holat ----------
@@ -48,10 +67,38 @@ function merge(local, remote) {
   const out = { ...local, rests: { ...local.rests }, gone: { ...(local.gone || {}), ...(remote.gone || {}) } };
   for (const [rid, rr] of Object.entries(remote.rests || {})) {
     const lr = out.rests[rid];
-    if (!lr || (rr.upd || 0) > (lr.upd || 0)) out.rests[rid] = rr;
+    if (!lr) { out.rests[rid] = rr; continue; }
+    const [older, newer] = (rr.upd || 0) > (lr.upd || 0) ? [lr, rr] : [rr, lr];
+    // Mahalliy obyektni o'rnida yangilaymiz: ochiq ekrandagi tugmalar shu obyekt bilan ishlaydi
+    const joined = joinRest(older, newer);
+    if (bare(joined) === bare(lr) && joined.upd === lr.upd) continue;
+    for (const k of Object.keys(lr)) if (!(k in joined)) delete lr[k];
+    Object.assign(lr, joined);
   }
   for (const [rid, t] of Object.entries(out.gone)) if (out.rests[rid] && (out.rests[rid].upd || 0) <= t) delete out.rests[rid];
   if ((remote.settingsUpd || 0) > (local.settingsUpd || 0)) { out.settings = remote.settings; out.settingsUpd = remote.settingsUpd; }
+  return out;
+}
+// Ikki telefonda bir vaqtda qilingan o'zgarishlar: oddiy maydonlar yangisidan, planshetlar va to'lovlar ikkalasidan
+function joinRest(older, newer) {
+  const out = { ...newer };
+  const rejected = { ...(older.rejected || {}) };
+  for (const [id, t] of Object.entries(newer.rejected || {})) rejected[id] = Math.max(rejected[id] || 0, t);
+  const devices = {};
+  for (const src of [older.devices || {}, newer.devices || {}]) {
+    for (const [id, d] of Object.entries(src)) {
+      if ((rejected[id] || 0) >= (d.approvedAt || 0)) continue; // keyinroq o'chirilgan
+      if (!devices[id] || (d.approvedAt || 0) > (devices[id].approvedAt || 0)) devices[id] = d;
+    }
+  }
+  const pays = new Map();
+  for (const p of [...(older.payments || []), ...(newer.payments || [])]) pays.set(`${p.at}:${p.months}:${p.amount}`, p);
+  out.devices = devices;
+  out.rejected = rejected;
+  out.payments = [...pays.values()].sort((a, b) => a.at - b.at);
+  if (!(newer.cutAt > (older.payments || []).reduce((m, p) => Math.max(m, p.at), 0))) out.until = Math.max(older.until || 0, newer.until || 0);
+  out.licIssued = Math.max(older.licIssued || 0, newer.licIssued || 0);
+  out.upd = Math.max(older.upd || 0, newer.upd || 0);
   return out;
 }
 function persist(remote = true) {
@@ -73,8 +120,10 @@ const brokerOf = () => {
 
 // ---------- Kirish ----------
 async function start() {
-  ownerId = (await fingerprint(OWNER.pub)).toLowerCase();
   try { keys = await kvGet("owner.keys"); } catch { keys = null; }
+  // Zaxira mavzusi paroldan olinadi: ochiq kalitni biladigan begona odam uni topa olmaydi
+  if (keys?.sign && !keys.bid) { try { await kvDel("owner.keys"); } catch {} keys = null; }
+  ownerId = keys?.bid || "";
   if (!keys?.sign) return passwordScreen();
   const pin = localStorage.getItem("owner.pin");
   if (pin) return pinScreen(pin);
@@ -101,7 +150,9 @@ function passwordScreen(err = "") {
       const jwk = JSON.parse(await open(k, OWNER.key, "owner-key"));
       const signKey = await importSignKey(jwk);
       const stateKey = await passKey(pw, b64(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(`state:${OWNER.salt}`)))), 100000);
-      keys = { sign: signKey, state: stateKey };
+      const bid = b64(new Uint8Array(await crypto.subtle.digest("SHA-256", enc.encode(`backup:${pw}:${OWNER.salt}`)))).replace(/[^A-Za-z0-9]/g, "").slice(0, 20).toLowerCase();
+      keys = { sign: signKey, state: stateKey, bid };
+      ownerId = bid;
       await kvSet("owner.keys", keys);
       pinSetup();
     } catch {
@@ -169,10 +220,18 @@ async function onMessage(topic, text) {
     let remote;
     try { remote = JSON.parse(await open(keys.state, text, topic)); } catch { return; }
     stamp();
+    const beforeRests = JSON.stringify(S.rests), beforeSettings = JSON.stringify(S.settings);
+    const beforeEach = {};
+    for (const r of Object.values(S.rests)) beforeEach[r.rid] = bare(r);
     const merged = merge(S, remote);
-    const changedLocal = JSON.stringify(merged.rests) !== JSON.stringify(S.rests) || JSON.stringify(merged.settings) !== JSON.stringify(S.settings);
+    const changedLocal = JSON.stringify(merged.rests) !== beforeRests || JSON.stringify(merged.settings) !== beforeSettings;
     const changedRemote = JSON.stringify(merged.rests) !== JSON.stringify(remote.rests || {}) || JSON.stringify(merged.settings) !== JSON.stringify(remote.settings);
     S = merged;
+    // Ikkala tomondan yig'ilgan restoran: ruxsatnomani ham yangilaymiz
+    for (const r of Object.values(S.rests)) {
+      const l = beforeEach[r.rid], m = remote.rests?.[r.rid];
+      if (l && m && bare(r) !== l && bare(r) !== bare(m)) publishLicense(r, false).catch((e) => console.warn(e));
+    }
     for (const r of Object.values(S.rests)) snap[r.rid] = bare(r);
     snap._settings = JSON.stringify(S.settings);
     if (changedLocal) { try { localStorage.setItem("owner.state", JSON.stringify(S)); } catch {} render(); }
@@ -181,31 +240,41 @@ async function onMessage(topic, text) {
   }
   const parts = topic.split("/");
   const rid = parts[2];
+  if (!RID_RE.test(rid || "") || rid in Object.prototype) return;
   if (parts[3] === "reg") {
     const id = parts[4];
+    if (!DEV_RE.test(id || "")) return;
     let reg = null;
     try { reg = text ? JSON.parse(text) : null; } catch { return; }
-    regs[rid] = regs[rid] || {};
-    if (reg && reg.pub && reg.id === id) regs[rid][id] = reg; else delete regs[rid][id];
+    const list = regs[rid] || (regs[rid] = Object.create(null));
+    if (reg && await validReg(reg, id)) list[id] = { id, pub: { kty: "EC", crv: "P-256", x: reg.pub.x, y: reg.pub.y }, name: String(reg.name || "").slice(0, 40), ua: String(reg.ua || "").slice(0, 160), at: Number(reg.at) || 0 };
+    else delete list[id];
     render();
     return;
   }
   if (parts[3] === "lic") {
-    // Serverdagi ruxsatnoma biznikidan farq qilsa (o'chirilgan yoki soxta), qayta yozamiz
+    // Serverdagi ruxsatnoma biznikidan farq qilsa (o'chirilgan yoki eskisi qayta yuborilgan), qayta yozamiz
     const r = S.rests[rid];
     if (!r || !r.licIssued) return;
-    let issued = 0;
-    try { issued = JSON.parse(JSON.parse(text).p).issued; } catch {}
-    issuedSeen[rid] = issued;
-    if (issued !== r.licIssued) setTimeout(() => { if (issuedSeen[rid] !== S.rests[rid]?.licIssued) publishLicense(S.rests[rid], false); }, 1500);
+    const lic = text ? await signed(text) : null;
+    issuedSeen[rid] = lic?.rid === rid ? lic.issued : 0;
+    if (issuedSeen[rid] === r.licIssued || healTimer[rid]) return;
+    healTimer[rid] = setTimeout(() => {
+      delete healTimer[rid];
+      const cur = S.rests[rid];
+      if (cur && issuedSeen[rid] !== cur.licIssued) publishLicense(cur, false).catch((e) => console.warn(e));
+    }, 3000);
   }
 }
+const healTimer = {};
 
 // Ruxsatnomani imzolab yuborish
 async function publishLicense(r, save = true) {
   const eph = await newEphemeral();
   const dev = {};
-  for (const [id, d] of Object.entries(r.devices || {})) dev[id] = await wrapFor(eph.priv, d.pub, r.key, `${r.rid}/${id}`);
+  for (const [id, d] of Object.entries(r.devices || {})) {
+    try { dev[id] = await wrapFor(eph.priv, d.pub, r.key, `${r.rid}/${id}`); } catch (e) { console.warn("planshet kaliti noto'g'ri:", id, e); }
+  }
   const issued = Math.max(Date.now(), (r.licIssued || 0) + 1);
   const lic = {
     v: 1, rid: r.rid, name: r.name, until: r.until || 0, issued, blocked: !!r.blocked,
@@ -242,7 +311,7 @@ function moveData(from) {
       const rids = new Set(Object.keys(S.rests));
       for (const [t, p] of got) {
         const parts = t.split("/");
-        if (!rids.has(parts[2]) || ["lic", "reg"].includes(parts[3])) continue;
+        if (!rids.has(parts[2]) || !["config", "stop", "orders", "calls", "reserves", "sales"].includes(parts[3]) || parts.length > 6) continue;
         client.publish(t, p, { qos: 1, retain: true });
       }
       toast(`Ma'lumotlar yangi serverga ko'chirildi`, { kind: "ok" });
@@ -519,7 +588,7 @@ function renderRest(r) {
   });
   $("#cut")?.addEventListener("click", async () => {
     if (!(await confirmBox("Muddat bugun tugatilsinmi? Planshetlar yopiladi.", "Tugatish", { danger: true }))) return;
-    r.until = Date.now() - 1000; await publishLicense(r); render();
+    r.until = Date.now() - 1000; r.cutAt = Date.now(); await publishLicense(r); render();
   });
   app.querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", async () => {
     const g = regs[r.rid][b.dataset.ok];

@@ -144,12 +144,13 @@ export function createStore(rid, opts = {}) {
         if (!key && !state.configLoaded) { state.configLoaded = true; changed({ type: "config" }); }
       }, 5000);
     });
+    opts.watcher?.online?.(true);
     // Internet yo'q paytda qilingan buyurtmalarni qayta yuborish
     for (const [id, o] of Object.entries(outbox)) sendOrder(id, o);
     changed({ type: "online" });
   });
   for (const ev of ["close", "offline"]) {
-    client.on(ev, () => { if (state.online) { state.online = false; changed({ type: "offline" }); } });
+    client.on(ev, () => { opts.watcher?.online?.(false); if (state.online) { state.online = false; changed({ type: "offline" }); } });
   }
   client.on("error", (e) => console.warn("MQTT:", e?.message || e));
 
@@ -164,7 +165,12 @@ export function createStore(rid, opts = {}) {
     if (topic === `${base}/lic`) { await opts.watcher?.handle(raw); return; }
     let text = raw;
     if (key && raw) {
-      try { text = await open(key, raw, topic); } catch { return; } // kaliti yo'q yoki soxta xabar
+      try { text = await open(key, raw, topic); } catch {
+        // kaliti yo'q yoki soxta xabar: e'tiborsiz. Chek ustiga begona narsa yozilgan bo'lsa, bizdagi nusxani o'chirmaymiz
+        const om = topic.match(/\/orders\/([^/]+)$/);
+        if (om && seen) seen.add(om[1]);
+        return;
+      }
     }
     let data = null;
     if (text) { try { data = JSON.parse(text); } catch { return; } }
