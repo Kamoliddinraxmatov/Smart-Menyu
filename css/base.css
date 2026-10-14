@@ -63,7 +63,7 @@ img { max-width: 100%; }
   background: var(--surface-2); border: 1px solid var(--line); font-size: 18px;
 }
 
-input[type=text], input[type=number], input[type=tel], input[type=password], input[type=search], select, textarea {
+input:not([type]), input[type=text], input[type=number], input[type=tel], input[type=password], input[type=search], select, textarea {
   width: 100%; min-height: 44px; padding: 10px 14px;
   border: 1px solid var(--line); border-radius: 12px; background: #fff;
   outline: none; transition: border-color .15s, box-shadow .15s;
