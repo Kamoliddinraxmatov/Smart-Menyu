@@ -414,6 +414,13 @@ function renderList() {
         ${[["all", "Restoranlar", counts.all], ["ok", "Faol", counts.ok], ["soon", "Tugayapti", counts.soon], ["expired", "To'lanmagan", counts.expired], ["wait", "Yangi planshet", counts.wait]]
           .map(([k, t, n]) => `<button class="ow-stat s-${k} ${ui.f === k ? "on" : ""}" data-f="${k}"><b>${n}</b><span>${t}</span></button>`).join("")}
       </section>
+      ${(() => {
+        const ap = allPending();
+        return ap.length ? `<section class="ow-sec ow-new">
+          <h3>📲 Tasdiq kutayotgan planshetlar <small>${ap.length} ta</small></h3>
+          ${ap.map(([r, g]) => `<button class="ow-req ow-req-link" data-rid="${esc(r.rid)}">${reqRows(r, g)}<span class="ow-req-go">Ochish va tasdiqlash →</span></button>`).join("")}
+        </section>` : "";
+      })()}
       <div class="ow-search"><input id="q" type="search" placeholder="🔍 Restoran nomi, shahar yoki kod" value="${esc(ui.q)}"></div>
       <section class="ow-list">
         ${list.map((r) => {
@@ -517,6 +524,26 @@ function readOldConfig(code) {
   });
 }
 
+// Kutilayotgan planshet haqida to'liq ma'lumot: qaysi restoran, qaysi planshet
+const fmtTime = (ts) => { const d = new Date(ts); return `${fmtDate(ts)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+function reqRows(r, g) {
+  const rows = [
+    ["Restoran", `<b>${esc(r.name)}</b>`],
+    ["Restoran kodi", `<span class="ow-mono">${esc(r.rid)}</span>`],
+    ["Shahar, aloqa", esc([r.city, r.contact, r.phone].filter(Boolean).join(" · ") || "kiritilmagan")],
+    ["Planshet kodi", `<b class="ow-mono">${prettyId(g.id)}</b>`],
+    ["Planshet nomi", g.name ? esc(g.name) : "<i>kiritilmagan</i>"],
+    ["Qurilma", esc(devModel(g.ua))],
+    ["So'rov vaqti", g.at ? fmtTime(g.at) : "—"]
+  ];
+  return `<dl class="ow-kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+}
+function allPending() {
+  const out = [];
+  for (const r of Object.values(S.rests)) for (const g of pendingOf(r)) out.push([r, g]);
+  return out.sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
+}
+
 function renderRest(r) {
   const st = status(r);
   const pend = pendingOf(r);
@@ -538,8 +565,8 @@ function renderRest(r) {
 
       ${pend.length ? `<section class="ow-sec ow-new">
         <h3>📲 Tasdiq kutayotgan planshetlar</h3>
-        ${pend.map((g) => `<div class="ow-dev">
-          <div><b class="ow-mono">${prettyId(g.id)}</b> ${g.name ? `· ${esc(g.name)}` : ""}<small>${esc(devModel(g.ua))} · ${fmtDate(g.at || Date.now())}</small></div>
+        ${pend.map((g) => `<div class="ow-req">
+          ${reqRows(r, g)}
           <div class="ow-dev-btns"><button class="btn btn-ghost" data-rej="${esc(g.id)}">Rad etish</button><button class="btn btn-primary" data-ok="${esc(g.id)}">Tasdiqlash</button></div>
         </div>`).join("")}
         <p class="ow-hint">Planshet ekranidagi kod shu yerdagi kod bilan bir xil ekanini tekshiring.</p>
@@ -592,6 +619,8 @@ function renderRest(r) {
   });
   app.querySelectorAll("[data-ok]").forEach((b) => b.addEventListener("click", async () => {
     const g = regs[r.rid][b.dataset.ok];
+    if (!g) return;
+    if (!(await confirmBox(`<b>${esc(r.name)}</b> restoraniga <b>${prettyId(g.id)}</b>${g.name ? ` (${esc(g.name)})` : ""} planshetini tasdiqlaysizmi?`, "Tasdiqlash"))) return;
     if (Object.keys(r.devices || {}).length >= (r.max || 5)) return toast(`Planshetlar chegarasi: ${r.max || 5}. Avval eskisini o'chiring yoki chegarani oshiring.`, { kind: "error", timeout: 6000 });
     r.devices = r.devices || {};
     r.devices[g.id] = { pub: g.pub, name: g.name || "", ua: g.ua || "", approvedAt: Date.now() };
