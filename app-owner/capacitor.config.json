@@ -7,5 +7,12 @@
     "allowMixedContent": false,
     "backgroundColor": "#0D0B0A",
     "webContentsDebuggingEnabled": false
+  },
+  "server": {
+    "url": "https://kamoliddinraxmatov.github.io/Smart-Menyu/owner.html",
+    "cleartext": false,
+    "allowNavigation": [
+      "kamoliddinraxmatov.github.io"
+    ]
   }
 }
