@@ -389,7 +389,7 @@ function catEditor() {
     m.querySelectorAll("[data-up]").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.up; [cats[i - 1], cats[i]] = [cats[i], cats[i - 1]]; draw(m); }));
     m.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
       const x = cats[+b.dataset.del];
-      if (!(await confirmBox(`<b>"${esc(x.name)}"</b> bo'limi taomlari bilan birga o'chirilsinmi?`, "O'chirish", { danger: true }))) return;
+      if (!(await confirmBox(`<b>${esc(x.name)}</b> bo'limi o'chirilsinmi?`, "O'chirish", { danger: true }))) return;
       // Darhol o'chadi: bo'lim ham, uning taomlari ham
       mutate((c) => {
         c.categories = c.categories.filter((y) => y.id !== x.id);
