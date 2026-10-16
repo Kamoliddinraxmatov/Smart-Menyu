@@ -592,3 +592,31 @@ label.field > span {
   border-radius: 999px;
   pointer-events: none;
 }
+html.lite *,
+html.lite *::before,
+html.lite *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html.lite .mood i,
+html.lite .tv-bg {
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
+  opacity: .35;
+}
+html.lite .mood i:not(.on) {
+  display: none;
+}
+html.lite .dish,
+html.lite .table-card,
+html.lite .card {
+  box-shadow: none !important;
+  transition: none !important;
+}
+html.lite .dish {
+  background: #1A1613 !important;
+}
+html.lite .menu-pane {
+  scroll-behavior: auto !important;
+}

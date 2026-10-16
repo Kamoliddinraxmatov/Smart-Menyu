@@ -122,5 +122,17 @@
 
   var q = location.search;
   var modern = typeof window.structuredClone === "function" && "noModule" in HTMLScriptElement.prototype && !/[?&]legacy=1/.test(q);
+
+  // Yengil rejim: kuchsiz planshetda shaffof xira (blur) effektlar va soyalar o'chadi, menyu silliq suriladi.
+  // ?lite=1 yoki ?lite=0 bilan qo'lda yoqish/o'chirish mumkin (eslab qoladi).
+  var lite = !modern || (navigator.deviceMemory && navigator.deviceMemory <= 4) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+  var lq = q.match(/[?&]lite=([01])/);
+  try {
+    if (lq) localStorage.setItem("menyu.lite", lq[1]);
+    var saved = localStorage.getItem("menyu.lite");
+    if (saved === "1") lite = true; else if (saved === "0") lite = false;
+  } catch (e) {}
+  if (lite) document.documentElement.className += " lite";
+
   load(modern ? "modern" : "legacy");
 })();

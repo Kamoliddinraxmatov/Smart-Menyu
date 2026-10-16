@@ -20,6 +20,8 @@ const agoL = (ts) => {
 };
 const ST = (t) => `${L("Stol", "Стол", "Table")} ${t}`;
 const store = createStore(rid, ACT);
+const seenImg = new Set(); // allaqachon yuklangan rasmlar (qayta chizishda darhol ko'rsatiladi)
+let imgObserver = null;
 const S = store.state;
 const app = document.getElementById("app");
 
@@ -771,7 +773,9 @@ function dishCard(i, cart) {
   const inCart = cart.filter((c) => c.itemId === i.id).reduce((s, c) => s + c.qty, 0);
   const stop = !!S.stop[i.id];
   const img = i.img
-    ? `<div class="dish-img ${i.fit === "contain" ? "contain" : ""}" style="background-image:url('${esc(i.img)}')">`
+    ? (seenImg.has(i.img)
+      ? `<div class="dish-img ${i.fit === "contain" ? "contain" : ""}" style="background-image:url('${esc(i.img)}')">`
+      : `<div class="dish-img ${i.fit === "contain" ? "contain" : ""}" data-img="${esc(i.img)}">`)
     : `<div class="dish-img emoji"><span class="dish-emo">${esc(i.emoji || "🍽️")}</span>`;
   const minPrice = i.variants?.length ? Math.min(...i.variants.map((v) => Number(v.price) || 0)) : i.price;
   const priceTxt = (i.variants?.length > 1 && new Set(i.variants.map((v) => v.price)).size > 1 ? (getLang() === "uz" ? "" : T("from") + " ") : "") + money(minPrice, cur()).replace(` ${cur()}`, "");
@@ -805,6 +809,29 @@ function heroHtml(c, count) {
   </header>`;
 }
 
+// Rasmlar faqat ekranga yaqinlashganda yuklanadi: kuchsiz planshetda xotira to'lib, menyu qotmasin
+function showImg(d) {
+  const u = d.dataset.img;
+  if (!u) return;
+  d.style.backgroundImage = `url('${u.replace(/'/g, "%27")}')`;
+  d.removeAttribute("data-img");
+  seenImg.add(u);
+}
+// Menyu o'z ichida suriladimi (katta ekran) yoki butun sahifa suriladimi (planshet tik holatda)
+function scroller(el) {
+  const p = el.closest(".menu-pane");
+  return p && /auto|scroll/.test(getComputedStyle(p).overflowY) ? p : null;
+}
+function lazyImages(root) {
+  const list = root.querySelectorAll(".dish-img[data-img]");
+  if (!("IntersectionObserver" in window)) { list.forEach(showImg); return; }
+  imgObserver?.disconnect();
+  imgObserver = new IntersectionObserver((entries) => {
+    entries.forEach((e) => { if (e.isIntersecting) { showImg(e.target); imgObserver.unobserve(e.target); } });
+  }, { root: scroller(root), rootMargin: "800px 0px" });
+  list.forEach((d) => imgObserver.observe(d));
+}
+
 let moodObserver = null;
 function renderGrid() {
   const el = app.querySelector("#grid");
@@ -834,6 +861,7 @@ function renderGrid() {
       <div class="grid-row">${list.map((i) => dishCard(i, cart)).join("")}</div>
     </section>`).join("");
 
+  lazyImages(el);
   setMood(sections[0].c.bg || sections[0].c.hero || null);
   moodObserver?.disconnect();
   if (sections.length > 1 && "IntersectionObserver" in window) {
@@ -867,6 +895,8 @@ function refreshCard(itemId, bump = false) {
   tmp.innerHTML = dishCard(item, getCart(ui.tableId)).trim();
   const card = tmp.firstElementChild;
   old.replaceWith(card);
+  const pic = card.querySelector(".dish-img[data-img]");
+  if (pic) showImg(pic); // karta ekranda: rasmni darhol ko'rsatamiz
   if (bump) card.classList.add("bump");
   card.querySelector("[data-add]")?.addEventListener("click", (e) => {
     e.stopPropagation();

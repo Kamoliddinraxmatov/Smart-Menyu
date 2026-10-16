@@ -181,3 +181,11 @@ label.field > span { display: block; font-size: 13px; font-weight: 600; color: v
 .lic-warn button { color: #FCD58A; font-size: 20px; padding: 0 4px; }
 .demo-badge { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 8000; background: rgba(214, 179, 112, .9); color: #1A140C; font-size: 12px; font-weight: 800;
   letter-spacing: .12em; padding: 3px 10px; border-radius: 999px; pointer-events: none; }
+
+/* Yengil rejim (kuchsiz planshetlar, js/boot.js yoqadi): og'ir effektlarsiz, menyu silliq suriladi */
+html.lite *, html.lite *::before, html.lite *::after { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html.lite .mood i, html.lite .tv-bg { filter: none !important; transform: none !important; transition: none !important; opacity: .35; }
+html.lite .mood i:not(.on) { display: none; }
+html.lite .dish, html.lite .table-card, html.lite .card { box-shadow: none !important; transition: none !important; }
+html.lite .dish { background: #1A1613 !important; }
+html.lite .menu-pane { scroll-behavior: auto !important; }
