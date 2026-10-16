@@ -561,3 +561,10 @@ body.lux {
 /* boshqa ofitsiantning band stoli */
 .table-card.st-other { border-style: solid; border-color: rgba(255,255,255,.18); opacity: .75; }
 .table-card.st-other .tc-status { color: var(--muted); }
+
+/* Eski planshetlar (aspect-ratio yo'q, Chrome < 88): rasm balandligi 0 bo'lib qolmasin */
+@supports not (aspect-ratio: 1 / 1) {
+  .dish-img:not(.emoji), .dm-img:not(.emoji) { height: 0; padding-top: 75%; }
+  .dish-img.emoji, .dm-img.emoji { min-height: 220px; }
+  @media (max-width: 559px) { .dish-img:not(.emoji) { padding-top: 68.75%; } }
+}

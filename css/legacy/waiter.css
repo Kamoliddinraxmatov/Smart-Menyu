@@ -2378,3 +2378,19 @@ body.lux {
 .table-card.st-other .tc-status {
   color: var(--muted);
 }
+@supports not (aspect-ratio: 1 / 1) {
+  .dish-img:not(.emoji),
+  .dm-img:not(.emoji) {
+    height: 0;
+    padding-top: 75%;
+  }
+  .dish-img.emoji,
+  .dm-img.emoji {
+    min-height: 220px;
+  }
+  @media (max-width: 559px) {
+    .dish-img:not(.emoji) {
+      padding-top: 68.75%;
+    }
+  }
+}
