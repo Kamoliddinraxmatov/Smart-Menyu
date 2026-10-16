@@ -64,7 +64,7 @@ function render() {
         <p>${esc(r.slogan || "")}</p>
         ${ACT.demo
           ? `<p class="h-code">${tr("demo")} · <button class="link" id="activate">${tr("connect")}</button></p>`
-          : `<p class="h-code">${tr("code")}: <b class="code">${esc(rid)}</b> · ${tr("tablet")}: <b class="code">${prettyId(ACT.dev.id)}</b> · ${tr("sub")}: <b>${daysLeft(ACT.watcher?.lic || ACT.lic)} ${tr("days")}</b></p>`}
+          : ""}
       </div>
     </section>
     <section class="h-apps">
