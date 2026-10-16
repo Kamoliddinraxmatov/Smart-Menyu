@@ -94,6 +94,16 @@ const ownerPhone = () => (ACT.watcher?.lic || ACT.lic)?.phone || "";
 const backLink = () => `<a class="lock-back" href="${link("index.html", rid)}">← Orqaga</a>`;
 function unlock() { ui.unlocked = true; try { sessionStorage.setItem(`menyu.admin.${rid}`, "1"); } catch {} render(); }
 
+// Parol katagi + 👁 tugmasi: bosilsa ✓ bo'lib, yozilayotgan parol ko'rinadi
+const pwField = (id, ph) => `<div class="pw-wrap"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="${id}" placeholder="${ph}" autocomplete="new-password"><button type="button" class="pw-eye" data-eye="${id}" aria-label="Parolni ko'rsatish">👁</button></div>`;
+function bindEyes() {
+  app.querySelectorAll("[data-eye]").forEach((b) => b.addEventListener("click", () => {
+    const show = b.textContent !== "✓";
+    app.querySelectorAll(".pw-wrap input").forEach((i) => { i.type = show ? "text" : "password"; });
+    app.querySelectorAll("[data-eye]").forEach((x) => { x.textContent = show ? "✓" : "👁"; x.classList.toggle("on", show); });
+  }));
+}
+
 // Birinchi kirish: boshqaruvchi o'zi parol o'ylab topadi (parol o'rnatilmaguncha boshqaruv ochilmaydi)
 function renderSetPin() {
   app.innerHTML = `
@@ -102,8 +112,8 @@ function renderSetPin() {
     ${logoHtml(cfg().restaurant, "logo logo-xl")}
     <h2>Boshqaruv uchun parol o'rnating</h2>
     <p class="muted">Kamida 4 ta raqam. Har safar boshqaruvga kirishda shu parol so'raladi.</p>
-    <input type="password" inputmode="numeric" maxlength="8" id="p1" placeholder="Yangi parol" autocomplete="new-password">
-    <input type="password" inputmode="numeric" maxlength="8" id="p2" placeholder="Parolni takrorlang" autocomplete="new-password">
+    ${pwField("p1", "Yangi parol")}
+    ${pwField("p2", "Parolni takrorlang")}
     <button class="btn btn-primary btn-block" id="go">Saqlash</button>
   </div>`;
   const go = () => {
@@ -113,6 +123,7 @@ function renderSetPin() {
     mutate((x) => { x.adminPin = a; x.adminLock = false; }, "Parol o'rnatildi");
     unlock();
   };
+  bindEyes();
   app.querySelector("#go").addEventListener("click", go);
   app.querySelector("#p2").addEventListener("keydown", (e) => e.key === "Enter" && go());
 }
@@ -137,7 +148,7 @@ function renderLock() {
     ${backLink()}
     ${logoHtml(cfg().restaurant, "logo logo-xl")}
     <h2>${esc(cfg().restaurant.name)} · Boshqaruv</h2>
-    <input type="password" inputmode="numeric" maxlength="8" id="pin" placeholder="Parol" autofocus>
+    ${pwField("pin", "Parol")}
     <button class="btn btn-primary btn-block" id="go">Kirish</button>
     ${left < MAX_TRIES ? `<p class="lock-left">Qolgan urinishlar: <b>${left}</b></p>` : ""}
   </div>`;
@@ -152,6 +163,8 @@ function renderLock() {
     toast(`Parol noto'g'ri. Qolgan urinishlar: ${MAX_TRIES - n}`, { kind: "error" });
     renderLock();
   };
+  bindEyes();
+  app.querySelector("#pin").focus();
   app.querySelector("#go").addEventListener("click", go);
   app.querySelector("#pin").addEventListener("keydown", (e) => e.key === "Enter" && go());
 }
