@@ -1911,7 +1911,9 @@ body.lux {
   background: rgba(255, 255, 255, .05);
 }
 @media (max-width: 900px) {
-  .table-view .topbar,
+  .table-view .topbar {
+    position: relative;
+  }
   body:has(.table-view) .topbar {
     position: relative;
   }

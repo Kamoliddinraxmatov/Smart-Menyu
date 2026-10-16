@@ -203,7 +203,9 @@ h3.mt { margin-top: 18px; }
 .crop-zoom { display: flex; align-items: center; gap: 12px; margin: 16px 4px 8px; font-size: 22px; color: var(--gold); }
 .crop-zoom input { flex: 1; accent-color: var(--gold); }
 /* Fayl tanlash: input tugma ustida shaffof turadi, telefon ichki oynalarida ham barmoq to'g'ridan-to'g'ri unga tegadi */
-label:has(> .file-overlay), label.btn, .cat-pic { position: relative; overflow: hidden; }
+/* :has() alohida: eski planshet uni tushunmasa, butun qoida bekor bo'lib, rasm tanlash butun oynani qoplab qolardi */
+label.btn, .cat-pic, .has-file { position: relative; overflow: hidden; }
+label:has(> .file-overlay) { position: relative; overflow: hidden; }
 .file-overlay { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 0; z-index: 2; }
 .res-tag { color: #7C3AED; font-weight: 700; margin-right: 6px; }
 .adm-loading { min-height: 100vh; display: grid; place-content: center; text-align: center; gap: 10px; padding: 24px; }

@@ -1008,9 +1008,13 @@ h3.mt {
   flex: 1;
   accent-color: var(--gold);
 }
-label:has(> .file-overlay),
 label.btn,
-.cat-pic {
+.cat-pic,
+.has-file {
+  position: relative;
+  overflow: hidden;
+}
+label:has(> .file-overlay) {
   position: relative;
   overflow: hidden;
 }

@@ -445,7 +445,8 @@ body.lux {
 .menu-pane > .cats.hide { transform: translateY(-110%); box-shadow: none; }
 .menu-pane > .cats .cat:not(.on) { background: rgba(255,255,255,.05); }
 @media (max-width: 900px) {
-  .table-view .topbar, body:has(.table-view) .topbar { position: relative; }
+  .table-view .topbar { position: relative; }
+  body:has(.table-view) .topbar { position: relative; }
   .menu-top { top: auto; margin: 0; padding: 0; }
   .menu-pane > .cats { top: 0; margin: 0 -14px 14px; padding: 8px 14px 10px; }
 }
