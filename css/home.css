@@ -63,3 +63,7 @@
 .lux .h-how h2 { font-family: var(--serif); font-weight: 600; }
 .lux .btn-primary { background: var(--gold); color: #1a1208; }
 @media (max-width: 760px) { .h-feats { grid-template-columns: 1fr 1fr; } .lux .h-rest h1 { font-size: 32px; } .lux .h-app { min-height: 200px; } }
+.h-top-r { display: flex; align-items: center; gap: 10px; }
+.h-lang { display: flex; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid var(--line, rgba(255,255,255,.12)); }
+.h-lang button { min-width: 48px; height: 40px; border-radius: 999px; font-weight: 800; font-size: 15px; letter-spacing: .04em; color: var(--muted, #A69C91); }
+.h-lang button.on { background: linear-gradient(180deg, #E2C384, #C9A35C); color: #1A140C; }
