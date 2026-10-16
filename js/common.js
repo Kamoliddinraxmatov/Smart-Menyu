@@ -102,6 +102,8 @@ export function unlockAudio() {
 }
 export const audioReady = () => !!audioCtx && audioCtx.state === "running";
 export function chime(kind = "new") {
+  // Android ilovada ovoz uchun bosish shart emas: kontekst yo'q bo'lsa yaratamiz, uxlab qolgan bo'lsa uyg'otamiz
+  if (!audioCtx || audioCtx.state === "suspended") unlockAudio();
   if (!audioCtx) return;
   const notes = kind === "ready" ? [784, 988, 1319] : kind === "error" ? [300, 200] : [660, 880, 660, 880];
   const step = kind === "ready" ? 0.16 : 0.12;

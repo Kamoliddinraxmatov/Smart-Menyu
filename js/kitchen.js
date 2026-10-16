@@ -36,6 +36,9 @@ function nativeGuard() {
   KN.start({ url: c.url, topic: `${c.base}/orders/+`, user: c.user, pass: c.pass, title: cfg()?.name || "Oshxona", sound: ui.sound }).catch(() => {});
 }
 nativeGuard();
+// Ilovada ovozni darhol tayyorlab qo'yamiz (sahifa qayta yuklansa ham signal jim qolmasin)
+unlockAudio();
+document.addEventListener("visibilitychange", () => { if (!document.hidden) unlockAudio(); });
 // Oshxona ekranidan chiqilsa (bosh sahifaga), xizmat to'xtaydi
 addEventListener("pagehide", () => { KN?.stop?.().catch?.(() => {}); });
 
@@ -261,7 +264,7 @@ store.on((evt) => {
     known.add(evt.order.id);
     ui.fresh.add(evt.order.id);
     setTimeout(() => { ui.fresh.delete(evt.order.id); }, 8000);
-    if (ui.sound && ui.started && Date.now() - lastChime > 1500) { lastChime = Date.now(); chime("new"); }
+    if (ui.sound && ui.started && Date.now() - lastChime > 1500) { lastChime = Date.now(); [0, 1100, 2200].forEach((d) => setTimeout(() => chime("new"), d)); } // oshxona shovqinida eshitilsin: 3 marta
     if (ui.started) toast(`🔔 Yangi buyurtma: <b>Stol ${esc(evt.order.tableNo)}</b> · ${esc(evt.order.waiterName || "")}`, { timeout: 5000 });
   }
   if (evt.type === "order") known.add(evt.order.id);
