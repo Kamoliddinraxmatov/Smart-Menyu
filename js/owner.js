@@ -599,8 +599,8 @@ function renderRest(r) {
         <h3>Restoran</h3>
         <div class="ow-row-btns">
           <button class="btn btn-ghost" id="edit">✏️ Ma'lumotlarni tahrirlash</button>
-          <button class="btn btn-ghost" id="brand">🎨 Nomi, logo, chek va PIN</button>
-          <button class="btn btn-ghost" id="pin">🔑 Admin PIN'ni tiklash</button>
+          <button class="btn btn-ghost" id="brand">🎨 Nomi, logo va chek</button>
+          <button class="btn btn-ghost" id="pin">🔑 Boshqaruv paroli</button>
         </div>
       </section>
     </main>`;
@@ -643,11 +643,7 @@ function renderRest(r) {
   }));
   $("#edit").addEventListener("click", () => editInfo(r));
   $("#brand").addEventListener("click", () => editBrand(r));
-  $("#pin").addEventListener("click", async () => {
-    if (!(await confirmBox("Restoran boshqaruvining PIN kodi o'chirilsinmi? Keyin boshqaruv parolsiz ochiladi va restoran yangi PIN qo'yadi.", "Tiklash"))) return;
-    try { await withStore(r, (s) => { const c = structuredClone(s.state.config); c.adminPin = ""; s.saveConfig(c); }); toast("Admin PIN tiklandi", { kind: "ok" }); }
-    catch { toast("Aloqa yo'q", { kind: "error" }); }
-  });
+  $("#pin").addEventListener("click", () => adminPassword(r));
 }
 
 function devModel(ua = "") {
@@ -707,6 +703,56 @@ function editInfo(r) {
   });
 }
 
+// Restoran sozlamasini serverdan o'qish (kelguncha 4 soniya kutadi)
+const loadCfg = (s) => new Promise((res) => {
+  if (s.state.configLoaded) return res(structuredClone(s.state.config));
+  const t = setTimeout(() => res(null), 4000);
+  s.on((e) => { if (e.type === "config") { clearTimeout(t); res(structuredClone(s.state.config)); } });
+});
+
+// Boshqaruv paroli: egasi ko'radi, o'zgartiradi, blokdan chiqaradi
+function adminPassword(r) {
+  modal(`
+    <div class="modal-head"><h3>🔑 Boshqaruv paroli</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body"><p class="ow-hint">Yuklanmoqda...</p></div>`, {
+    async onMount(m, close) {
+      const body = m.querySelector(".modal-body");
+      let cfg = null;
+      try { cfg = await withStore(r, loadCfg); } catch {}
+      if (!cfg) { body.innerHTML = `<p class="ow-hint">Restoran sozlamalarini o'qib bo'lmadi. Internetni tekshiring.</p>`; return; }
+      body.innerHTML = `
+        <p class="ow-hint">${esc(r.name)} restorani boshqaruviga kirish paroli:</p>
+        <div class="ow-pass">${cfg.adminPin ? esc(cfg.adminPin) : "<small>O'rnatilmagan. Restoran boshqaruvga birinchi kirganda o'zi qo'yadi.</small>"}</div>
+        ${cfg.adminLock ? `<p class="ow-lock">⛔ Bloklangan: parol 5 marta noto'g'ri kiritilgan.</p>` : ""}
+        <label class="field"><span>Yangi parol (4–8 ta raqam)</span><input id="np" inputmode="numeric" maxlength="8" placeholder="masalan 2580"></label>
+        <button class="btn btn-primary btn-block" id="setp">Saqlash${cfg.adminLock ? " va blokdan chiqarish" : ""}</button>
+        ${cfg.adminLock ? `<button class="btn btn-ghost btn-block" id="unl" style="margin-top:10px">Eski parol bilan blokdan chiqarish</button>` : ""}`;
+      const save = async (btn, fn, msg) => {
+        btn.disabled = true;
+        try {
+          const ok = await withStore(r, async (s) => {
+            const c = await loadCfg(s);
+            if (!c) return false;
+            fn(c);
+            c.adminLock = false;
+            c.adminGen = (c.adminGen || 0) + 1; // planshetlardagi xato urinishlar hisobi yangidan boshlanadi
+            s.saveConfig(c);
+            return true;
+          });
+          if (!ok) throw new Error("no config");
+          close(); toast(msg, { kind: "ok" });
+        } catch { btn.disabled = false; toast("Aloqa yo'q. Internetni tekshiring.", { kind: "error" }); }
+      };
+      m.querySelector("#setp").addEventListener("click", (e) => {
+        const v = m.querySelector("#np").value.trim();
+        if (!/^\d{4,8}$/.test(v)) return toast("Parol 4–8 ta raqamdan iborat bo'lsin", { kind: "error" });
+        save(e.currentTarget, (c) => { c.adminPin = v; }, `Yangi parol saqlandi: ${v}`);
+      });
+      m.querySelector("#unl")?.addEventListener("click", (e) => save(e.currentTarget, () => {}, "Blokdan chiqarildi"));
+    }
+  });
+}
+
 function editBrand(r) {
   modal(`
     <div class="modal-head"><h3>Restoran sozlamalari</h3><button class="icon-btn" data-close>✕</button></div>
@@ -732,7 +778,6 @@ function editBrand(r) {
         <label class="field"><span>Manzil (chekda)</span><input id="bAddr" value="${esc(R.address || "")}"></label>
         <div class="row2">
           <label class="field"><span>Chek kengligi</span><select id="bW">${["80", "58"].map((w) => `<option value="${w}" ${String(R.receiptWidth || "80") === w ? "selected" : ""}>${w} mm</option>`).join("")}</select></label>
-          <label class="field"><span>Boshqaruv PIN kodi</span><input id="bPin" inputmode="numeric" value="${esc(cfg.adminPin || "")}" placeholder="bo'sh: parolsiz"></label>
         </div>
         <label class="field"><span>Chek pastidagi matn</span><input id="bNote" value="${esc(R.receiptNote || "")}" placeholder="Rahmat! Yana kutib qolamiz"></label>`;
       m.insertAdjacentHTML("beforeend", `<div class="modal-actions"><button class="btn btn-ghost" data-close2>Bekor qilish</button><button class="btn btn-primary" id="ok">Saqlash</button></div>`);
@@ -747,7 +792,6 @@ function editBrand(r) {
           name: v("#bName") || R.name, slogan: v("#bSlogan"), color: m.querySelector("#bColor").value, service: Number(v("#bSvc")) || 0,
           phone: v("#bPhone"), currency: v("#bCur") || "so'm", address: v("#bAddr"), receiptWidth: m.querySelector("#bW").value, receiptNote: v("#bNote")
         });
-        cfg.adminPin = v("#bPin").replace(/\D/g, "").slice(0, 8);
         try { await withStore(r, (s) => s.saveConfig(cfg)); } catch { return toast("Aloqa yo'q", { kind: "error" }); }
         if (R.name !== r.name) { r.name = R.name; await publishLicense(r); }
         close(); render(); toast("Saqlandi", { kind: "ok" });

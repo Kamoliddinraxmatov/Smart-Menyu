@@ -63,6 +63,11 @@ function render() {
     app.innerHTML = `<div class="adm-loading"><div class="lic-ico lic-spin">⏳</div><h2>Restoran ma'lumotlari yuklanmoqda...</h2><p>${S.online ? "Bir oz kuting." : "Internet yo'q. Planshet internetga ulanishi bilan davom etadi."}</p></div>`;
     return;
   }
+  if (!ACT.demo) {
+    // Haqiqiy restoran: boshqaruv doim parol bilan. Birinchi kirishda parol o'rnatiladi.
+    if (!cfg().adminPin) return renderSetPin();
+    if (cfg().adminLock) return renderBlocked();
+  }
   if (cfg().adminPin && !ui.unlocked) return renderLock();
   const r = cfg().restaurant;
   app.innerHTML = `
@@ -80,18 +85,72 @@ function render() {
   ({ brand: tabBrand, menu: tabMenu, waiters: tabWaiters, tables: tabTables, report: tabReport, devices: tabDevices })[ui.tab](c);
 }
 
-function renderLock() {
+const MAX_TRIES = 5;
+// Noto'g'ri urinishlar shu planshetda sanaladi. Egasi parolni o'zgartirsa yoki blokdan chiqarsa, hisob yangidan boshlanadi.
+const triesKey = () => `menyu.adminTries.${rid}.${cfg().adminGen || 0}.${cfg().adminPin}`;
+const getTries = () => { try { return Number(localStorage.getItem(triesKey()) || 0); } catch { return 0; } };
+const setTries = (n) => { try { n ? localStorage.setItem(triesKey(), String(n)) : localStorage.removeItem(triesKey()); } catch {} };
+const ownerPhone = () => (ACT.watcher?.lic || ACT.lic)?.phone || "";
+const backLink = () => `<a class="lock-back" href="${link("index.html", rid)}">← Orqaga</a>`;
+function unlock() { ui.unlocked = true; try { sessionStorage.setItem(`menyu.admin.${rid}`, "1"); } catch {} render(); }
+
+// Birinchi kirish: boshqaruvchi o'zi parol o'ylab topadi (parol o'rnatilmaguncha boshqaruv ochilmaydi)
+function renderSetPin() {
   app.innerHTML = `
   <div class="lock">
+    ${backLink()}
     ${logoHtml(cfg().restaurant, "logo logo-xl")}
-    <h2>${esc(cfg().restaurant.name)} · Admin</h2>
-    <input type="password" inputmode="numeric" id="pin" placeholder="Admin PIN" autofocus>
-    <button class="btn btn-primary btn-block" id="go">Kirish</button>
+    <h2>Boshqaruv uchun parol o'rnating</h2>
+    <p class="muted">Kamida 4 ta raqam. Har safar boshqaruvga kirishda shu parol so'raladi.</p>
+    <input type="password" inputmode="numeric" maxlength="8" id="p1" placeholder="Yangi parol" autocomplete="new-password">
+    <input type="password" inputmode="numeric" maxlength="8" id="p2" placeholder="Parolni takrorlang" autocomplete="new-password">
+    <button class="btn btn-primary btn-block" id="go">Saqlash</button>
   </div>`;
   const go = () => {
-    if (app.querySelector("#pin").value === String(cfg().adminPin)) {
-      ui.unlocked = true; sessionStorage.setItem(`menyu.admin.${rid}`, "1"); render();
-    } else toast("PIN noto'g'ri", { kind: "error" });
+    const a = app.querySelector("#p1").value.trim(), b = app.querySelector("#p2").value.trim();
+    if (!/^\d{4,8}$/.test(a)) return toast("Parol 4–8 ta raqamdan iborat bo'lsin", { kind: "error" });
+    if (a !== b) return toast("Parollar bir xil emas", { kind: "error" });
+    mutate((x) => { x.adminPin = a; x.adminLock = false; }, "Parol o'rnatildi");
+    unlock();
+  };
+  app.querySelector("#go").addEventListener("click", go);
+  app.querySelector("#p2").addEventListener("keydown", (e) => e.key === "Enter" && go());
+}
+
+// 5 marta noto'g'ri parol: boshqaruv yopiladi, faqat Smart Menyu egasi ochib beradi
+function renderBlocked() {
+  const ph = ownerPhone();
+  app.innerHTML = `
+  <div class="lock">
+    ${backLink()}
+    <div class="lock-ico">⛔</div>
+    <h2>Boshqaruv bloklandi</h2>
+    <p class="muted">Parol ${MAX_TRIES} marta noto'g'ri kiritildi. Ochish uchun Smart Menyu egasiga murojaat qiling.</p>
+    ${ph ? `<a class="btn btn-primary btn-block" href="tel:${esc(ph.replace(/[^\d+]/g, ""))}">📞 ${esc(ph)}</a>` : ""}
+  </div>`;
+}
+
+function renderLock() {
+  const left = MAX_TRIES - getTries();
+  app.innerHTML = `
+  <div class="lock">
+    ${backLink()}
+    ${logoHtml(cfg().restaurant, "logo logo-xl")}
+    <h2>${esc(cfg().restaurant.name)} · Boshqaruv</h2>
+    <input type="password" inputmode="numeric" maxlength="8" id="pin" placeholder="Parol" autofocus>
+    <button class="btn btn-primary btn-block" id="go">Kirish</button>
+    ${left < MAX_TRIES ? `<p class="lock-left">Qolgan urinishlar: <b>${left}</b></p>` : ""}
+  </div>`;
+  const go = () => {
+    if (app.querySelector("#pin").value.trim() === String(cfg().adminPin)) { setTries(0); return unlock(); }
+    const n = getTries() + 1;
+    setTries(n);
+    if (n >= MAX_TRIES && !ACT.demo) {
+      mutate((x) => { x.adminLock = true; }, "Boshqaruv bloklandi");
+      return render();
+    }
+    toast(`Parol noto'g'ri. Qolgan urinishlar: ${MAX_TRIES - n}`, { kind: "error" });
+    renderLock();
   };
   app.querySelector("#go").addEventListener("click", go);
   app.querySelector("#pin").addEventListener("keydown", (e) => e.key === "Enter" && go());
@@ -127,7 +186,7 @@ function tabBrand(c) {
         <label class="field"><span>Chek kengligi (termoprinter)</span><select data-r="receiptWidth">${["80", "58"].map((w) => `<option value="${w}" ${String(r.receiptWidth || "80") === w ? "selected" : ""}>${w} mm</option>`).join("")}</select></label>
         <label class="field"><span>Chek pastidagi matn</span><input type="text" data-r="receiptNote" value="${esc(r.receiptNote || "")}" placeholder="Rahmat! Yana kutib qolamiz"></label>
       </div>
-      <label class="field"><span>Admin PIN (bo'sh qoldirsangiz, parolsiz ochiladi)</span><input type="text" inputmode="numeric" id="adminPin" value="${esc(cfg().adminPin || "")}"></label>
+      <label class="field"><span>Boshqaruv paroli (4–8 ta raqam)</span><input type="text" inputmode="numeric" maxlength="8" id="adminPin" value="${esc(cfg().adminPin || "")}"></label>
     </div>
     <div class="preview">
       <div class="label">Ko'rinishi</div>
@@ -145,7 +204,11 @@ function tabBrand(c) {
     if (inp.type === "color" || inp.dataset.r === "name") render();
   }));
   c.querySelectorAll("[data-color]").forEach((b) => b.addEventListener("click", () => { mutate((x) => { x.restaurant.color = b.dataset.color; }); render(); }));
-  c.querySelector("#adminPin").addEventListener("change", (e) => { mutate((x) => { x.adminPin = e.target.value.trim(); }, "Admin PIN saqlandi"); ui.unlocked = true; sessionStorage.setItem(`menyu.admin.${rid}`, "1"); });
+  c.querySelector("#adminPin").addEventListener("change", (e) => {
+    const v = e.target.value.trim();
+    if (!/^\d{4,8}$/.test(v)) { toast("Parol 4–8 ta raqamdan iborat bo'lsin", { kind: "error" }); e.target.value = cfg().adminPin || ""; return; }
+    mutate((x) => { x.adminPin = v; x.adminLock = false; }, "Parol saqlandi"); ui.unlocked = true; sessionStorage.setItem(`menyu.admin.${rid}`, "1");
+  });
   c.querySelector("#logo").addEventListener("change", async (e) => {
     const f = e.target.files[0]; if (!f) return;
     let url;

@@ -4,6 +4,10 @@
 if (!/waiter\.html$/.test(location.pathname)) {
   try { Object.keys(sessionStorage).filter((k) => k.startsWith("menyu.waiter.")).forEach((k) => sessionStorage.removeItem(k)); } catch {}
 }
+// Boshqaruvdan chiqilsa, keyingi kirishda parol yana so'raladi
+if (!/admin\.html$/.test(location.pathname)) {
+  try { Object.keys(sessionStorage).filter((k) => k.startsWith("menyu.admin.")).forEach((k) => sessionStorage.removeItem(k)); } catch {}
+}
 
 export function getRid() {
   const p = new URLSearchParams(location.search);
