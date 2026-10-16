@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Menyu: o'rnatish</title>
+<link rel="icon" href="img/icon.svg">
+<style>
+  :root { --bg: #0D0B0A; --card: #1A1613; --line: rgba(255,255,255,.1); --text: #F5EFE6; --muted: #A69C91; --gold: #D6B370; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 28px 16px 48px; display: grid; gap: 18px; }
+  .brand { display: flex; align-items: center; gap: 12px; justify-content: center; }
+  .brand img { width: 48px; height: 48px; }
+  .brand b { color: var(--gold); font-size: 24px; }
+  h1 { margin: 4px 0 0; text-align: center; font-size: 26px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 20px; display: grid; gap: 14px; text-align: center; }
+  .card h2 { margin: 0; font-size: 20px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .btn { display: block; padding: 20px; border-radius: 16px; background: linear-gradient(180deg, #E2C384, #C9A35C); color: #1A140C; font-weight: 800; font-size: 20px; text-decoration: none; }
+  .btn.ghost { background: transparent; color: var(--gold); border: 2px solid var(--gold); font-size: 17px; padding: 14px; }
+  .qr { background: #fff; border-radius: 16px; padding: 14px; width: 240px; height: 240px; margin: 0 auto; }
+  .qr svg { width: 100%; height: 100%; display: block; }
+  ol { margin: 0; padding-left: 22px; text-align: left; color: var(--muted); font-size: 15px; display: grid; gap: 6px; }
+  ol b { color: var(--text); }
+  details { color: var(--muted); }
+  summary { cursor: pointer; color: var(--gold); padding: 6px 0; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand"><img src="img/icon.svg" alt=""><b>Smart Menyu</b></div>
+  <h1>Ilovani o'rnatish</h1>
+
+  <section class="card">
+    <h2>📲 Restoran planshetiga</h2>
+    <a class="btn" href="https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyu.apk">⬇ Yuklab olish</a>
+    <p>Yoki boshqa telefon ekranidagi QR kodni planshet kamerasi bilan skanerlang:</p>
+    <div class="qr" id="qrApp"></div>
+  </section>
+
+  <section class="card">
+    <h2>Yuklab olgandan keyin</h2>
+    <ol>
+      <li>Ekran pastida <b>Открыть</b> yoki <b>Ochish</b> ni bosing.</li>
+      <li>"Неизвестные источники" so'ralsa: <b>Настройки</b> → <b>Разрешить</b> ni yoqing → orqaga.</li>
+      <li><b>Установить</b> ni bosing. Play Protect so'rasa: <b>Всё равно установить</b>.</li>
+      <li>Ilovani oching va <b>restoran kodini</b> kiriting.</li>
+    </ol>
+  </section>
+
+  <details>
+    <summary>Egasi ilovasi (faqat Smart Menyu egasi uchun)</summary>
+    <section class="card" style="margin-top:10px">
+      <a class="btn ghost" href="https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyuEgasi.apk">⬇ Egasi ilovasini yuklab olish</a>
+      <div class="qr" id="qrOwner"></div>
+    </section>
+  </details>
+</main>
+<script src="vendor/qrcode.js"></script>
+<script>
+  const draw = (id, url) => {
+    const q = qrcode(0, "M"); q.addData(url); q.make();
+    document.getElementById(id).innerHTML = q.createSvgTag({ cellSize: 6, margin: 0, scalable: true });
+  };
+  draw("qrApp", "https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyu.apk");
+  draw("qrOwner", "https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyuEgasi.apk");
+</script>
+</body>
+</html>
