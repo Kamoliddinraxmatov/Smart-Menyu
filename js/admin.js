@@ -346,8 +346,35 @@ function blurredDataUrl(src) {
   });
 }
 
+// Bo'limni o'chirishda taomlari bilan nima qilish: undefined = bekor, null = taomlari ham o'chadi, id = shu bo'limga o'tkaziladi
+function askDelCat(x, n, others) {
+  return new Promise((resolve) => {
+    let done = false;
+    const end = (v) => { if (!done) { done = true; resolve(v); } };
+    modal(`
+      <div class="modal-head"><h3>"${esc(x.name)}" bo'limini o'chirish</h3><button class="icon-btn" data-close>✕</button></div>
+      <div class="modal-body">
+        <p class="confirm-text">Bu bo'limda <b>${n} ta taom</b> bor. Ular bilan nima qilamiz?</p>
+        ${others.length ? `<label class="muted small">Taomlarni shu bo'limga o'tkazish:</label>
+          <select id="dc-to">${others.map((y) => `<option value="${esc(y.id)}">${esc((y.emoji ? y.emoji + " " : "") + y.name)}</option>`).join("")}</select>
+          <button class="btn btn-primary btn-block" id="dc-move" style="margin-top:10px">Taomlarni o'tkazib, bo'limni o'chirish</button>` : ""}
+        <button class="btn btn-danger btn-block" id="dc-all" style="margin-top:10px">Bo'limni ${n} ta taomi bilan o'chirish</button>
+      </div>
+      <div class="modal-actions"><button class="btn btn-ghost" data-close>Bekor qilish</button></div>`, {
+      onMount(m, close) {
+        m.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => end(undefined)));
+        m.querySelector("#dc-move")?.addEventListener("click", () => { end(m.querySelector("#dc-to").value); close(); });
+        m.querySelector("#dc-all").addEventListener("click", () => { end(null); close(); });
+        m.parentElement.addEventListener("click", (e) => { if (e.target === m.parentElement) end(undefined); });
+      }
+    });
+  });
+}
+
 function catEditor() {
   let cats = structuredClone(cfg().categories);
+  const moves = {}; // o'chirilgan bo'lim -> taomlari qayerga (null: o'chadi)
+  const finalCat = (c) => { const seen = new Set(); while (c && c in moves && !seen.has(c)) { seen.add(c); c = moves[c]; } return c; };
   const draw = (m) => {
     m.querySelector("#cl").innerHTML = cats.map((x, i) => `
       <div class="cat-card">
@@ -387,10 +414,16 @@ function catEditor() {
       draw(m);
     }));
     m.querySelectorAll("[data-up]").forEach((b) => b.addEventListener("click", () => { const i = +b.dataset.up; [cats[i - 1], cats[i]] = [cats[i], cats[i - 1]]; draw(m); }));
-    m.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
+    m.querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => {
       const x = cats[+b.dataset.del];
-      if (cfg().items.some((i) => i.cat === x.id)) { toast("Avval bu kategoriyadagi taomlarni boshqasiga o'tkazing", { kind: "error" }); return; }
-      cats.splice(+b.dataset.del, 1); draw(m);
+      const n = cfg().items.filter((i) => finalCat(i.cat) === x.id).length;
+      if (n) {
+        const to = await askDelCat(x, n, cats.filter((y) => y !== x));
+        if (to === undefined) return;
+        moves[x.id] = to; // null: taomlari ham o'chadi, aks holda shu bo'limga o'tadi
+      }
+      cats = cats.filter((y) => y !== x); draw(m);
+      toast("O'zgarish \"Saqlash\" bosilganda kuchga kiradi");
     }));
   };
   modal(`
@@ -413,7 +446,14 @@ function catEditor() {
         b.disabled = false; b.textContent = txt;
       });
       m.querySelector("#addc").addEventListener("click", () => { cats.push({ id: "c" + newId(), name: "Yangi kategoriya", emoji: "🍽️" }); draw(m); });
-      m.querySelector("#ok").addEventListener("click", () => { mutate((x) => { x.categories = cats.map((y) => ({ ...y, name: y.name.trim() || "Bo'lim" })); }, "Kategoriyalar saqlandi"); close(); render(); });
+      m.querySelector("#ok").addEventListener("click", () => {
+        mutate((x) => {
+          x.categories = cats.map((y) => ({ ...y, name: y.name.trim() || "Bo'lim" }));
+          // O'chirilgan bo'limlarning taomlari: boshqa bo'limga o'tadi yoki o'chadi
+          x.items = x.items.filter((i) => finalCat(i.cat) !== null).map((i) => (i.cat in moves ? { ...i, cat: finalCat(i.cat) } : i));
+        }, "Bo'limlar saqlandi");
+        close(); render();
+      });
     }
   });
 }
