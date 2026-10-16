@@ -11,7 +11,7 @@ import {
   passKey, open, seal, importSignKey, sign, importVerifyKey, verify, newEphemeral, wrapFor, genDataKey, importDataKey,
   prettyId, fingerprint, kvGet, kvSet, kvDel, b64, rand
 } from "./crypto.js";
-import { esc, money, modal, toast, confirmBox, fileToDataUrl, registerSW, saveFile } from "./common.js";
+import { esc, money, modal, toast, confirmBox, fileToDataUrl, registerSW, saveFile, ADMIN_PASS_RULE, adminPassOk } from "./common.js";
 
 const app = document.getElementById("app");
 const DAY = 86400000;
@@ -724,7 +724,7 @@ function adminPassword(r) {
         <p class="ow-hint">${esc(r.name)} restorani boshqaruviga kirish paroli:</p>
         <div class="ow-pass">${cfg.adminPin ? esc(cfg.adminPin) : "<small>O'rnatilmagan. Restoran boshqaruvga birinchi kirganda o'zi qo'yadi.</small>"}</div>
         ${cfg.adminLock ? `<p class="ow-lock">⛔ Bloklangan: parol 5 marta noto'g'ri kiritilgan.</p>` : ""}
-        <label class="field"><span>Yangi parol (4–8 ta raqam)</span><input id="np" inputmode="numeric" maxlength="8" placeholder="masalan 2580"></label>
+        <label class="field"><span>Yangi parol (bosh harf va raqam, kamida 6 belgi)</span><input id="np" maxlength="30" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="masalan Kamoliddin1234"></label>
         <button class="btn btn-primary btn-block" id="setp">Saqlash${cfg.adminLock ? " va blokdan chiqarish" : ""}</button>
         ${cfg.adminLock ? `<button class="btn btn-ghost btn-block" id="unl" style="margin-top:10px">Eski parol bilan blokdan chiqarish</button>` : ""}`;
       const save = async (btn, fn, msg) => {
@@ -745,7 +745,7 @@ function adminPassword(r) {
       };
       m.querySelector("#setp").addEventListener("click", (e) => {
         const v = m.querySelector("#np").value.trim();
-        if (!/^\d{4,8}$/.test(v)) return toast("Parol 4–8 ta raqamdan iborat bo'lsin", { kind: "error" });
+        if (!adminPassOk(v)) return toast(ADMIN_PASS_RULE, { kind: "error", timeout: 6000 });
         save(e.currentTarget, (c) => { c.adminPin = v; }, `Yangi parol saqlandi: ${v}`);
       });
       m.querySelector("#unl")?.addEventListener("click", (e) => save(e.currentTarget, () => {}, "Blokdan chiqarildi"));

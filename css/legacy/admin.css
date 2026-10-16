@@ -1118,8 +1118,8 @@ label:has(> .file-overlay) {
 .lock input {
   width: 100%;
   text-align: center;
-  font-size: 22px;
-  letter-spacing: .3em;
+  font-size: 20px;
+  letter-spacing: .04em;
 }
 .lock .muted {
   margin: 0;

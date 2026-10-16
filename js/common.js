@@ -94,6 +94,10 @@ export function itemVisual(item, cls = "thumb") {
 
 // --- Ovoz (Web Audio) ---
 let audioCtx = null;
+// Boshqaruv paroli: kamida 6 belgi, lotin harflari va raqamlar, kamida 1 ta bosh harf va 1 ta raqam (masalan Kamoliddin1234)
+export const ADMIN_PASS_RULE = "Kamida 6 belgi: bosh harf va raqam bo'lsin (masalan Kamoliddin1234)";
+export const adminPassOk = (v) => /^[A-Za-z0-9]{6,30}$/.test(v) && /[A-Z]/.test(v) && /\d/.test(v);
+
 export function unlockAudio() {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();

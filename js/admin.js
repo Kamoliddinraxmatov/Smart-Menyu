@@ -3,7 +3,8 @@ import { createStore, newId } from "./sync.js";
 import { activate } from "./license.js";
 import {
   getRid, saveFile, esc, money, fullName, initials, clock, orderTotal, applyBrand, logoHtml, itemVisual,
-  toast, modal, confirmBox, connBadge, fileToDataUrl, cropImage, link, registerSW
+  toast, modal, confirmBox, connBadge, fileToDataUrl, cropImage, link, registerSW,
+  ADMIN_PASS_RULE, adminPassOk
 } from "./common.js";
 import { itemTr, catTr } from "./i18n.js";
 import { fixUz, translate } from "./translate.js";
@@ -97,7 +98,7 @@ function unlock() { ui.unlocked = true; try { sessionStorage.setItem(`menyu.admi
 // Parol katagi + 👁 tugmasi: bosilsa ✓ bo'lib, yozilayotgan parol ko'rinadi
 const EYE = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
 const TICK = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
-const pwField = (id, ph) => `<div class="pw-wrap"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="${id}" placeholder="${ph}" autocomplete="new-password"><button type="button" class="pw-eye" data-eye="${id}" aria-label="Parolni ko'rsatish">${EYE}</button></div>`;
+const pwField = (id, ph) => `<div class="pw-wrap"><input type="password" maxlength="30" autocapitalize="off" autocorrect="off" spellcheck="false" id="${id}" placeholder="${ph}" autocomplete="new-password"><button type="button" class="pw-eye" data-eye="${id}" aria-label="Parolni ko'rsatish">${EYE}</button></div>`;
 function bindEyes() {
   let show = false;
   app.querySelectorAll("[data-eye]").forEach((b) => b.addEventListener("click", () => {
@@ -114,14 +115,14 @@ function renderSetPin() {
     ${backLink()}
     ${logoHtml(cfg().restaurant, "logo logo-xl")}
     <h2>Boshqaruv uchun parol o'rnating</h2>
-    <p class="muted">Kamida 4 ta raqam. Har safar boshqaruvga kirishda shu parol so'raladi.</p>
+    <p class="muted">${ADMIN_PASS_RULE}. Har safar boshqaruvga kirishda shu parol so'raladi.</p>
     ${pwField("p1", "Yangi parol")}
     ${pwField("p2", "Parolni takrorlang")}
     <button class="btn btn-primary btn-block" id="go">Saqlash</button>
   </div>`;
   const go = () => {
     const a = app.querySelector("#p1").value.trim(), b = app.querySelector("#p2").value.trim();
-    if (!/^\d{4,8}$/.test(a)) return toast("Parol 4–8 ta raqamdan iborat bo'lsin", { kind: "error" });
+    if (!adminPassOk(a)) return toast(ADMIN_PASS_RULE, { kind: "error", timeout: 6000 });
     if (a !== b) return toast("Parollar bir xil emas", { kind: "error" });
     mutate((x) => { x.adminPin = a; x.adminLock = false; }, "Parol o'rnatildi");
     unlock();
@@ -202,7 +203,7 @@ function tabBrand(c) {
         <label class="field"><span>Chek kengligi (termoprinter)</span><select data-r="receiptWidth">${["80", "58"].map((w) => `<option value="${w}" ${String(r.receiptWidth || "80") === w ? "selected" : ""}>${w} mm</option>`).join("")}</select></label>
         <label class="field"><span>Chek pastidagi matn</span><input type="text" data-r="receiptNote" value="${esc(r.receiptNote || "")}" placeholder="Rahmat! Yana kutib qolamiz"></label>
       </div>
-      <label class="field"><span>Boshqaruv paroli (4–8 ta raqam)</span><input type="text" inputmode="numeric" maxlength="8" id="adminPin" value="${esc(cfg().adminPin || "")}"></label>
+      <label class="field"><span>Boshqaruv paroli (bosh harf va raqam, kamida 6 belgi)</span><input type="text" maxlength="30" autocapitalize="off" autocorrect="off" spellcheck="false" id="adminPin" value="${esc(cfg().adminPin || "")}"></label>
     </div>
     <div class="preview">
       <div class="label">Ko'rinishi</div>
@@ -222,7 +223,7 @@ function tabBrand(c) {
   c.querySelectorAll("[data-color]").forEach((b) => b.addEventListener("click", () => { mutate((x) => { x.restaurant.color = b.dataset.color; }); render(); }));
   c.querySelector("#adminPin").addEventListener("change", (e) => {
     const v = e.target.value.trim();
-    if (!/^\d{4,8}$/.test(v)) { toast("Parol 4–8 ta raqamdan iborat bo'lsin", { kind: "error" }); e.target.value = cfg().adminPin || ""; return; }
+    if (!adminPassOk(v)) { toast(ADMIN_PASS_RULE, { kind: "error", timeout: 6000 }); e.target.value = cfg().adminPin || ""; return; }
     mutate((x) => { x.adminPin = v; x.adminLock = false; }, "Parol saqlandi"); ui.unlocked = true; sessionStorage.setItem(`menyu.admin.${rid}`, "1");
   });
   c.querySelector("#logo").addEventListener("change", async (e) => {
