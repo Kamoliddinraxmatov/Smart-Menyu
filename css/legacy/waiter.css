@@ -2460,3 +2460,13 @@ body.lux {
   color: #4ADE80 !important;
   font-size: 15px;
 }
+.btn.to-tables {
+  height: 46px;
+  padding: 0 18px;
+  border-radius: 99px;
+  color: var(--gold);
+  border: 1px solid rgba(214, 179, 112, .55);
+  background: rgba(23, 20, 18, .6);
+  font-weight: 800;
+  font-size: 16px;
+}

@@ -662,7 +662,7 @@ function renderTable() {
     <section class="menu-pane" id="menuPane">
       <div class="menu-top">
       <div class="menu-head">
-        ${ui.guest ? "" : `<button class="btn btn-ghost to-tables" data-act="back" title="${L("Barcha stollar", "Все столы", "All tables")}">← ${L("Stollar", "Столы", "Tables")}</button>`}
+        ${ui.guest ? "" : `<button class="btn btn-ghost to-tables" data-act="back" title="${L("Barcha stollar", "Все столы", "All tables")}">← ${L("Orqaga", "Назад", "Back")}</button>`}
         <div class="mh-title">${ui.guest
           ? `<h2>${T("menu")}</h2><small>${T("yourWaiter")}: <b>${esc(fullName(w) || "—")}</b></small>`
           : `<h2>${ST(esc(t.no))}</h2><small>${esc(t.zone || "")} · ${L("Ofitsiant", "Официант", "Waiter")}: <b>${esc(fullName(w) || "—")}</b></small>`}</div>
