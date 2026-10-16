@@ -95,12 +95,15 @@ const backLink = () => `<a class="lock-back" href="${link("index.html", rid)}">�
 function unlock() { ui.unlocked = true; try { sessionStorage.setItem(`menyu.admin.${rid}`, "1"); } catch {} render(); }
 
 // Parol katagi + 👁 tugmasi: bosilsa ✓ bo'lib, yozilayotgan parol ko'rinadi
-const pwField = (id, ph) => `<div class="pw-wrap"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="${id}" placeholder="${ph}" autocomplete="new-password"><button type="button" class="pw-eye" data-eye="${id}" aria-label="Parolni ko'rsatish">👁</button></div>`;
+const EYE = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const TICK = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+const pwField = (id, ph) => `<div class="pw-wrap"><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" id="${id}" placeholder="${ph}" autocomplete="new-password"><button type="button" class="pw-eye" data-eye="${id}" aria-label="Parolni ko'rsatish">${EYE}</button></div>`;
 function bindEyes() {
+  let show = false;
   app.querySelectorAll("[data-eye]").forEach((b) => b.addEventListener("click", () => {
-    const show = b.textContent !== "✓";
+    show = !show;
     app.querySelectorAll(".pw-wrap input").forEach((i) => { i.type = show ? "text" : "password"; });
-    app.querySelectorAll("[data-eye]").forEach((x) => { x.textContent = show ? "✓" : "👁"; x.classList.toggle("on", show); });
+    app.querySelectorAll("[data-eye]").forEach((x) => { x.innerHTML = show ? TICK : EYE; x.classList.toggle("on", show); });
   }));
 }
 
