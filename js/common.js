@@ -1,5 +1,10 @@
 // Umumiy yordamchi funksiyalar: format, brend ranglari, ovoz, bildirishnomalar.
 
+// Ofitsiant sahifasidan boshqa sahifaga o'tilsa, kirgan ofitsiant unutiladi: keyingi safar ism va PIN so'raladi
+if (!/waiter\.html$/.test(location.pathname)) {
+  try { Object.keys(sessionStorage).filter((k) => k.startsWith("menyu.waiter.")).forEach((k) => sessionStorage.removeItem(k)); } catch {}
+}
+
 export function getRid() {
   const p = new URLSearchParams(location.search);
   let rid = (p.get("r") || "").trim();

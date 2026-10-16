@@ -45,12 +45,15 @@ function saveGuest(tid) {
   try { tid ? localStorage.setItem(`menyu.guest.${rid}`, tid) : localStorage.removeItem(`menyu.guest.${rid}`); } catch {}
 }
 
+// Kirgan ofitsiant faqat shu sahifa ochiq turganda eslab qolinadi (sahifa yangilansa ham).
+// Bosh sahifaga chiqib, qayta "Ofitsiant va menyu" bosilsa, ism va PIN yana so'raladi (common.js tozalaydi).
 function loadMe() {
-  try { return JSON.parse(localStorage.getItem(`menyu.waiter.${rid}`) || "null"); } catch { return null; }
+  try { localStorage.removeItem(`menyu.waiter.${rid}`); } catch {} // eski versiya doimiy eslab qolardi
+  try { return JSON.parse(sessionStorage.getItem(`menyu.waiter.${rid}`) || "null"); } catch { return null; }
 }
 function saveMe(w) {
   ui.me = w ? { id: w.id } : null;
-  try { w ? localStorage.setItem(`menyu.waiter.${rid}`, JSON.stringify(ui.me)) : localStorage.removeItem(`menyu.waiter.${rid}`); } catch {}
+  try { w ? sessionStorage.setItem(`menyu.waiter.${rid}`, JSON.stringify(ui.me)) : sessionStorage.removeItem(`menyu.waiter.${rid}`); } catch {}
 }
 const cfg = () => S.config;
 const meW = () => cfg().waiters.find((w) => w.id === ui.me?.id);
