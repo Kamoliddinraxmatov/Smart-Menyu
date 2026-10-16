@@ -2456,3 +2456,7 @@ body.lux {
   color: #FF5A5A !important;
   font-size: 15px;
 }
+.table-card.st-free .tc-status {
+  color: #4ADE80 !important;
+  font-size: 15px;
+}

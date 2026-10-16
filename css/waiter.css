@@ -586,3 +586,5 @@ body.lux {
 /* Band stol: "BAND" yozuvi va karta chetlari qizil */
 .table-card.st-other, .table-card.st-busy { border: 2px solid #EF4444 !important; opacity: 1; }
 .table-card.st-other .tc-status, .table-card.st-busy .tc-status { color: #FF5A5A !important; font-size: 15px; }
+/* Bo'sh stol: "BO'SH" yozuvi yashil */
+.table-card.st-free .tc-status { color: #4ADE80 !important; font-size: 15px; }
