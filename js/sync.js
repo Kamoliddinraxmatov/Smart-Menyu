@@ -113,8 +113,10 @@ export function createStore(rid, opts = {}) {
     }
   }
 
-  const client = window.MENYU_DEMO ? localBus() : window.mqtt.connect(opts.url || brokerUrl(!key), {
-    ...(opts.auth || (key ? brokerOpts() : {})),
+  const url = opts.url || brokerUrl(!key);
+  const auth = opts.auth || (key ? brokerOpts() : {});
+  const client = window.MENYU_DEMO ? localBus() : window.mqtt.connect(url, {
+    ...auth,
     clientId: `menyu_${rid}_${Math.random().toString(16).slice(2, 10)}`,
     clean: true,
     keepalive: 30,
@@ -362,6 +364,8 @@ export function createStore(rid, opts = {}) {
     close() { return sending.then(() => new Promise((r) => (client.end ? client.end(false, {}, r) : r()))); },
     flush() { return sending; },
     pending() { return Object.keys(outbox).length; },
+    // Server manzili va mavzular (Android ilovadagi oshxona xizmati ekran o'chiq paytda ham shu yerni tinglaydi)
+    conn: { url, base, user: auth.username || "", pass: auth.password || "" },
     client
   };
   return api;

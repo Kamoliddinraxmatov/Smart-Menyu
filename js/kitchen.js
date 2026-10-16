@@ -27,6 +27,18 @@ const ui = {
 
 const cfg = () => S.config;
 
+// Android ilova: ekran o'chiq yoki qulflangan bo'lsa ham yangi buyurtmada signal chalinadi va ekran o'zi yonadi.
+// Buni ilovadagi alohida xizmat qiladi (KitchenService), u serverdagi buyurtmalarni doim tinglaydi.
+const KN = window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins?.Kitchen;
+function nativeGuard() {
+  if (!KN || window.MENYU_DEMO || !store.conn) return;
+  const c = store.conn;
+  KN.start({ url: c.url, topic: `${c.base}/orders/+`, user: c.user, pass: c.pass, title: cfg()?.name || "Oshxona", sound: ui.sound }).catch(() => {});
+}
+nativeGuard();
+// Oshxona ekranidan chiqilsa (bosh sahifaga), xizmat to'xtaydi
+addEventListener("pagehide", () => { KN?.stop?.().catch?.(() => {}); });
+
 function active() {
   return Object.values(S.orders).filter((o) => o.status === "new" || o.status === "cooking").sort((a, b) => a.createdAt - b.createdAt);
 }
@@ -83,7 +95,7 @@ function render() {
   app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { ui.tab = b.dataset.tab; render(); }));
   app.querySelector("[data-act=stop]").addEventListener("click", stopList);
   app.querySelector("[data-act=allday]").addEventListener("click", () => { ui.allDay = !ui.allDay; localStorage.setItem("menyu.kds.allday", ui.allDay ? "1" : "0"); render(); });
-  app.querySelector("[data-act=sound]").addEventListener("click", () => { ui.sound = !ui.sound; localStorage.setItem("menyu.kds.sound", ui.sound ? "1" : "0"); if (ui.sound) chime("new"); render(); });
+  app.querySelector("[data-act=sound]").addEventListener("click", () => { ui.sound = !ui.sound; localStorage.setItem("menyu.kds.sound", ui.sound ? "1" : "0"); if (ui.sound) chime("new"); nativeGuard(); render(); });
   app.querySelector("[data-act=fs]").addEventListener("click", () => {
     if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => {});
   });

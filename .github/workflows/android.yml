@@ -68,6 +68,9 @@ jobs:
         working-directory: app
         run: npx cap sync android
 
+      - name: Oshxona xizmati (ekran o'chiq bo'lsa ham yangi buyurtmada signal va ekran yonadi)
+        run: python3 tools/patch-android.py app/android
+
       - name: Egasi ilovasini tayyorlash
         working-directory: app-owner
         run: |
