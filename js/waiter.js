@@ -320,6 +320,7 @@ function renderLogin() {
   const loginBg = cfg().categories.find((c) => c.hero)?.hero || "";
   app.innerHTML = `
   <div class="login" style="--login-bg:url('${esc(absUrl(loginBg))}')">
+    <a class="login-back" href="${link("index.html", rid)}">← ${L("Orqaga", "Назад", "Back")}</a>
     <div class="login-card">
       <div class="login-brand">${logoHtml(r, "logo logo-xl")}<h1>${esc(r.name)}</h1><p>${esc(r.slogan || "")}</p></div>
       <h2>${L("Ofitsiant, ismingizni tanlang", "Официант, выберите своё имя", "Waiter, choose your name")}</h2>

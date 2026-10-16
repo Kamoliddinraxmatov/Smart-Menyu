@@ -2394,3 +2394,20 @@ body.lux {
     }
   }
 }
+.login-back {
+  position: fixed;
+  z-index: 5;
+  left: 16px;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  display: inline-flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 99px;
+  background: rgba(23, 20, 18, .85);
+  color: var(--gold);
+  border: 1px solid rgba(214, 179, 112, .5);
+  font-weight: 800;
+  font-size: 16px;
+  text-decoration: none;
+}
