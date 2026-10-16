@@ -576,3 +576,9 @@ body.lux {
   background: rgba(23,20,18,.85); color: var(--gold); border: 1px solid rgba(214,179,112,.5);
   font-weight: 800; font-size: 16px; text-decoration: none;
 }
+.guests-pick { margin-top: 12px; }
+.guests-pick small { display: block; color: var(--muted); margin-bottom: 8px; font-size: 15px; }
+.gp-row { display: flex; align-items: center; justify-content: center; gap: 22px; }
+.gp-row b { min-width: 56px; text-align: center; font-size: 34px; }
+.gp-btn { width: 64px; height: 64px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--text); font-size: 32px; line-height: 1; }
+.gp-btn:active { background: rgba(255,255,255,.18); }

@@ -288,7 +288,7 @@ function guestConfirm(t) {
           waiterName: fullName(w) || "",
           sentBy: "Mijoz",
           byGuest: true,
-          guests: activeOrders(t.id)[0]?.guests || Math.min(t.seats || 2, 2),
+          guests: guestsFor(t),
           comment: "",
           items: cart.map(orderLine),
           status: "new",
@@ -529,6 +529,12 @@ function helloHtml() {
     </section>`;
 }
 
+// Stolda necha kishi o'tiribdi (ofitsiant stolni ochganda tanlaydi). Bo'sh stolda ko'rsatilmaydi.
+function tableGuests(t) {
+  return activeOrders(t.id)[0]?.guests || S.reserves?.[t.id]?.guests || 0;
+}
+const guestsFor = (t) => activeOrders(t.id)[0]?.guests || ui.guests?.[t.id] || S.reserves?.[t.id]?.guests || 0;
+
 function tableCard(t) {
   const st = viewState(t);
   const w = waiterById(tableWaiterId(t));
@@ -536,7 +542,7 @@ function tableCard(t) {
   const since = st.orders[0]?.createdAt;
   return `
   <button class="table-card st-${st.key}" data-table="${esc(t.id)}">
-    <div class="tc-top"><span class="tc-no">${esc(t.no)}</span><span class="tc-seats">👤 ${esc(t.seats || "")}</span></div>
+    <div class="tc-top"><span class="tc-no">${esc(t.no)}</span>${tableGuests(t) ? `<span class="tc-seats">👤 ${tableGuests(t)}</span>` : ""}</div>
     <div class="tc-status">${st.label}</div>
     ${st.key === "reserved" && st.res.note ? `<div class="tc-res">${esc(st.res.note)}</div>` : ""}
     ${st.key === "ready" ? `<div class="tc-go">${L("Mijozga olib boring", "Отнесите гостю", "Take it to the guest")}</div>` : ""}
@@ -600,10 +606,10 @@ function freeTap(t, st) {
     <div class="modal-head"><h3>${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
       ${res
-        ? `<p class="tap-status">🔖 ${L("Bron qilingan", "Забронирован", "Reserved")}${res.note ? ` · <b>${esc(res.note)}</b>` : ""}</p><p class="muted small">${esc(res.waiterName || "")} · ${clock(res.at)}</p>${res.waiterId !== ui.me?.id ? `<p class="muted small">${L("Bronni faqat uni qilgan ofitsiant yoki admin bekor qila oladi.", "Отменить бронь может только её автор или админ.", "Only the waiter who made it or an admin can cancel it.")}</p>` : ""}`
+        ? `<p class="tap-status">🔖 ${L("Bron qilingan", "Забронирован", "Reserved")}${res.guests ? ` · <b>👤 ${res.guests} ${L("kishi", "чел.", "people")}</b>` : ""}${res.note ? ` · <b>${esc(res.note)}</b>` : ""}</p><p class="muted small">${esc(res.waiterName || "")} · ${clock(res.at)}</p>${res.waiterId !== ui.me?.id ? `<p class="muted small">${L("Bronni faqat uni qilgan ofitsiant yoki admin bekor qila oladi.", "Отменить бронь может только её автор или админ.", "Only the waiter who made it or an admin can cancel it.")}</p>` : ""}`
         : `<p class="tap-status">${L("Bo'sh stol", "Свободный стол", "Free table")}</p>
-           <label class="res-note"><small>${L("Bron uchun izoh (ixtiyoriy): mijoz ismi, vaqti", "Комментарий к брони (необязательно): имя, время", "Reservation note (optional): name, time")}</small>
-           <input id="resNote" maxlength="60" placeholder="${L("Masalan: Alisher, 19:30", "Например: Алишер, 19:30", "e.g. Alisher, 7:30 pm")}"></label>`}
+           <div class="guests-pick"><small>${L("Necha kishi?", "Сколько гостей?", "How many guests?")}</small>
+             <div class="gp-row"><button type="button" class="gp-btn" data-g="-1">−</button><b id="gpN">2</b><button type="button" class="gp-btn" data-g="1">+</button></div></div>`}
     </div>
     <div class="modal-actions tap-actions">
       <button class="btn btn-info btn-lg btn-block" id="tapOrder">🍽 ${res ? L("Mijoz keldi · Buyurtma", "Гость пришёл · Заказ", "Guest arrived · Order") : L("Buyurtma berish", "Принять заказ", "Take order")}</button>
@@ -612,10 +618,18 @@ function freeTap(t, st) {
         : `<button class="btn btn-res btn-lg btn-block" id="tapRes">🔖 ${L("Bron qilish", "Забронировать", "Reserve")}</button>`}
     </div>`, {
     onMount(m, close) {
-      m.querySelector("#tapOrder").addEventListener("click", () => { close(); openTable(t.id); });
+      let n = 2;
+      m.querySelectorAll("[data-g]").forEach((b) => b.addEventListener("click", () => {
+        n = Math.max(1, Math.min(99, n + Number(b.dataset.g)));
+        m.querySelector("#gpN").textContent = n;
+      }));
+      m.querySelector("#tapOrder").addEventListener("click", () => {
+        ui.guests = { ...(ui.guests || {}), [t.id]: res ? (res.guests || 0) : n };
+        close(); openTable(t.id);
+      });
       m.querySelector("#tapRes")?.addEventListener("click", () => {
         const me = meW();
-        store.setReserve(t.id, { at: Date.now(), tableNo: t.no, waiterId: me.id, waiterName: fullName(me), note: m.querySelector("#resNote").value.trim() });
+        store.setReserve(t.id, { at: Date.now(), tableNo: t.no, waiterId: me.id, waiterName: fullName(me), guests: n });
         close(); toast(`🔖 ${ST(esc(t.no))}: ${L("bron qilindi", "забронирован", "reserved")}`, { kind: "ok" }); render();
       });
       m.querySelector("#tapUnres")?.addEventListener("click", () => {
@@ -1113,7 +1127,7 @@ function confirmOrder(t) {
     waiterId: w?.id || me.id,
     waiterName: fullName(w || me),
     sentBy: fullName(me),
-    guests: active[0]?.guests || Math.min(t.seats || 2, 2),
+    guests: guestsFor(t),
     comment: "",
     items: cart.map(orderLine),
     status: "new",
