@@ -1089,3 +1089,25 @@ label.btn,
   flex: 1 1 100%;
   margin: 0;
 }
+.side-back {
+  display: none;
+}
+@media (max-width: 900px) {
+  .side-back {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 99px;
+    color: var(--gold, var(--brand));
+    border: 1px solid rgba(214, 179, 112, .5);
+    font-weight: 800;
+    font-size: 15px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .side-brand {
+    display: none;
+  }
+}

@@ -69,6 +69,7 @@ function render() {
   <div class="admin">
     <aside class="side">
       <div class="side-brand">${logoHtml(r)}<div><b>${esc(r.name)}</b><small>Admin panel</small></div></div>
+      <a class="side-back" href="${link("index.html", rid)}">← Orqaga</a>
       <nav>${TABS.map(([id, ic, name]) => `<button class="${ui.tab === id ? "on" : ""}" data-tab="${id}"><span>${ic}</span>${name}</button>`).join("")}</nav>
       <div class="side-foot">${connBadge(S.online)}<a href="${link("index.html", rid)}">← Bosh sahifa</a></div>
     </aside>
