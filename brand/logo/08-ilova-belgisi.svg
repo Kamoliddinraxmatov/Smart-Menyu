@@ -1,6 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="1024" height="1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F1D9A0"/><stop offset="1" stop-color="#B8914A"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="url(#g)"/>
-<path d="M120 300a136 136 0 0 1 272 0z" fill="#14100D"/>
-<rect x="96" y="310" width="320" height="26" rx="13" fill="#14100D"/>
-<circle cx="256" cy="148" r="16" fill="#14100D"/>
-<path d="M176 288a80 80 0 0 1 56-74" fill="none" stroke="#D6B370" stroke-width="12" stroke-linecap="round"/>
-<text x="256" y="420" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-weight="900" font-size="46" letter-spacing="3" fill="#14100D">SMART MENYU</text></svg>
+<g transform="translate(256 300) scale(1.94) translate(-256 -290)">
+<g fill="#14100D"><path d="M186 290a70 70 0 0 1 140 0z"/><rect x="172" y="296" width="168" height="14" rx="7"/><circle cx="256" cy="210" r="9"/></g>
+<path d="M226 192a42 42 0 0 1 60 0" fill="none" stroke="#14100D" stroke-width="9" stroke-linecap="round"/></g>
+<text x="256" y="430" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-weight="900" font-size="46" letter-spacing="3" fill="#14100D">SMART MENYU</text></svg>
