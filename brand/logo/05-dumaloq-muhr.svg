@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="1024" height="1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F1D9A0"/><stop offset="1" stop-color="#B8914A"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="#14100D"/>
+<defs><path id="arc" d="M96 256a160 160 0 1 1 320 0a160 160 0 1 1 -320 0"/></defs>
+<circle cx="256" cy="256" r="196" fill="none" stroke="url(#g)" stroke-width="8"/>
+<circle cx="256" cy="256" r="124" fill="url(#g)"/>
+<text font-family="Montserrat, Arial, sans-serif" font-weight="800" font-size="32" fill="#F5EFE6"><textPath href="#arc" textLength="990" lengthAdjust="spacing">SMART MENYU • RESTORAN MENYUSI •</textPath></text>
+<g fill="#14100D"><path d="M186 290a70 70 0 0 1 140 0z"/><rect x="172" y="296" width="168" height="14" rx="7"/><circle cx="256" cy="210" r="9"/></g>
+<g fill="none" stroke="#14100D" stroke-width="9" stroke-linecap="round"><path d="M226 192a42 42 0 0 1 60 0"/></g></svg>
