@@ -6,13 +6,15 @@
   "android": {
     "allowMixedContent": false,
     "backgroundColor": "#0D0B0A",
-    "webContentsDebuggingEnabled": false
+    "webContentsDebuggingEnabled": false,
+    "minWebViewVersion": 55
   },
   "server": {
     "url": "https://kamoliddinraxmatov.github.io/Smart-Menyu/index.html",
     "cleartext": false,
     "allowNavigation": [
       "kamoliddinraxmatov.github.io"
-    ]
+    ],
+    "errorPath": "error.html"
   }
 }

@@ -33,10 +33,18 @@ jobs:
           distribution: temurin
           java-version: 21
 
+      - name: Eski planshetlar uchun nusxa yangi ekanini tekshirish
+        run: |
+          npm i --no-save --no-audit --no-fund esbuild@0.24.0
+          node tools/build-legacy.mjs
+          git diff --exit-code -- js/legacy css/legacy vendor/legacy || { echo "js/ o'zgargan: node tools/build-legacy.mjs ni ishga tushirib, natijani commit qiling"; exit 1; }
+
       - name: Veb fayllarni ilovaga ko'chirish
         run: |
           mkdir -p app/www
           cp -r index.html waiter.html kitchen.html admin.html manifest.webmanifest css js img vendor app/www/
+          # Sayt ochilmasa ilova ichida ko'rinadigan sahifa (qora ekran o'rniga)
+          cp app/error.html app/www/error.html
           # Egasi ilovasi restoran planshetiga kirmaydi
           rm -f app/www/js/owner.js app/www/css/owner.css
           # Planshetga faqat egasining ochiq kaliti kerak: shifrlangan maxfiy kalit olib tashlanadi
