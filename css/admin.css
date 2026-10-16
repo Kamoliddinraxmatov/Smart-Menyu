@@ -211,3 +211,13 @@ label:has(> .file-overlay), label.btn, .cat-pic { position: relative; overflow: 
 .adm-loading p { color: var(--muted); margin: 0; }
 .dev-steps ol { margin: 0; padding-left: 22px; display: grid; gap: 12px; font-size: 16px; line-height: 1.5; }
 .big-code { font-size: 20px; color: var(--gold, var(--brand)); letter-spacing: .03em; }
+
+/* Yuqori tugmalar (Menyu, Ofitsiantlar, Stollar...) ekran chetiga yopishmasin: tepadan joy qoldiriladi */
+.side { padding-top: calc(env(safe-area-inset-top, 0px) + 28px); }
+@media (max-width: 900px) {
+  .side { padding-top: calc(env(safe-area-inset-top, 0px) + 26px); padding-bottom: 12px; }
+  .side nav button { padding: 12px 14px; font-size: 15px; }
+}
+.svc-card { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.svc-card .field { margin: 0; flex: 1 1 180px; max-width: 260px; }
+.svc-card p { flex: 1 1 100%; margin: 0; }

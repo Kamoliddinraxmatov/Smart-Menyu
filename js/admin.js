@@ -444,6 +444,11 @@ function tabWaiters(c) {
     <div><h1>Ofitsiantlar</h1><p>Har bir ofitsiant planshetga ismini tanlab, PIN-kod bilan kiradi. Stolga biriktirilgan ofitsiant buyurtmaga avtomatik yoziladi.</p></div>
     <button class="btn btn-primary" id="add">+ Ofitsiant qo'shish</button>
   </div>
+  <div class="card svc-card">
+    <label class="field"><span>Ofitsiantlar xizmat haqi, %</span><input type="number" id="svc" min="0" max="30" step="1" inputmode="numeric" value="${esc(cfg().restaurant.service ?? 0)}"></label>
+    <button class="btn btn-primary" id="svcSave">Saqlash</button>
+    <p class="hint">Barcha ofitsiantlarga tegishli. Chek yopilganda summaga shu foiz qo'shiladi.</p>
+  </div>
   <div class="card list">
     ${cfg().waiters.map((w) => {
       const tables = cfg().tables.filter((t) => t.waiterId === w.id).map((t) => t.no);
@@ -455,6 +460,11 @@ function tabWaiters(c) {
       </div>`;
     }).join("") || `<div class="empty">Hali ofitsiant yo'q</div>`}
   </div>`;
+  c.querySelector("#svcSave").addEventListener("click", () => {
+    const v = Math.round(Number(c.querySelector("#svc").value));
+    if (!(v >= 0 && v <= 30)) { toast("Xizmat haqi 0 dan 30 % gacha bo'lishi kerak", { kind: "error" }); return; }
+    mutate((x) => { x.restaurant.service = v; }, `Xizmat haqi saqlandi: ${v} %`);
+  });
   c.querySelector("#add").addEventListener("click", () => waiterEditor(null));
   c.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => waiterEditor(cfg().waiters.find((w) => w.id === b.dataset.edit))));
 }
