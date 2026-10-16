@@ -583,3 +583,6 @@ body.lux {
 .gp-row b { min-width: 56px; text-align: center; font-size: 34px; }
 .gp-btn { width: 64px; height: 64px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.07); color: var(--text); font-size: 32px; line-height: 1; }
 .gp-btn:active { background: rgba(255,255,255,.18); }
+/* Band stol: "BAND" yozuvi va karta chetlari qizil */
+.table-card.st-other, .table-card.st-busy { border: 2px solid #EF4444 !important; opacity: 1; }
+.table-card.st-other .tc-status, .table-card.st-busy .tc-status { color: #FF5A5A !important; font-size: 15px; }
