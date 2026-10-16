@@ -68,6 +68,7 @@ function render() {
 
   app.innerHTML = `
   <header class="kbar">
+    <a class="kback" href="${link("index.html", rid)}">← Orqaga</a>
     <div class="kbrand">${logoHtml(cfg().restaurant)}<div><b>${esc(cfg().restaurant.name)}</b><small>Oshxona ekrani</small></div></div>
     <div class="kstats">
       <span class="ks ks-new"><b>${nNew}</b>Yangi</span>
