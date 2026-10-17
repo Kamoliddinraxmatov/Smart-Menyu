@@ -18,7 +18,7 @@
     "#boot{position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483000;background:#0D0B0A;color:#F5EFE6;" +
     "font:16px/1.5 system-ui,Roboto,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;overflow:auto}" +
     "#boot .b-in{max-width:560px;width:100%;text-align:center}" +
-    "#boot .b-logo{width:72px;height:72px;margin:0 auto 14px;border:2px solid #D6B370;border-radius:50%;color:#D6B370;font:700 38px/68px Georgia,serif}" +
+    "#boot .b-logo{display:block;width:120px;height:120px;margin:0 auto 14px}" +
     "#boot .b-t{font-size:22px;font-weight:700;margin:0 0 6px}" +
     "#boot .b-s{color:#A69C91;margin:0 0 16px}" +
     "#boot .b-spin{width:34px;height:34px;margin:8px auto;border:3px solid rgba(214,179,112,.25);border-top-color:#D6B370;border-radius:50%;animation:bspin 1s linear infinite}" +
@@ -36,7 +36,7 @@
   function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"; }); }
 
   function loading() {
-    box.innerHTML = '<div class="b-in"><div class="b-logo">M</div><p class="b-t">Smart Menyu</p><p class="b-s">Yuklanmoqda…</p><div class="b-spin"></div></div>';
+    box.innerHTML = '<div class="b-in"><img class="b-logo" src="img/logo-192.png" alt=""><p class="b-t">Smart Menyu</p><p class="b-s">Yuklanmoqda…</p><div class="b-spin"></div></div>';
   }
 
   function info() {
@@ -50,7 +50,7 @@
     var tip = old
       ? "Planshetdagi \"Android System WebView\" juda eski (Chrome " + chrome + "). Play Market'dan \"Android System WebView\" va \"Chrome\" ni yangilang, keyin ilovani qayta oching."
       : "Internet borligini tekshiring va \"Qayta urinish\" ni bosing. Bo'lmasa, shu ekranni rasmga olib yuboring.";
-    box.innerHTML = '<div class="b-in"><div class="b-logo">M</div><p class="b-t">' + esc(title || "Ilova ochilmadi") + '</p>' +
+    box.innerHTML = '<div class="b-in"><img class="b-logo" src="img/logo-192.png" alt=""><p class="b-t">' + esc(title || "Ilova ochilmadi") + '</p>' +
       '<p class="b-s">' + esc(tip) + '</p>' +
       '<div class="b-err">' + esc((errs.length ? errs.join("\n") + "\n\n" : "") + info()) + '</div>' +
       '<button id="b-retry">Qayta urinish</button><button class="g" id="b-clean">Tozalab qayta ochish</button></div>';

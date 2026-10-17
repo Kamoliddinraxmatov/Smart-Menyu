@@ -76,7 +76,7 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npx cap add android
-          npx capacitor-assets generate --android --iconBackgroundColor '#D6B370' --iconBackgroundColorDark '#D6B370' --splashBackgroundColor '#0D0B0A' --splashBackgroundColorDark '#0D0B0A' || true
+          npx capacitor-assets generate --android --iconBackgroundColor '#0D0B0A' --iconBackgroundColorDark '#0D0B0A' --splashBackgroundColor '#0D0B0A' --splashBackgroundColorDark '#0D0B0A' || true
           npx cap sync android
 
       - name: Himoya (debug va zaxira nusxa o'chiriladi)
