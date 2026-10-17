@@ -15,6 +15,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(KitchenPlugin.class);
+        registerPlugin(UpdaterPlugin.class);
         super.onCreate(savedInstanceState);
         boolean kitchen = getSharedPreferences(KitchenService.PREFS, Context.MODE_PRIVATE).getBoolean("active", false);
         applyKitchenWindow(this, kitchen);

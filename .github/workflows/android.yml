@@ -90,6 +90,17 @@ jobs:
           done
 
 
+      - name: Doimiy imzo (yangi versiya eskisining ustidan o'rnatiladi, planshet qayta tasdiqlanmaydi)
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          if [ -n "$SIGNING_KEY" ]; then
+            mkdir -p ~/.android && echo "$SIGNING_KEY" | base64 -d > ~/.android/debug.keystore
+            echo "Doimiy imzo ishlatiladi"
+          else
+            echo "::warning::SIGNING_KEY sozlanmagan: APK tasodifiy imzo bilan chiqadi va eskisining ustidan o'rnatilmaydi"
+          fi
+
       - name: APK yig'ish
         working-directory: app/android
         run: |
