@@ -115,6 +115,8 @@
     if (rendered()) {
       done = true; clearInterval(timer);
       if (box.parentNode) box.parentNode.removeChild(box);
+      // Planshet ilovasida: yangi versiya chiqsa "Yangilash" oynasi (js/update.js)
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Updater) add("js/update.js", false);
       return;
     }
     if (!failed && Date.now() - started > 15000) fail("Ilova ochilmadi");
