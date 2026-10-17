@@ -50,7 +50,7 @@ function render() {
   <div class="home">
     <div class="h-bg"></div>
     <header class="h-top">
-      <div class="h-logo"><img src="img/icon.svg" alt=""><b>Smart Menyu</b></div>
+      <div class="h-logo"><img src="img/logo-192.png" alt=""><b>Smart Menyu</b></div>
       <div class="h-top-r">
         <div class="h-lang" role="group" aria-label="Til / Язык">${["uz", "ru"].map((l) => `<button data-lang="${l}" class="${L === l ? "on" : ""}">${l.toUpperCase()}</button>`).join("")}</div>
         ${connBadge(S.online).replace(/>(Onlayn|Aloqa yo'q)</, `>${tr(S.online ? "on" : "off")}<`)}
