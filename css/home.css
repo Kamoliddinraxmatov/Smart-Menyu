@@ -1,7 +1,7 @@
 .home { max-width: 1040px; margin: 0 auto; padding: 18px 18px 40px; }
 .h-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px; }
 .h-logo { display: flex; align-items: center; gap: 10px; font-size: 20px; }
-.h-logo img { width: 52px; height: 52px; border-radius: 12px; }
+.h-logo img { width: 36px; height: 36px; }
 .h-rest {
   display: flex; align-items: center; gap: 20px; padding: 26px; border-radius: 28px; color: #fff;
   background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%); box-shadow: var(--shadow-lg); margin-bottom: 20px;
