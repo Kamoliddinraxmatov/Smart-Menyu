@@ -3,5 +3,5 @@
 <circle cx="256" cy="256" r="196" fill="none" stroke="url(#g)" stroke-width="8"/>
 <circle cx="256" cy="256" r="124" fill="url(#g)"/>
 <text font-family="Montserrat, Arial, sans-serif" font-weight="800" font-size="32" fill="#F5EFE6"><textPath href="#arc" textLength="990" lengthAdjust="spacing">SMART MENYU • RESTORAN MENYUSI •</textPath></text>
-<g fill="#14100D"><path d="M186 290a70 70 0 0 1 140 0z"/><rect x="172" y="296" width="168" height="14" rx="7"/><circle cx="256" cy="210" r="9"/></g>
-<g fill="none" stroke="#14100D" stroke-width="9" stroke-linecap="round"><path d="M226 192a42 42 0 0 1 60 0"/></g></svg>
+<g fill="#14100D"><path d="M182 300a74 74 0 0 1 148 0z"/><rect x="168" y="306" width="176" height="15" rx="7.5"/><circle cx="256" cy="214" r="10"/><rect x="252" y="214" width="8" height="14"/></g>
+<g fill="none" stroke="#14100D" stroke-width="10" stroke-linecap="round"><path d="M236.3 200.2A24 24 0 0 1 275.7 200.2"/><path d="M220.0 188.8A44 44 0 0 1 292.0 188.8"/></g></svg>

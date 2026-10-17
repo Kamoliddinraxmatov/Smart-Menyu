@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="1024" height="1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F1D9A0"/><stop offset="1" stop-color="#B8914A"/></linearGradient></defs><rect width="512" height="512" rx="112" fill="#14100D"/>
+<defs><path id="arc" d="M96 256a160 160 0 1 1 320 0a160 160 0 1 1 -320 0"/></defs>
+<circle cx="256" cy="256" r="196" fill="none" stroke="url(#g)" stroke-width="8"/>
+<circle cx="256" cy="256" r="124" fill="url(#g)"/>
+<text font-family="Montserrat, Arial, sans-serif" font-weight="800" font-size="32" fill="#F5EFE6"><textPath href="#arc" textLength="990" lengthAdjust="spacing">SMART MENYU • RESTORAN MENYUSI •</textPath></text>
+<g fill="#14100D">
+<circle cx="256" cy="180" r="8"/><rect x="252.5" y="180" width="7" height="12"/>
+<path d="M184 262a72 72 0 0 1 144 0z"/>
+<path d="M160 266h192a4 4 0 0 1 0 8l-10 4H170l-10-4a4 4 0 0 1 0-8z"/>
+<path d="M220 281H318C332 281 342 280 345 284C347 289 339 291 330 292L292 297C282 299 274 304 268 310L249 291C243 286 233 284 220 284Z"/>
+<path d="M249 291L268 310L240 338L221 319Z"/>
+<path d="M216 320L240 344L217 367L193 343Z"/>
+</g>
+<circle cx="207" cy="347" r="3.5" fill="url(#g)"/>
+<path d="M200 252c2-22 14-38 32-46" fill="none" stroke="url(#g)" stroke-width="7" stroke-linecap="round"/>
+<g fill="none" stroke="url(#g)" stroke-width="2.5" stroke-linecap="round"><path d="M296 289l38-4"/></g>
+<g fill="none" stroke="#14100D" stroke-width="9" stroke-linecap="round"><path d="M239.6 168.5A20 20 0 0 1 272.4 168.5"/><path d="M224.9 158.2A38 38 0 0 1 287.1 158.2"/></g></svg>
