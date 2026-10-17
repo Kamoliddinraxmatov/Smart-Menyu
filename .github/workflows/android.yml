@@ -94,12 +94,26 @@ jobs:
         env:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
-          if [ -n "$SIGNING_KEY" ]; then
-            mkdir -p ~/.android && echo "$SIGNING_KEY" | base64 -d > ~/.android/debug.keystore
-            echo "Doimiy imzo ishlatiladi"
-          else
+          if [ -z "$SIGNING_KEY" ]; then
             echo "::warning::SIGNING_KEY sozlanmagan: APK tasodifiy imzo bilan chiqadi va eskisining ustidan o'rnatilmaydi"
+            exit 0
           fi
+          k="$RUNNER_TEMP/sm.keystore"
+          printf '%s' "$SIGNING_KEY" | tr -d ' \r\n' | base64 -d > "$k"
+          keytool -list -v -keystore "$k" -storepass android | grep "SHA256:"
+          echo "SM_KEYSTORE=$k" >> "$GITHUB_ENV"
+          for d in app app-owner; do
+            python3 - "$d/android/app/build.gradle" "$k" <<'PY'
+          import sys
+          p, k = sys.argv[1], sys.argv[2]
+          g = open(p).read()
+          block = 'signingConfigs { fixed { storeFile file("%s"); storePassword "android"; keyAlias "androiddebugkey"; keyPassword "android" } }\n    buildTypes {' % k
+          g = g.replace("buildTypes {", block, 1)
+          g = g.replace("debug { debuggable false }", "debug { debuggable false; signingConfig signingConfigs.fixed }", 1)
+          assert "signingConfig signingConfigs.fixed" in g
+          open(p, "w").write(g)
+          PY
+          done
 
       - name: APK yig'ish
         working-directory: app/android
@@ -113,6 +127,16 @@ jobs:
         run: |
           chmod +x gradlew && ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk ../../SmartMenyuEgasi.apk
+
+      - name: Imzoni tekshirish
+        if: env.SM_KEYSTORE != ''
+        run: |
+          want=$(keytool -list -v -keystore "$SM_KEYSTORE" -storepass android | grep "SHA256:" | head -1 | awk '{print $2}')
+          for f in SmartMenyu.apk SmartMenyuEgasi.apk; do
+            got=$(keytool -printcert -jarfile $f | grep "SHA256:" | head -1 | awk '{print $2}')
+            echo "$f: $got"
+            [ "$got" = "$want" ] || { echo "::error::$f doimiy kalit bilan imzolanmadi"; exit 1; }
+          done
 
       - uses: actions/upload-artifact@v4
         with:
