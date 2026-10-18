@@ -1,0 +1,11 @@
+{
+  "appId": "uz.smartmenyu.agent",
+  "appName": "Smart Menyu Agent",
+  "webDir": "www",
+  "backgroundColor": "#0D0B0A",
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0D0B0A",
+    "webContentsDebuggingEnabled": false
+  }
+}

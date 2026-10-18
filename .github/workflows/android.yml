@@ -1,9 +1,11 @@
 # Har safar main'ga yangi kod tushganda ikki Android ilovani (APK) yig'adi va Releases bo'limiga qo'yadi:
 #   SmartMenyu.apk       restoran planshetlari uchun (ofitsiant, oshxona, boshqaruv)
 #   SmartMenyuEgasi.apk  faqat egasi uchun (restoranlarga obuna berish, planshetlarni tasdiqlash)
+#   SmartMenyuAgent.apk  sotuv agentlari uchun (yo'qotish kalkulyatori, internetsiz ishlaydi)
 # Doimiy havolalar:
 # https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyu.apk
 # https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyuEgasi.apk
+# https://github.com/Kamoliddinraxmatov/Smart-Menyu/releases/latest/download/SmartMenyuAgent.apk
 name: Android APK
 
 on:
@@ -52,6 +54,9 @@ jobs:
           mkdir -p app-owner/www
           cp -r css js img vendor app-owner/www/
           cp owner.html app-owner/www/index.html
+          # Agent ilovasi saytga bog'liq emas: hamma fayl ilova ichida, internetsiz ochiladi
+          mkdir -p app-agent/www
+          cp agent/index.html agent/manifest.webmanifest agent/logo-192.png agent/logo-512.png app-agent/www/
 
       - name: Capacitor o'rnatish
         working-directory: app
@@ -79,9 +84,17 @@ jobs:
           npx capacitor-assets generate --android --iconBackgroundColor '#0D0B0A' --iconBackgroundColorDark '#0D0B0A' --splashBackgroundColor '#0D0B0A' --splashBackgroundColorDark '#0D0B0A' || true
           npx cap sync android
 
+      - name: Agent ilovasini tayyorlash
+        working-directory: app-agent
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          npx capacitor-assets generate --android --iconBackgroundColor '#0D0B0A' --iconBackgroundColorDark '#0D0B0A' --splashBackgroundColor '#0D0B0A' --splashBackgroundColorDark '#0D0B0A' || true
+          npx cap sync android
+
       - name: Himoya (debug va zaxira nusxa o'chiriladi)
         run: |
-          for d in app app-owner; do
+          for d in app app-owner app-agent; do
             m=$d/android/app/src/main/AndroidManifest.xml
             sed -i 's/android:allowBackup="true"/android:allowBackup="false" android:fullBackupContent="false"/' $m
             grep -q 'allowBackup="false"' $m
@@ -102,7 +115,7 @@ jobs:
           printf '%s' "$SIGNING_KEY" | tr -d ' \r\n' | base64 -d > "$k"
           keytool -list -v -keystore "$k" -storepass android | grep "SHA256:"
           echo "SM_KEYSTORE=$k" >> "$GITHUB_ENV"
-          for d in app app-owner; do
+          for d in app app-owner app-agent; do
             python3 - "$d/android/app/build.gradle" "$k" <<'PY'
           import sys
           p, k = sys.argv[1], sys.argv[2]
@@ -128,11 +141,17 @@ jobs:
           chmod +x gradlew && ./gradlew assembleDebug --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk ../../SmartMenyuEgasi.apk
 
+      - name: Agent ilovasi
+        working-directory: app-agent/android
+        run: |
+          chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../../SmartMenyuAgent.apk
+
       - name: Imzoni tekshirish
         if: env.SM_KEYSTORE != ''
         run: |
           want=$(keytool -list -v -keystore "$SM_KEYSTORE" -storepass android | grep "SHA256:" | head -1 | awk '{print $2}')
-          for f in SmartMenyu.apk SmartMenyuEgasi.apk; do
+          for f in SmartMenyu.apk SmartMenyuEgasi.apk SmartMenyuAgent.apk; do
             got=$(keytool -printcert -jarfile $f | grep "SHA256:" | head -1 | awk '{print $2}')
             echo "$f: $got"
             [ "$got" = "$want" ] || { echo "::error::$f doimiy kalit bilan imzolanmadi"; exit 1; }
@@ -144,6 +163,7 @@ jobs:
           path: |
             SmartMenyu.apk
             SmartMenyuEgasi.apk
+            SmartMenyuAgent.apk
 
       - name: Release'ga qo'yish
         if: github.ref == 'refs/heads/main'
@@ -151,8 +171,9 @@ jobs:
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: Smart Menyu 1.0.${{ github.run_number }}
-          body: "SmartMenyu.apk: restoran planshetlari uchun. SmartMenyuEgasi.apk: faqat egasi uchun. Yuklab oling va o'rnating (noma'lum manbalardan o'rnatishga ruxsat bering)."
+          body: "SmartMenyu.apk: restoran planshetlari uchun. SmartMenyuEgasi.apk: faqat egasi uchun. SmartMenyuAgent.apk: sotuv agentlari uchun kalkulyator. Yuklab oling va o'rnating (noma'lum manbalardan o'rnatishga ruxsat bering)."
           files: |
             SmartMenyu.apk
             SmartMenyuEgasi.apk
+            SmartMenyuAgent.apk
           make_latest: true
