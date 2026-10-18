@@ -108,8 +108,19 @@ function persist(remote = true) {
   try { localStorage.setItem("owner.state", JSON.stringify(S)); } catch {}
   if (remote) backup();
 }
+// Serverdagi zaxira hali kelmagan bo'lsa (masalan ilova qayta o'rnatilgandan keyin ro'yxat bo'sh), uning ustiga
+// yozmaymiz: aks holda bo'sh ro'yxat eski zaxirani o'chirib yuboradi. Zaxira kelgach yoki serverda zaxira yo'qligi
+// aniq bo'lgach (obunadan keyin 8 soniya), kutib turgan saqlash bajariladi.
+let remoteReady = false;
+let backupWaiting = false;
+function remoteArrived() {
+  if (remoteReady) return;
+  remoteReady = true;
+  if (backupWaiting) { backupWaiting = false; backup(); }
+}
 async function backup() {
   if (!client || !keys) return;
+  if (!remoteReady) { backupWaiting = true; return; }
   const topic = `${V2}/_owner/${ownerId}/state`;
   client.publish(topic, await seal(keys.state, JSON.stringify(S), topic), { qos: 1, retain: true });
 }
@@ -206,7 +217,7 @@ function connect() {
   client = window.mqtt.connect(brokerOf(), { ...authOf(), clientId: `menyu_owner_${Math.random().toString(16).slice(2, 10)}`, clean: true, keepalive: 30, reconnectPeriod: 2000 });
   client.on("connect", () => {
     online = true;
-    client.subscribe([`${V2}/_owner/${ownerId}/state`, `${V2}/+/reg/+`, `${V2}/+/lic`], { qos: 1 });
+    client.subscribe([`${V2}/_owner/${ownerId}/state`, `${V2}/+/reg/+`, `${V2}/+/lic`], { qos: 1 }, (err) => { if (!err) setTimeout(remoteArrived, 8000); });
     render();
   });
   client.on("close", () => { if (online) { online = false; render(); } });
@@ -217,7 +228,7 @@ function connect() {
 const issuedSeen = {};
 async function onMessage(topic, text) {
   if (topic === `${V2}/_owner/${ownerId}/state`) {
-    if (!text) return;
+    if (!text) { remoteArrived(); return; }
     let remote;
     try { remote = JSON.parse(await open(keys.state, text, topic)); } catch { return; }
     stamp();
@@ -228,6 +239,7 @@ async function onMessage(topic, text) {
     const changedLocal = JSON.stringify(merged.rests) !== beforeRests || JSON.stringify(merged.settings) !== beforeSettings;
     const changedRemote = JSON.stringify(merged.rests) !== JSON.stringify(remote.rests || {}) || JSON.stringify(merged.settings) !== JSON.stringify(remote.settings);
     S = merged;
+    remoteArrived();
     // Ikkala tomondan yig'ilgan restoran: ruxsatnomani ham yangilaymiz
     for (const r of Object.values(S.rests)) {
       const l = beforeEach[r.rid], m = remote.rests?.[r.rid];
