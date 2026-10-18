@@ -123,3 +123,4 @@ body.lux { background: radial-gradient(900px 500px at 50% -10%, rgba(214, 179, 1
 .ow-feats li.off { color: var(--muted); }
 .ow-feats small { color: var(--gold); font-size: 11px; margin-left: 4px; }
 .ow-over { color: #E8846B !important; }
+.ow-steps { margin: 8px 0 12px; padding-left: 20px; display: grid; gap: 6px; }

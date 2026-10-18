@@ -10,7 +10,7 @@ import { DEFAULT_CONFIG } from "./defaults.js";
 import { PLANS as TARIFFS, FEATURES, planOf } from "./plan.js";
 import {
   passKey, open, seal, importSignKey, sign, importVerifyKey, verify, newEphemeral, wrapFor, genDataKey, importDataKey,
-  prettyId, fingerprint, kvGet, kvSet, kvDel, b64, rand
+  prettyId, fingerprint, kvGet, kvSet, kvDel, b64, rand, genDeviceKeys, exportPub, unwrapWith
 } from "./crypto.js";
 import { esc, money, modal, toast, confirmBox, fileToDataUrl, registerSW, saveFile, ADMIN_PASS_RULE, adminPassOk } from "./common.js";
 
@@ -265,11 +265,13 @@ async function onMessage(topic, text) {
     render();
     return;
   }
+  if (parts[3] === "recover" && parts[4] === "ans") { onRecoverAnswer(rid, text); return; }
   if (parts[3] === "lic") {
+    const lic = text ? await signed(text) : null;
+    if (lic?.rid === rid) lics[rid] = lic; // ro'yxatda yo'q restoranni planshetdan tiklash uchun
     // Serverdagi ruxsatnoma biznikidan farq qilsa (o'chirilgan yoki eskisi qayta yuborilgan), qayta yozamiz
     const r = S.rests[rid];
     if (!r || !r.licIssued) return;
-    const lic = text ? await signed(text) : null;
     issuedSeen[rid] = lic?.rid === rid ? lic.issued : 0;
     if (issuedSeen[rid] === r.licIssued || healTimer[rid]) return;
     healTimer[rid] = setTimeout(() => {
@@ -280,6 +282,90 @@ async function onMessage(topic, text) {
   }
 }
 const healTimer = {};
+const lics = Object.create(null); // serverdagi imzolangan ruxsatnomalar: rid -> lic
+
+// ---------- Restoranni planshetdan tiklash ----------
+// Egasi telefoni ro'yxatni yo'qotsa (ilova qayta o'rnatildi, zaxira yo'q), restoran kaliti uning ishlab turgan
+// planshetida bor. Egasi bir martalik kalit yaratadi va uning kodini (XXXX-XXXX) planshetga kiritadi. Planshet
+// restoran kalitini faqat shu kalit uchun o'rab yuboradi. Qolgan ma'lumot (nom, muddat, tarif, planshetlar)
+// serverdagi imzolangan ruxsatnomadan olinadi.
+let recovery = null; // { rid, priv, done }
+async function startRecovery(rid) {
+  const kp = await genDeviceKeys();
+  const pub = await exportPub(kp.publicKey);
+  const code = await fingerprint(pub);
+  recovery = { rid, priv: kp.privateKey, code };
+  client.subscribe(`${V2}/${rid}/recover/ans`, { qos: 1 });
+  client.publish(`${V2}/${rid}/recover/req`, JSON.stringify({ pub, at: Date.now() }), { qos: 1, retain: true });
+  return code;
+}
+function endRecovery(rid) {
+  client?.publish(`${V2}/${rid}/recover/req`, "", { qos: 1, retain: true });
+  client?.publish(`${V2}/${rid}/recover/ans`, "", { qos: 1, retain: true });
+  client?.unsubscribe(`${V2}/${rid}/recover/ans`);
+  recovery = null;
+}
+async function onRecoverAnswer(rid, text) {
+  const rc = recovery;
+  if (!text || !rc || rc.rid !== rid || rc.busy) return;
+  let ans, raw;
+  try { ans = JSON.parse(text); raw = await unwrapWith(rc.priv, ans.eph, ans.wrapped, `${rid}/recover`); } catch { return; } // boshqa so'rovga javob
+  rc.busy = true;
+  const lic = lics[rid];
+  if (!lic) { rc.busy = false; return toast("Restoranning ruxsatnomasi serverda topilmadi. Internetni tekshirib, qayta urinib ko'ring.", { kind: "error", timeout: 7000 }); }
+  const r = {
+    rid, name: lic.name || rid, city: "", contact: "", phone: "", note: "", max: lic.max || 5,
+    createdAt: Date.now(), until: lic.until || 0, blocked: !!lic.blocked, key: raw, devices: {}, payments: [], licIssued: lic.issued || 0
+  };
+  if (planOf(lic.plan)) r.plan = lic.plan;
+  // Kalit to'g'riligini restoran menyusini ochib tekshiramiz
+  const cfg = await withStore(r, (st) => loadCfg(st)).catch(() => null);
+  if (!cfg) { rc.busy = false; return toast("Planshetdan kelgan kalit bilan restoran ma'lumotlari ochilmadi. Qayta urinib ko'ring.", { kind: "error", timeout: 7000 }); }
+  r.phone = cfg.restaurant?.phone || "";
+  // Planshetlar: ruxsatnomadagi har biri uchun ochiq kalit (serverdagi so'rovidan yoki javob bergan planshetdan)
+  const known = { ...(regs[rid] || {}) };
+  if (ans.dev?.id && ans.dev.pub && await validReg(ans.dev, ans.dev.id)) known[ans.dev.id] = { id: ans.dev.id, pub: ans.dev.pub, name: String(ans.dev.name || "").slice(0, 40), ua: "" };
+  const missing = [];
+  for (const id of Object.keys(lic.dev || {})) {
+    const g = known[id];
+    if (g) r.devices[id] = { pub: g.pub, name: g.name || "", ua: g.ua || "", approvedAt: Date.now() };
+    else missing.push(id);
+  }
+  if (lic.phone && !S.settings.phone) S.settings.phone = lic.phone;
+  S.rests[rid] = r;
+  if (S.gone) delete S.gone[rid];
+  persist();
+  endRecovery(rid);
+  document.querySelector(".modal-back [data-close]")?.click();
+  ui.view = "rest"; ui.rid = rid; render();
+  toast(`"${esc(r.name)}" tiklandi.${missing.length ? ` ${missing.length} ta planshet keyingi o'zgarishda qayta tasdiq so'rashi mumkin.` : ""}`, { kind: "ok", timeout: 8000 });
+}
+function recoverDialog() {
+  modal(`
+    <div class="modal-head"><h3>Restoranni planshetdan tiklash</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body" id="rcBody">
+      <p class="ow-hint">Restoran ro'yxatdan yo'qolgan bo'lsa, uni ishlab turgan planshetidan tiklash mumkin. Planshetlar o'zgarmaydi va ishlashda davom etadi.</p>
+      <label class="field"><span>Restoran kodi</span><input id="rcRid" autocapitalize="none" spellcheck="false" placeholder="masalan: yoshlar-trdv"></label>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" data-close>Bekor qilish</button><button class="btn btn-primary" id="rcGo">Davom etish</button></div>`, {
+    onMount(m, close) {
+      m.querySelector("#rcGo").addEventListener("click", async (e) => {
+        const rid = m.querySelector("#rcRid").value.trim().toLowerCase().replace(/\s+/g, "");
+        if (!RID_RE.test(rid)) return toast("Restoran kodini to'g'ri kiriting", { kind: "error" });
+        if (S.rests[rid]) return toast("Bu restoran ro'yxatda bor", { kind: "error" });
+        if (!client || !online) return toast("Internet yo'q", { kind: "error" });
+        const code = await startRecovery(rid);
+        e.currentTarget.remove();
+        m.querySelector("#rcBody").innerHTML = `
+          <p>Restoranning ishlab turgan planshetida:</p>
+          <ol class="ow-steps"><li><b>Boshqaruv</b> bo'limini oching (boshqaruv paroli bilan).</li><li><b>📱 Qurilmalar</b> → <b>🔑 Egasiga tiklash</b> tugmasini bosing.</li><li>Shu kodni kiriting:</li></ol>
+          <div class="ow-code"><b>${prettyId(code)}</b></div>
+          <p class="ow-hint">⏳ Planshet javobi kutilmoqda... Javob kelishi bilan restoran o'zi tiklanadi.</p>`;
+      });
+      m.addEventListener("click", (e) => { if (e.target.closest("[data-close]") && recovery && !recovery.busy) endRecovery(recovery.rid); });
+    }
+  });
+}
 
 // Ruxsatnomani imzolab yuborish
 async function publishLicense(r, save = true) {
@@ -877,7 +963,9 @@ function renderSettings() {
       <section class="ow-sec">
         <h3>Zaxira nusxa</h3>
         <p class="ow-hint">Restoranlar ro'yxati va kalitlari shifrlangan holda serverda saqlanadi. Qo'shimcha xavfsizlik uchun faylga ham saqlab qo'ying.</p>
-        <div class="ow-row-btns"><button class="btn btn-ghost" id="exp">⬇ Faylga saqlash</button><label class="btn btn-ghost">⬆ Fayldan tiklash<input type="file" accept=".smz,application/octet-stream,text/plain" id="imp" class="file-overlay"></label></div>
+        <div class="ow-row-btns"><button class="btn btn-ghost" id="exp">⬇ Faylga saqlash</button><label class="btn btn-ghost">⬆ Fayldan tiklash<input type="file" id="imp" class="file-overlay"></label></div>
+        <p class="ow-hint">Zaxira fayli bo'lmasa, restoranni uning ishlab turgan planshetidan tiklash mumkin.</p>
+        <div class="ow-row-btns"><button class="btn btn-ghost" id="recover">📲 Restoranni planshetdan tiklash</button></div>
       </section>
       <section class="ow-sec">
         <h3>Xavfsizlik</h3>
@@ -921,6 +1009,7 @@ function renderSettings() {
     }, 2500);
     toast("Server o'zgartirildi", { kind: "ok" });
   });
+  $("#recover").addEventListener("click", recoverDialog);
   $("#exp").addEventListener("click", async () => {
     const text = await seal(keys.state, JSON.stringify(S), "backup");
     saveFile(`smart-menyu-zaxira-${fmtDate(Date.now())}.smz`, text, "application/octet-stream");

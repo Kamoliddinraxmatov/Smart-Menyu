@@ -1,6 +1,7 @@
 // Admin panel: restoran brendi, menyu, ofitsiantlar, stollar va hisobot
 import { createStore, newId } from "./sync.js";
-import { activate } from "./license.js";
+import { activate, restaurantKey, brokerUrl, brokerOpts, V2 } from "./license.js";
+import { newEphemeral, wrapFor, fingerprint } from "./crypto.js";
 import {
   getRid, saveFile, esc, money, fullName, initials, clock, orderTotal, applyBrand, logoHtml, itemVisual,
   toast, modal, confirmBox, connBadge, fileToDataUrl, cropImage, link, registerSW,
@@ -786,7 +787,55 @@ function tabDevices(c) {
       <li>Planshetda kerakli bo'limni tanlang: <b>Ofitsiant</b>, <b>Oshxona ekrani</b> yoki <b>Boshqaruv</b>.</li>
     </ol>
     <p class="muted">Bu planshet: <b class="code">${esc(ACT.dev ? ACT.dev.id.slice(0, 4) + "-" + ACT.dev.id.slice(4) : "namoyish")}</b>${ACT.lic ? ` · Obuna: <b>${new Date(ACT.watcher?.lic?.until || ACT.lic.until).toLocaleDateString("ru-RU")}</b> gacha` : ""} · Tarif: <b>${esc(planOf(plan()).name)}</b></p>
-  </div>`;
+  </div>
+  ${ACT.demo ? "" : `<div class="card">
+    <h3>Egasiga tiklash</h3>
+    <p class="muted">Smart Menyu egasi restoranni o'z ilovasida tiklayotgan bo'lsa, u bergan kodni shu yerga kiriting.</p>
+    <button class="btn btn-ghost" id="recover">🔑 Egasiga tiklash</button>
+  </div>`}`;
+  c.querySelector("#recover")?.addEventListener("click", recoverForOwner);
+}
+
+// Egasi telefoni restoranlar ro'yxatini yo'qotganda: restoran kalitini faqat egasi ekranidagi kodga mos kalit uchun
+// o'rab yuboramiz (kodni bilmagan begona odam kalitni ololmaydi)
+function recoverForOwner() {
+  modal(`
+    <div class="modal-head"><h3>Egasiga tiklash</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body">
+      <p class="muted">Smart Menyu Egasi ilovasida chiqqan 8 belgili kodni kiriting.</p>
+      <label class="field"><span>Kod</span><input id="rc" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX"></label>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" data-close>Bekor qilish</button><button class="btn btn-primary" id="ok">Yuborish</button></div>`, {
+    onMount(m, close) {
+      m.querySelector("#ok").addEventListener("click", async (e) => {
+        const code = m.querySelector("#rc").value.toUpperCase().replace(/[^0-9A-Z]/g, "");
+        if (code.length !== 8) return toast("Kod 8 belgidan iborat", { kind: "error" });
+        const k = await restaurantKey();
+        if (!k || !window.mqtt) return toast("Planshet ruxsatnomasi topilmadi", { kind: "error" });
+        const btn = e.currentTarget; btn.disabled = true; btn.textContent = "Yuborilmoqda...";
+        const fail = (msg) => { toast(msg, { kind: "error", timeout: 6000 }); btn.disabled = false; btn.textContent = "Yuborish"; };
+        const base = `${V2}/${k.rid}/recover`;
+        const cl = window.mqtt.connect(brokerUrl(), { ...brokerOpts(), clientId: `menyu_rc_${Math.random().toString(16).slice(2, 8)}`, clean: true, reconnectPeriod: 0, connectTimeout: 8000 });
+        const t = setTimeout(() => { cl.end(true); fail("Egasining so'rovi topilmadi. Egasi ilovasida kod ochiq turganini tekshiring."); }, 8000);
+        cl.on("error", () => { clearTimeout(t); cl.end(true); fail("Server bilan aloqa yo'q"); });
+        cl.on("connect", () => cl.subscribe(`${base}/req`));
+        cl.on("message", async (_, payload) => {
+          let req;
+          try { req = JSON.parse(payload.toString()); } catch { return; }
+          if (!req?.pub || (await fingerprint(req.pub)) !== code) { clearTimeout(t); cl.end(true); return fail("Kod mos kelmadi. Egasi ilovasidagi kodni qayta tekshiring."); }
+          clearTimeout(t);
+          const eph = await newEphemeral();
+          const wrapped = await wrapFor(eph.priv, req.pub, k.raw, `${k.rid}/recover`);
+          const ans = { eph: eph.pub, wrapped, dev: { id: k.dev.id, pub: k.dev.pub, name: k.name }, at: Date.now() };
+          cl.publish(`${base}/ans`, JSON.stringify(ans), { qos: 1, retain: true }, () => {
+            cl.end();
+            close();
+            toast("Yuborildi. Egasi ilovasida restoran tiklandi.", { kind: "ok", timeout: 6000 });
+          });
+        });
+      });
+    }
+  });
 }
 
 // ---------- Tarif: yopiq funksiyalar ----------
