@@ -9,6 +9,8 @@
 //   <base>/calls/<tableId> stoldan signal: ofitsiantni chaqirish yoki hisobni so'rash
 //   <base>/reserves/<tableId> stol oldindan band (bron): { at, waiterId, waiterName, note }
 //   <base>/sales/<sana>/<id> yopilgan chekning ixcham nusxasi (hisobot uchun, faqat admin o'qiydi)
+//   <base>/guests/<id>     "Qayta tashrif" mijozi: telefon, tashriflar, kupon (winback.js)
+//   <base>/wb/...          Telegram bot bilan almashinuv (bot kaliti bilan shifrlangan, winback.js o'zi ochadi)
 import { DEFAULT_CONFIG } from "./defaults.js";
 import { brokerUrl, brokerOpts, V2 } from "./license.js";
 import { seal, open } from "./crypto.js";
@@ -85,6 +87,8 @@ export function createStore(rid, opts = {}) {
     reserves: {},
     sales: {},
     salesLoaded: false,
+    guests: {},
+    guestsLoaded: false,
     configLoaded: !!cached?.config
   };
 
@@ -97,6 +101,7 @@ export function createStore(rid, opts = {}) {
   try { dev = localStorage.getItem("menyu.dev") || Math.random().toString(36).slice(2, 6); localStorage.setItem("menyu.dev", dev); } catch { dev = "x"; }
 
   const listeners = new Set();
+  const rawListeners = new Set();
   let notifyQueued = false;
   function emit(evt) {
     for (const fn of listeners) { try { fn(evt, state); } catch (e) { console.error(e); } }
@@ -165,6 +170,7 @@ export function createStore(rid, opts = {}) {
 
   async function receive(topic, raw) {
     if (topic === `${base}/lic`) { await opts.watcher?.handle(raw); return; }
+    if (topic.startsWith(`${base}/wb/`)) { for (const fn of rawListeners) { try { await fn(topic, raw); } catch (e) { console.warn(e); } } return; }
     let text = raw;
     if (key && raw) {
       try { text = await open(key, raw, topic); } catch {
@@ -190,6 +196,12 @@ export function createStore(rid, opts = {}) {
     if (topic === `${base}/stop`) {
       state.stop = data || {};
       changed({ type: "stop" });
+      return;
+    }
+    const gm = topic.match(/\/guests\/([^/]+)$/);
+    if (gm) {
+      if (data) state.guests[gm[1]] = data; else delete state.guests[gm[1]];
+      changed({ type: "guest", id: gm[1] });
       return;
     }
     const sm = topic.match(/\/sales\/[^/]+\/([^/]+)$/);
@@ -327,7 +339,7 @@ export function createStore(rid, opts = {}) {
       const sale = {
         id: o.id, no: o.no, day, at: o.closedAt || Date.now(), createdAt: o.createdAt, tableNo: o.tableNo, zone: o.zone || "",
         waiterId: o.waiterId || "", waiterName: o.waiterName || "", guests: o.guests || 0, pay: o.pay || "naqd",
-        sum, svc: Math.round(sum * (o.serviceRate || 0) / 100), cook: o.readyAt ? o.readyAt - (o.startedAt || o.createdAt) : 0,
+        sum, svc: Math.round(sum * (o.serviceRate || 0) / 100), disc: o.disc?.amount || 0, cook: o.readyAt ? o.readyAt - (o.startedAt || o.createdAt) : 0,
         byGuest: !!o.byGuest, items: (o.items || []).map((it) => [it.name + (it.opts ? ` (${it.opts})` : ""), it.qty, it.price])
       };
       state.sales[o.id] = sale;
@@ -341,6 +353,33 @@ export function createStore(rid, opts = {}) {
       const sub = () => client.subscribe(`${base}/sales/#`, { qos: 1 }, () => setTimeout(() => { state.salesLoaded = true; changed({ type: "sales" }); }, 1500));
       if (state.online) sub();
       client.on("connect", sub);
+    },
+
+    // "Qayta tashrif" mijozlari (winback.js)
+    loadGuests() {
+      if (api._guestsSub) return;
+      api._guestsSub = true;
+      const sub = () => client.subscribe(`${base}/guests/+`, { qos: 1 }, () => setTimeout(() => { state.guestsLoaded = true; changed({ type: "guests" }); }, 1500));
+      if (state.online) sub();
+      client.on("connect", sub);
+    },
+    putGuest(g) {
+      g.updatedAt = Date.now();
+      state.guests[g.id] = g;
+      publish(`${base}/guests/${g.id}`, g);
+      changed({ type: "guest", id: g.id, local: true });
+    },
+    // Shifrini o'zi ochadigan mavzular (bot bilan almashinuv). filters: base'dan keyingi qism, masalan "wb/in/+"
+    watchRaw(filters, fn) {
+      rawListeners.add(fn);
+      const list = filters.map((f) => `${base}/${f}`);
+      const sub = () => client.subscribe(list, { qos: 1 });
+      if (state.online) sub();
+      client.on("connect", sub);
+    },
+    publishRaw(topic, text) {
+      sending = sending.then(() => { client.publish(`${base}/${topic}`, text, { qos: 1, retain: true }); });
+      return sending;
     },
 
     removeOrder(id) {

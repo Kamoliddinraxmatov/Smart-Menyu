@@ -1,6 +1,7 @@
 // Ofitsiant (menyu) planshet ilovasi
 import { createStore, newId } from "./sync.js";
 import { activate } from "./license.js";
+import { createWinback, normCode, fmtDay } from "./winback.js";
 import {
   getRid, esc, money, fullName, initials, ago, clock, shortNo, orderTotal, applyBrand, logoHtml, itemVisual,
   unlockAudio, chime, vibrate, keepAwake, toast, modal, confirmBox, connBadge, registerSW, link
@@ -20,6 +21,7 @@ const agoL = (ts) => {
 };
 const ST = (t) => `${L("Stol", "Стол", "Table")} ${t}`;
 const store = createStore(rid, ACT);
+const wb = createWinback(store, ACT);
 const seenImg = new Set(); // allaqachon yuklangan rasmlar (qayta chizishda darhol ko'rsatiladi)
 let imgObserver = null;
 const S = store.state;
@@ -440,7 +442,7 @@ function myVisits() {
   Object.values(S.orders).forEach((o) => {
     if (o.status !== "closed" || all[o.id]) return;
     const sum = orderTotal(o);
-    all[o.id] = { id: o.id, at: o.closedAt || o.createdAt, createdAt: o.createdAt, tableNo: o.tableNo, zone: o.zone || "", waiterId: o.waiterId, guests: o.guests || 0, pay: o.pay || "", sum, svc: Math.round(sum * (o.serviceRate || 0) / 100), items: o.items.map((it) => [it.name + (it.opts ? ` (${it.opts})` : ""), it.qty, it.price]) };
+    all[o.id] = { id: o.id, at: o.closedAt || o.createdAt, createdAt: o.createdAt, tableNo: o.tableNo, zone: o.zone || "", waiterId: o.waiterId, guests: o.guests || 0, pay: o.pay || "", sum, svc: Math.round(sum * (o.serviceRate || 0) / 100), disc: o.disc?.amount || 0, items: o.items.map((it) => [it.name + (it.opts ? ` (${it.opts})` : ""), it.qty, it.price]) };
   });
   const visits = {};
   Object.values(all).filter((x) => x.waiterId === me.id).forEach((x) => {
@@ -448,7 +450,7 @@ function myVisits() {
     const v = visits[k] || (visits[k] = { k, tableNo: x.tableNo, zone: x.zone, at: x.at, start: x.createdAt || x.at, guests: 0, pay: x.pay, sum: 0, svc: 0, items: {} });
     v.start = Math.min(v.start, x.createdAt || x.at);
     v.guests = Math.max(v.guests, x.guests || 0);
-    v.sum += x.sum; v.svc += x.svc;
+    v.sum += x.sum - (x.disc || 0); v.svc += x.svc;
     (x.items || []).forEach(([n, q]) => { v.items[n] = (v.items[n] || 0) + q; });
   });
   return Object.values(visits).sort((a, b) => b.at - a.at);
@@ -513,7 +515,7 @@ function helloHtml() {
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const mine = Object.values(S.orders).filter((o) => o.waiterId === me.id);
   const closedToday = mine.filter((o) => o.status === "closed" && (o.closedAt || 0) >= start.getTime());
-  const sales = closedToday.reduce((s, o) => s + orderTotal(o) * (1 + (o.serviceRate || 0) / 100), 0);
+  const sales = closedToday.reduce((s, o) => s + orderTotal(o) * (1 + (o.serviceRate || 0) / 100) - (o.disc?.amount || 0), 0);
   const tips = closedToday.reduce((s, o) => s + orderTotal(o) * (o.serviceRate || 0) / 100, 0);
   const busy = new Set(mine.filter((o) => o.status !== "closed").map((o) => o.tableId)).size;
   return `
@@ -1167,7 +1169,11 @@ function billModal(t) {
   const sub = orders.reduce((s, o) => s + orderTotal(o), 0);
   const rate = Number(cfg().restaurant.service) || 0;
   const service = Math.round(sub * rate / 100);
-  const total = sub + service;
+  // "Qayta tashrif" kuponi: chegirma taomlar summasidan, xizmat haqi to'liq summadan
+  const discO = orders.find((o) => o.disc);
+  const disc = discO ? Math.round(sub * discO.disc.pct / 100) : 0;
+  const coupons = wb.ready && wb.can("winback");
+  const total = sub - disc + service;
   const notServed = orders.filter((o) => o.status === "new" || o.status === "cooking" || o.status === "ready").length;
   const w = waiterById(tableWaiterId(t));
   modal(`
@@ -1177,6 +1183,7 @@ function billModal(t) {
         <div class="bill-brand">${logoHtml(cfg().restaurant)}<b>${esc(cfg().restaurant.name)}</b></div>
         <ul>${lines.map((l) => `<li><span>${l.qty} × ${esc(l.name)}${l.opts ? ` <small>(${esc(l.opts)})</small>` : ""}</span><span>${money(l.qty * l.price, cur())}</span></li>`).join("")}</ul>
         <div class="sum-row"><span>${L("Jami taomlar", "Блюда всего", "Food total")}</span><b>${money(sub, cur())}</b></div>
+        ${disc ? `<div class="sum-row disc-row"><span>🎟 ${L("Chegirma", "Скидка", "Discount")} ${discO.disc.pct}% <small>${esc(discO.disc.code)}</small> <button class="link-btn" id="undisc">${L("olib tashlash", "убрать", "remove")}</button></span><b>−${money(disc, cur())}</b></div>` : ""}
         ${rate ? `<div class="sum-row"><span>${L("Xizmat haqi", "Обслуживание", "Service")} ${rate}%</span><b>${money(service, cur())}</b></div>` : ""}
         <div class="sum-row big"><span>To'lov uchun</span><b>${money(total, cur())}</b></div>
         <p class="muted small">${L("Ofitsiant", "Официант", "Waiter")}: ${esc(fullName(w))} · ${clock()}</p>
@@ -1184,15 +1191,24 @@ function billModal(t) {
       ${notServed ? `<p class="warn-note">⚠️ ${L(`${notServed} ta chek hali mijozga berilmagan.`, `Ещё не подано чеков: ${notServed}.`, `${notServed} check(s) not served yet.`)}</p>` : ""}
     </div>
     <div class="modal-actions">
+      ${coupons && !discO ? `<button class="btn btn-ghost btn-lg" id="coupon">🎟 ${L("Kupon", "Купон", "Coupon")}</button>` : ""}
       <button class="btn btn-ok btn-lg btn-block" id="close">✓ ${L("Stolni yopish", "Закрыть стол", "Close table")}</button>
     </div>`, {
     onMount(m, close) {
+      m.querySelector("#coupon")?.addEventListener("click", () => { close(); couponModal(t); });
+      m.querySelector("#undisc")?.addEventListener("click", () => {
+        store.updateOrder(discO.id, { disc: null });
+        wb.release?.(discO.disc.gid, discO.disc.code);
+        close(); billModal(t);
+      });
       m.querySelector("#close").addEventListener("click", async () => {
         const cooking = orders.filter((o) => o.status === "new" || o.status === "cooking").length;
         if (cooking && !(await confirmBox(L(`Oshxonada hali ${cooking} ta buyurtma tayyorlanmoqda. Stol baribir yopilsinmi?`, `На кухне ещё готовится заказов: ${cooking}. Всё равно закрыть стол?`, `${cooking} order(s) are still cooking. Close the table anyway?`), L("Ha, yopish", "Да, закрыть", "Yes, close"), { danger: true }))) return;
         const now = Date.now();
         orders.forEach((o) => {
-          const done = store.updateOrder(o.id, { status: "closed", closedAt: now, servedAt: o.servedAt || now, serviceRate: rate, closedBy: fullName(meW()) });
+          const patch = { status: "closed", closedAt: now, servedAt: o.servedAt || now, serviceRate: rate, closedBy: fullName(meW()) };
+          if (o === discO) patch.disc = { ...o.disc, amount: disc };
+          const done = store.updateOrder(o.id, patch);
           if (done) store.recordSale(done);
         });
         if (S.calls[t.id]) store.setCall(t.id, null);
@@ -1200,14 +1216,91 @@ function billModal(t) {
         toast(`${ST(esc(t.no))} ${L("yopildi va bo'shadi", "закрыт и свободен", "closed and free")} · ${money(total, cur())}`, { kind: "ok", timeout: 5000 });
         ui.view = "tables";
         render();
-        showReceipt({ t, w, orders, lines });
+        showReceipt({ t, w, orders, lines, disc: disc ? { pct: discO.disc.pct, code: discO.disc.code, amount: disc } : null });
       });
     }
   });
 }
 
+// ---------- "Qayta tashrif" kuponi: kamera bilan skanerlash yoki kodni yozish ----------
+const COUPON_ERR = {
+  format: () => L("Kod 1 harf va 5 raqamdan iborat (masalan K73049)", "Код: 1 буква и 5 цифр (например K73049)", "The code is 1 letter and 5 digits (e.g. K73049)"),
+  notfound: () => L("Bunday kupon topilmadi", "Купон не найден", "Coupon not found"),
+  used: () => L("Bu kupon allaqachon ishlatilgan", "Этот купон уже использован", "This coupon has already been used"),
+  expired: (c) => L(`Kupon muddati tugagan (${fmtDay(c.until)})`, `Срок купона истёк (${fmtDay(c.until)})`, `The coupon expired (${fmtDay(c.until)})`),
+  busy: () => L("Bu kupon boshqa stolda ishlatilmoqda", "Этот купон уже применён за другим столом", "This coupon is in use at another table")
+};
+
+function couponModal(t) {
+  let stream = null, timer = null, done = false;
+  const stop = () => { clearInterval(timer); stream?.getTracks().forEach((x) => x.stop()); stream = null; };
+  modal(`
+    <div class="modal-head"><h3>🎟 ${L("Kupon", "Купон", "Coupon")} · ${ST(esc(t.no))}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body">
+      <div class="cp-cam"><video id="cpv" playsinline muted></video><p id="cpHint">${L("Mijoz telefonidagi QR kodni kameraga ko'rsating", "Поднесите QR-код с телефона гостя к камере", "Hold the guest's QR code up to the camera")}</p></div>
+      <label class="field"><span>${L("Yoki kodni yozing", "Или введите код", "Or type the code")}</span><input id="cpCode" maxlength="8" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="K73049"></label>
+      <p class="cp-res" id="cpRes"></p>
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary btn-lg btn-block" id="cpGo">${L("Tekshirish", "Проверить", "Check")}</button></div>`, {
+    onMount(m, close) {
+      const res = m.querySelector("#cpRes");
+      const finish = () => { stop(); close(); billModal(t); };
+      m.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", stop));
+      const tryCode = (raw) => {
+        if (done) return;
+        const r = wb.check(raw, t.id);
+        if (!r.ok) { res.className = "cp-res bad"; res.textContent = COUPON_ERR[r.err](r.c); return; }
+        const orders = activeOrders(t.id);
+        if (!orders.length) { res.className = "cp-res bad"; res.textContent = L("Stolda ochiq chek yo'q", "На столе нет открытого чека", "No open check on this table"); return; }
+        if (orders.some((o) => o.disc)) { res.className = "cp-res bad"; res.textContent = L("Bu chekda allaqachon kupon bor", "К этому чеку уже применён купон", "This check already has a coupon"); return; }
+        done = true;
+        store.updateOrder(orders[0].id, { disc: { code: r.c.code, pct: r.c.pct, gid: r.g.id } });
+        wb.hold(r.g, t.id);
+        res.className = "cp-res ok";
+        res.textContent = `${r.c.pct}% ${L("chegirma amal qilyapti ✓", "скидка применена ✓", "discount applied ✓")}`;
+        vibrate([80]);
+        setTimeout(finish, 1300);
+      };
+      m.querySelector("#cpGo").addEventListener("click", () => tryCode(m.querySelector("#cpCode").value));
+      m.querySelector("#cpCode").addEventListener("keydown", (e) => { if (e.key === "Enter") tryCode(e.target.value); });
+      startScan(m.querySelector("#cpv"), (text) => { const c = normCode(text); if (c.length === 6) tryCode(c); }).then((s) => { stream = s; if (!s) m.querySelector(".cp-cam").hidden = true; });
+      timer = setInterval(() => { if (!document.body.contains(m)) stop(); }, 1000);
+    }
+  });
+}
+
+// Old (front) kamera bilan QR o'qish: BarcodeDetector bo'lsa shu, bo'lmasa jsQR (vendor/jsqr.js)
+async function startScan(video, onText) {
+  if (!navigator.mediaDevices?.getUserMedia) return null;
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 } }, audio: false }); } catch { return null; }
+  video.srcObject = stream;
+  try { await video.play(); } catch {}
+  let detect = null;
+  if ("BarcodeDetector" in window) {
+    try { const d = new window.BarcodeDetector({ formats: ["qr_code"] }); detect = async () => (await d.detect(video))[0]?.rawValue; } catch {}
+  }
+  if (!detect) {
+    if (!window.jsQR) await new Promise((r) => { const sc = document.createElement("script"); sc.src = "vendor/jsqr.js"; sc.onload = r; sc.onerror = r; document.head.appendChild(sc); });
+    const cv = document.createElement("canvas"), cx = cv.getContext("2d", { willReadFrequently: true });
+    detect = async () => {
+      if (!window.jsQR || !video.videoWidth) return null;
+      cv.width = video.videoWidth; cv.height = video.videoHeight;
+      cx.drawImage(video, 0, 0);
+      return window.jsQR(cx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height)?.data;
+    };
+  }
+  const loop = async () => {
+    if (!stream || !stream.active) return;
+    try { const v = await detect(); if (v) onText(v); } catch {}
+    setTimeout(loop, 250);
+  };
+  loop();
+  return stream;
+}
+
 // ---------- Chek chop etish (58/80 mm termoprinter) ----------
-function receiptHtml({ t, w, orders, lines, pay, split = 0, title = "" }) {
+function receiptHtml({ t, w, orders, lines, pay, split = 0, title = "", disc = null }) {
   const r = cfg().restaurant;
   const width = String(r.receiptWidth || "80") === "58" ? 58 : 80;
   const c = cfg().restaurant.currency || "so'm";
@@ -1215,7 +1308,7 @@ function receiptHtml({ t, w, orders, lines, pay, split = 0, title = "" }) {
   const sub = lines.reduce((s, l) => s + l.qty * l.price, 0);
   const rate = Number(r.service) || 0;
   const service = Math.round(sub * rate / 100);
-  const total = sub + service;
+  const total = sub - (disc?.amount || 0) + service;
   const d = new Date();
   const dt = `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()} ${clock()}`;
   const payName = { naqd: "Naqd", karta: "Karta", click: "Click/Payme" }[pay] || pay;
@@ -1247,6 +1340,7 @@ function receiptHtml({ t, w, orders, lines, pay, split = 0, title = "" }) {
     <hr>
     <table>
       <tr><td>Jami</td><td class="r">${m(sub)}</td></tr>
+      ${disc ? `<tr><td>Chegirma ${disc.pct}% (${esc(disc.code)})</td><td class="r">-${m(disc.amount)}</td></tr>` : ""}
       ${rate ? `<tr><td>Xizmat ${rate}%</td><td class="r">${m(service)}</td></tr>` : ""}
       <tr class="tot"><td>TO'LOV</td><td class="r">${m(total)}</td></tr>
       ${split > 1 ? `<tr><td>${split} kishiga</td><td class="r">${m(Math.ceil(total / split / 100) * 100)} dan</td></tr>` : ""}
@@ -1259,7 +1353,7 @@ function receiptHtml({ t, w, orders, lines, pay, split = 0, title = "" }) {
 }
 
 // Termoprinter uchun oddiy matnli chek (58 mm: 32 belgi, 80 mm: 48 belgi)
-function receiptText({ t, w, orders, lines }) {
+function receiptText({ t, w, orders, lines, disc = null }) {
   const r = cfg().restaurant;
   const W = String(r.receiptWidth || "80") === "58" ? 32 : 48;
   const c = r.currency || "so'm";
@@ -1279,8 +1373,9 @@ function receiptText({ t, w, orders, lines }) {
     out.push(lr(`  ${l.qty} x ${m(l.price)}`, m(l.qty * l.price)));
   }
   out.push(line, lr("Jami", m(sub)));
+  if (disc) out.push(lr(`Chegirma ${disc.pct}% (${disc.code})`, "-" + m(disc.amount)));
   if (rate) out.push(lr(`Xizmat ${rate}%`, m(service)));
-  out.push(lr("TO'LOV", m(sub + service)), line, center(r.receiptNote || "Rahmat! Yana kutib qolamiz"), center("Smart Menyu"), "", "", "");
+  out.push(lr("TO'LOV", m(sub - (disc?.amount || 0) + service)), line, center(r.receiptNote || "Rahmat! Yana kutib qolamiz"), center("Smart Menyu"), "", "", "");
   return out.filter((x, i) => typeof x === "string" && (x !== "" || i >= out.length - 3)).join("\n");
 }
 

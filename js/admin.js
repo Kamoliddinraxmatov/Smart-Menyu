@@ -10,12 +10,14 @@ import {
 import { itemTr, catTr } from "./i18n.js";
 import { fixUz, translate } from "./translate.js";
 import { has, currentPlan, planOf, needPlan, FEATURES } from "./plan.js";
+import { createWinback, WB_DEFAULTS, fmtDay } from "./winback.js";
 
 const ACT = await activate();
 const rid = ACT.rid;
 const store = createStore(rid, ACT);
 const S = store.state;
 const app = document.getElementById("app");
+const wb = createWinback(store, ACT);
 
 const ui = { tab: new URLSearchParams(location.search).has("owner") ? "brand" : "menu", unlocked: sessionStorage.getItem(`menyu.admin.${rid}`) === "1", catFilter: "all" };
 const cfg = () => S.config;
@@ -667,18 +669,21 @@ function salesInRange(from, to) {
     if (o.status !== "closed" || all[o.id]) return;
     const sum = orderTotal(o);
     all[o.id] = { id: o.id, no: o.no, day: ymd(new Date(o.closedAt || o.createdAt)), at: o.closedAt || o.createdAt, createdAt: o.createdAt, tableNo: o.tableNo, zone: o.zone || "",
-      waiterId: o.waiterId, waiterName: o.waiterName, guests: o.guests || 0, pay: o.pay || "naqd", sum, svc: Math.round(sum * (o.serviceRate || 0) / 100),
+      waiterId: o.waiterId, waiterName: o.waiterName, guests: o.guests || 0, pay: o.pay || "naqd", sum, svc: Math.round(sum * (o.serviceRate || 0) / 100), disc: o.disc?.amount || 0,
       cook: o.readyAt ? o.readyAt - (o.startedAt || o.createdAt) : 0, byGuest: !!o.byGuest, items: o.items.map((it) => [it.name + (it.opts ? ` (${it.opts})` : ""), it.qty, it.price]) };
   });
   return Object.values(all).filter((x) => x.at >= from.getTime() && x.at < to.getTime()).sort((a, b) => a.at - b.at);
 }
+
+// To'langan summa: taomlar + xizmat haqi - "Qayta tashrif" kupon chegirmasi
+const paid = (x) => x.sum + x.svc - (x.disc || 0);
 
 function tabReport(c) {
   store.loadSales();
   const [from, to] = periodRange();
   const list = salesInRange(from, to);
   const oneDay = to - from <= 86400000 + 3600000;
-  const revenue = list.reduce((s, x) => s + x.sum + x.svc, 0);
+  const revenue = list.reduce((s, x) => s + paid(x), 0);
   const svc = list.reduce((s, x) => s + x.svc, 0);
   const guests = list.reduce((s, x) => s + (x.guests || 0), 0);
   const cooks = list.filter((x) => x.cook > 0).map((x) => x.cook);
@@ -692,7 +697,7 @@ function tabReport(c) {
   else for (let d = new Date(from); d < to; d.setDate(d.getDate() + 1)) buckets.push({ key: ymd(d), label: `${d.getDate()}.${String(d.getMonth() + 1).padStart(2, "0")}`, v: 0 });
   list.forEach((x) => {
     const k = oneDay ? Math.min(23, Math.max(8, new Date(x.at).getHours())) : x.day;
-    const b = buckets.find((y) => y.key === k); if (b) b.v += x.sum + x.svc;
+    const b = buckets.find((y) => y.key === k); if (b) b.v += paid(x);
   });
   const maxB = Math.max(1, ...buckets.map((b) => b.v));
 
@@ -700,14 +705,14 @@ function tabReport(c) {
   list.forEach((x) => {
     const k = x.waiterId || "-";
     const w = (byWaiter[k] = byWaiter[k] || { name: x.waiterName || "—", n: 0, sum: 0, svc: 0, guests: 0 });
-    w.n++; w.sum += x.sum + x.svc; w.svc += x.svc; w.guests += x.guests || 0;
+    w.n++; w.sum += paid(x); w.svc += x.svc; w.guests += x.guests || 0;
   });
   const byItem = {};
   list.forEach((x) => x.items.forEach(([n, q, p]) => { const i = (byItem[n] = byItem[n] || { q: 0, sum: 0 }); i.q += q; i.sum += q * p; }));
   const top = Object.entries(byItem).sort((a, b) => b[1].q - a[1].q).slice(0, 10);
   const maxTop = top[0]?.[1].q || 1;
   const pays = {};
-  list.forEach((x) => { pays[x.pay] = (pays[x.pay] || 0) + x.sum + x.svc; });
+  list.forEach((x) => { pays[x.pay] = (pays[x.pay] || 0) + paid(x); });
   const payName = { naqd: "💵 Naqd", karta: "💳 Karta", click: "📱 Click/Payme" };
   const fmtD = (d) => d.toLocaleDateString("ru-RU");
   const rangeTxt = oneDay ? fmtD(from) : `${fmtD(from)} — ${fmtD(new Date(to - 1))}`;
@@ -749,7 +754,7 @@ function tabReport(c) {
   <div class="card">
     <h3>Cheklar ro'yxati</h3>
     <table class="tbl"><thead><tr><th>Vaqt</th><th>Chek</th><th>Stol</th><th>Ofitsiant</th><th>Taomlar</th><th>To'lov</th><th>Summa</th></tr></thead>
-    <tbody>${list.slice().reverse().slice(0, 100).map((x) => `<tr><td>${oneDay ? clock(x.at) : `${fmtD(new Date(x.at))} ${clock(x.at)}`}</td><td>#${esc(String(x.no || x.id.slice(-4)))}</td><td>${esc(x.tableNo)}</td><td>${esc(x.waiterName || "")}</td><td class="muted">${x.items.reduce((s, i) => s + i[1], 0)} ta</td><td>${payName[x.pay] || esc(x.pay)}</td><td><b>${money(x.sum + x.svc, cur())}</b></td></tr>`).join("") || `<tr><td colspan="7" class="muted">Bo'sh</td></tr>`}</tbody></table>
+    <tbody>${list.slice().reverse().slice(0, 100).map((x) => `<tr><td>${oneDay ? clock(x.at) : `${fmtD(new Date(x.at))} ${clock(x.at)}`}</td><td>#${esc(String(x.no || x.id.slice(-4)))}</td><td>${esc(x.tableNo)}</td><td>${esc(x.waiterName || "")}</td><td class="muted">${x.items.reduce((s, i) => s + i[1], 0)} ta</td><td>${payName[x.pay] || esc(x.pay)}</td><td><b>${money(paid(x), cur())}</b></td></tr>`).join("") || `<tr><td colspan="7" class="muted">Bo'sh</td></tr>`}</tbody></table>
     ${list.length > 100 ? `<p class="hint">Oxirgi 100 ta ko'rsatildi. To'liq ro'yxat Excel faylida.</p>` : ""}
   </div>`;
 
@@ -759,8 +764,8 @@ function tabReport(c) {
   c.querySelectorAll("[data-csv]").forEach((b) => b.addEventListener("click", () => {
     const name = `${cfg().restaurant.name.replace(/[^\w\-]+/g, "_")}_${ymd(from)}_${ymd(new Date(to - 1))}`;
     if (b.dataset.csv === "checks") {
-      downloadCsv(`${name}_cheklar.csv`, [["Sana", "Vaqt", "Chek", "Stol", "Zona", "Ofitsiant", "Mehmonlar", "Taomlar", "Summa", "Xizmat haqi", "Jami", "To'lov turi"],
-        ...list.map((x) => [fmtD(new Date(x.at)), clock(x.at), x.no || x.id, x.tableNo, x.zone, x.waiterName, x.guests, x.items.map(([n, q]) => `${q}x ${n}`).join(", "), x.sum, x.svc, x.sum + x.svc, x.pay])]);
+      downloadCsv(`${name}_cheklar.csv`, [["Sana", "Vaqt", "Chek", "Stol", "Zona", "Ofitsiant", "Mehmonlar", "Taomlar", "Summa", "Xizmat haqi", "Chegirma", "Jami", "To'lov turi"],
+        ...list.map((x) => [fmtD(new Date(x.at)), clock(x.at), x.no || x.id, x.tableNo, x.zone, x.waiterName, x.guests, x.items.map(([n, q]) => `${q}x ${n}`).join(", "), x.sum, x.svc, x.disc || 0, paid(x), x.pay])]);
     } else {
       downloadCsv(`${name}_taomlar.csv`, [["Taom", "Soni", "Summa"], ...Object.entries(byItem).sort((a, b) => b[1].sum - a[1].sum).map(([n, i]) => [n, i.q, i.sum])]);
     }
@@ -870,21 +875,177 @@ function lockedCard(f) {
 }
 
 // ---------- Qayta tashrif (mijozni chegirma bilan qaytarish) ----------
-// Funksiyaning o'zi keyingi bosqichda yoziladi. Hozircha: Biznes/Premium'da tavsif, Start/Standart'da qulf (tarifni oshirishga taklif).
+const LANG_FLAG = { uz: "🇺🇿", ru: "🇷🇺", en: "🇬🇧" };
+const WB_SECTIONS = [["waiting", "Kutilayotganlar"], ["returned", "Qaytib kelganlar"], ["expired", "Kuponi kuygan"]];
+ui.wbSec = ui.wbSec || "waiting";
+
+function botLine() {
+  if (!wb.ready) return `<p class="wb-bot off">🤖 Telegram bot hali ulanmagan. Smart Menyu egasi restoraningiz botini ulashi bilan mijozlar ro'yxatga tusha boshlaydi.</p>`;
+  if (!wb.info) return `<p class="wb-bot">🤖 Bot ulanmoqda...</p>`;
+  if (!wb.info.ok) return `<p class="wb-bot off">🤖 Bot ishlamayapti: ${wb.info.err === "token" ? "token noto'g'ri. Smart Menyu egasiga murojaat qiling." : "serverga ulanib bo'lmadi, birozdan keyin o'zi qayta urinadi."}</p>`;
+  return `<p class="wb-bot on">🤖 Bot: <a href="https://t.me/${esc(wb.info.user)}" target="_blank" rel="noopener"><b>@${esc(wb.info.user)}</b></a> ishlayapti ✓</p>`;
+}
+
+function couponState(c) {
+  if (c.err === "blocked") return `<span class="wb-st bad">Mijoz botni o'chirgan</span>`;
+  if (c.err) return `<span class="wb-st bad">Yetkazilmadi</span>`;
+  if (c.delivered) return `<span class="wb-st ok">Yuborildi ${fmtDay(c.delivered)}${c.auto ? " · avto" : ""}</span>`;
+  if (c.sentAt) return `<span class="wb-st">Yuborilmoqda...</span>`;
+  return `<span class="wb-st new">Yuborilmagan</span>`;
+}
+
+function guestHead(g) {
+  return `<b>${esc(g.phone)}</b> ${LANG_FLAG[g.lang] || ""}${g.name ? ` <small>${esc(g.name)}</small>` : ""}`;
+}
+
 function tabWinback(c) {
-  const head = `<div class="page-head"><h1>Qayta tashrif</h1><p>Mijoz Telegram bot orqali raqamini qoldiradi, keyin unga shaxsiy chegirma kuponi yuboriladi va u qaytib keladi.</p></div>`;
+  const head = `<div class="page-head"><h1>Qayta tashrif</h1><p>Mijoz stoldagi QR kod orqali Telegram botga raqamini qoldiradi. Stol yopilganda unga shaxsiy chegirma kuponi tayyorlanadi, siz xabarni yuborasiz va mijoz qaytib keladi.</p></div>`;
   if (!can("winback")) { c.innerHTML = head + lockedCard("winback"); return; }
+  const st = { ...WB_DEFAULTS, ...(cfg().winback || {}) };
+  const auto = can("winbackAuto");
+  if (!wb.ready || !S.guestsLoaded) {
+    c.innerHTML = head + `<div class="card">${botLine()}${wb.ready ? `<p class="muted">Mijozlar ro'yxati yuklanmoqda...</p>` : ""}</div>` + wbSettingsCard(st, auto);
+    bindWbSettings(c, st);
+    return;
+  }
+  const L = wb.lists();
+  const stt = wb.stats();
+  const toSend = wb.toSend();
+  const list = L[ui.wbSec];
   c.innerHTML = head + `
+  <div class="card">${botLine()}
+    <div class="row-between wb-actions">
+      <button class="btn btn-ghost" id="wbQr">🔳 Stollar uchun QR kodlar</button>
+      ${st.paused ? `<span class="wb-st bad">⏸ Pauzada: yangi kupon va xabar yo'q</span>` : ""}
+    </div>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><small>Yuborilgan xabar</small><b>${stt.sent}</b><span class="kpi-sub">mijozlar: ${stt.guests}</span></div>
+    <div class="kpi"><small>Qaytib kelgan</small><b>${stt.returned}</b><span class="kpi-sub">${stt.rate}% · hamrohlar: ${stt.companions}</span></div>
+    <div class="kpi"><small>Ular olib kelgan tushum</small><b>${money(stt.net, cur())}</b><span class="kpi-sub">hisob ${money(stt.sum, cur())} · chegirma ${money(stt.disc, cur())}</span></div>
+    <div class="kpi"><small>1 so'm chegirmaga</small><b>${stt.perSom ? `${String(stt.perSom).replace(".", ",")} so'm` : "—"}</b><span class="kpi-sub">sof tushum</span></div>
+  </div>
+  <div class="chips-row">
+    ${WB_SECTIONS.map(([id, name]) => `<button class="chip ${ui.wbSec === id ? "on" : ""}" data-wbsec="${id}">${name} <b>${L[id].length}</b></button>`).join("")}
+  </div>
   <div class="card">
-    <h3>Tez orada</h3>
-    <p class="muted">Bu bo'lim tayyorlanmoqda. Restoraningiz tarifida u ochiq: ishga tushishi bilan shu yerda paydo bo'ladi.</p>
-    <ul class="plan-feats">
-      <li>✓ Kutilayotganlar, qaytib kelganlar va kuponi kuyganlar ro'yxati</li>
-      <li>✓ Chegirma foizi va muddatini o'zingiz belgilaysiz, "Pauza" tugmasi</li>
-      <li>✓ Xabarni bitta tugma bilan yuborish</li>
-      <li>${can("winbackAuto") ? "✓" : "🔒"} Unutsangiz, kupon tugashidan 3 kun oldin avtomatik yuborish${can("winbackAuto") ? "" : ` <small>(${esc(needPlan("winbackAuto"))})</small>`}</li>
-    </ul>
+    ${ui.wbSec === "waiting" ? `<div class="row-between wb-send-row">
+      <p class="muted">Kuponi bor, hali qaytmagan mijozlar. Kupon muddati tugashiga qarab tartiblangan.${auto ? (st.auto !== false ? " Yuborishni unutsangiz, kupon tugashidan 3 kun oldin o'zi yuboriladi." : "") : ""}</p>
+      <button class="btn btn-primary" id="wbSend" ${toSend.length && !st.paused ? "" : "disabled"}>📨 Yuborish (${toSend.length})</button>
+    </div>` : ""}
+    <div class="list">
+      ${list.map(({ g, c: k }) => {
+        const v = Object.values(g.visits || {}).sort((a, b) => b.at - a.at)[0];
+        if (ui.wbSec === "waiting") return `<div class="li wb-li"><div class="li-main">${guestHead(g)}
+          <small>${v ? `Tashrif ${fmtDay(v.at)} · Stol ${esc(v.table)} · ${esc((v.items || []).join(", "))}` : ""}</small>
+          <small>Kupon <b class="wb-code">${esc(k.code)}</b> · ${k.pct}% · ${fmtDay(k.until)} gacha</small></div>${couponState(k)}</div>`;
+        if (ui.wbSec === "returned") return `<div class="li wb-li"><div class="li-main">${guestHead(g)}
+          <small>Qaytdi ${fmtDay(k.used.at)} · Stol ${esc(k.used.table || "")} · ${k.used.guests || 1} kishi</small>
+          <small>Hisob ${money(k.used.sum, cur())} · chegirma ${money(k.used.disc, cur())} (${k.pct}%) · kupon ${esc(k.code)}</small></div><span class="wb-st ok">Qaytdi ✓</span></div>`;
+        return `<div class="li wb-li"><div class="li-main">${guestHead(g)}
+          <small>Kupon ${esc(k.code)} · ${k.pct}% · ${fmtDay(k.until)} da kuydi${k.sentAt ? " · xabar yuborilgan" : " · xabar yuborilmagan"}</small></div><span class="wb-st bad">Kuydi</span></div>`;
+      }).join("") || `<div class="empty">${{ waiting: "Hozircha kuponi bor mijoz yo'q. Stollarga QR kodlarni qo'ying: mijozlar shu yerda paydo bo'ladi.", returned: "Hali kupon bilan qaytgan mijoz yo'q.", expired: "Kuponi kuygan mijoz yo'q." }[ui.wbSec]}</div>`}
+    </div>
+  </div>` + wbSettingsCard(st, auto);
+  c.querySelectorAll("[data-wbsec]").forEach((b) => b.addEventListener("click", () => { ui.wbSec = b.dataset.wbsec; render(); }));
+  c.querySelector("#wbSend")?.addEventListener("click", () => wbSendModal(toSend));
+  c.querySelector("#wbQr").addEventListener("click", wbQrModal);
+  bindWbSettings(c, st);
+}
+
+function wbSettingsCard(st, auto) {
+  return `<div class="card">
+    <h3>Sozlamalar</h3>
+    <div class="row2">
+      <label class="field"><span>Chegirma, %</span><input type="number" id="wbPct" min="1" max="90" inputmode="numeric" value="${esc(st.pct)}"></label>
+      <label class="field"><span>Kupon muddati, kun</span><input type="number" id="wbDays" min="1" max="90" inputmode="numeric" value="${esc(st.days)}"></label>
+    </div>
+    <button class="btn btn-primary" id="wbSave">Saqlash</button>
+    <p class="hint">Yangi foiz va muddat bundan keyin beriladigan kuponlarga qo'llanadi.</p>
+    <div class="wb-toggles">
+      <button class="btn ${st.paused ? "btn-primary" : "btn-ghost"}" id="wbPause">${st.paused ? "▶ Davom ettirish" : "⏸ Pauza"}</button>
+      ${auto ? `<button class="btn btn-ghost" id="wbAuto">${st.auto !== false ? "✓ Avtomatik yuborish yoqilgan" : "Avtomatik yuborish o'chiq"}</button>`
+        : `<span class="muted">🔒 Avtomatik yuborish: ${esc(needPlan("winbackAuto"))} tarifida</span>`}
+    </div>
+    <p class="hint">Pauzada yangi kupon berilmaydi va xabar yuborilmaydi. Berilgan kuponlar muddati tugaguncha amal qiladi.</p>
   </div>`;
+}
+
+function bindWbSettings(c, st) {
+  c.querySelector("#wbSave").addEventListener("click", () => {
+    const pct = Math.round(Number(c.querySelector("#wbPct").value)), days = Math.round(Number(c.querySelector("#wbDays").value));
+    if (!(pct >= 1 && pct <= 90)) return toast("Chegirma 1 dan 90 % gacha bo'lsin", { kind: "error" });
+    if (!(days >= 1 && days <= 90)) return toast("Muddat 1 dan 90 kungacha bo'lsin", { kind: "error" });
+    mutate((x) => { x.winback = { ...WB_DEFAULTS, ...(x.winback || {}), pct, days }; }, `Kupon: ${pct}%, ${days} kun`);
+  });
+  c.querySelector("#wbPause").addEventListener("click", () => {
+    mutate((x) => { x.winback = { ...WB_DEFAULTS, ...(x.winback || {}), paused: !st.paused }; }, st.paused ? "Qayta tashrif davom etmoqda" : "Qayta tashrif pauzada");
+    render();
+  });
+  c.querySelector("#wbAuto")?.addEventListener("click", () => {
+    mutate((x) => { x.winback = { ...WB_DEFAULTS, ...(x.winback || {}), auto: st.auto === false }; }, st.auto === false ? "Avtomatik yuborish yoqildi" : "Avtomatik yuborish o'chirildi");
+    render();
+  });
+}
+
+function wbSendModal(list) {
+  const by = { uz: 0, ru: 0, en: 0 };
+  list.forEach((g) => { by[g.lang || "uz"] = (by[g.lang || "uz"] || 0) + 1; });
+  let lang = list[0]?.lang || "uz";
+  modal(`
+    <div class="modal-head"><h3>Xabarni yuborish</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body">
+      <p class="muted">${list.length} ta mijozga, har biriga o'z tilida va o'z kupon kodi bilan. Xabar bilan birga kupon QR kodi rasmi boradi.</p>
+      <div class="chips-row">${[["uz", "UZ"], ["ru", "RU"], ["en", "EN"]].map(([l, n]) => `<button class="chip ${l === lang ? "on" : ""}" data-l="${l}">${n} <b>${by[l]}</b></button>`).join("")}</div>
+      <pre class="wb-preview" id="pv"></pre>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-close>Bekor qilish</button>
+      <button class="btn btn-primary" id="go">📨 Yuborish (${list.length})</button>
+    </div>`, {
+    onMount(m, close) {
+      const sample = (l) => list.find((g) => (g.lang || "uz") === l) || list[0];
+      const draw = () => {
+        m.querySelector("#pv").textContent = wb.message(sample(lang), lang);
+        m.querySelectorAll("[data-l]").forEach((b) => b.classList.toggle("on", b.dataset.l === lang));
+      };
+      m.querySelectorAll("[data-l]").forEach((b) => b.addEventListener("click", () => { lang = b.dataset.l; draw(); }));
+      draw();
+      m.querySelector("#go").addEventListener("click", async () => {
+        m.querySelector("#go").disabled = true;
+        const n = await wb.send(list);
+        close();
+        toast(`✓ ${n} ta xabar yuborildi`, { kind: "ok" });
+        render();
+      });
+    }
+  });
+}
+
+function wbQrModal() {
+  const tables = cfg().tables;
+  if (!wb.botLink("x")) return toast("Bot hali ishlamayapti: QR kod uchun bot kerak", { kind: "error" });
+  const cards = tables.map((t) => ({ t, url: wb.botLink(t.id) }));
+  const name = cfg().restaurant.name;
+  modal(`
+    <div class="modal-head"><h3>Stollar uchun QR kodlar</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="modal-body">
+      <p class="muted">Har stolga o'z QR kodini qo'ying. Mijoz skanerlasa, bot qaysi stoldan kelganini biladi.</p>
+      <div class="wb-qrs">${cards.map(({ t, url }) => `<figure><img src="${qrSrc(url)}" alt=""><figcaption>Stol ${esc(t.no)}</figcaption></figure>`).join("")}</div>
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary" id="save">⬇ Chop etish uchun faylga saqlash</button></div>`, {
+    wide: true,
+    onMount(m) {
+      m.querySelector("#save").addEventListener("click", () => {
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(name)}: stol QR kodlari</title><style>
+          body{font-family:system-ui,sans-serif;margin:0;padding:10mm;display:grid;grid-template-columns:repeat(2,1fr);gap:10mm}
+          .q{border:1px dashed #999;border-radius:6mm;padding:8mm;text-align:center;page-break-inside:avoid}
+          .q img{width:60mm;height:60mm;image-rendering:pixelated}.q h2{margin:0 0 3mm}.q p{margin:3mm 0 0;font-size:13px}
+        </style></head><body>${cards.map(({ t, url }) => `<div class="q"><h2>${esc(name)}</h2><img src="${qrSrc(url)}"><p><b>Stol ${esc(t.no)}</b><br>Skanerlang va keyingi tashrifga chegirma oling 🎁<br>Отсканируйте и получите скидку 🎁</p></div>`).join("")}</body></html>`;
+        saveFile(`stol-qr-${rid}.html`, html, "text/html");
+      });
+    }
+  });
 }
 
 // Egasi tarifni o'zgartirdi: oyna darhol yangi tarifga moslanadi
@@ -895,12 +1056,17 @@ window.addEventListener("menyu-lic", () => {
   render();
 });
 
-store.on((evt) => {
-  if (evt.type !== "render") return;
-  if (document.querySelector(".modal-back")) return;
+// Ma'lumot o'zgardi: oyna ochiq bo'lsa, yopilgach qayta chizamiz (aks holda o'zgarish ko'rinmay qoladi)
+function softRender() {
+  if (document.querySelector(".modal-back")) { clearTimeout(softRender.t); softRender.t = setTimeout(softRender, 400); return; }
   const a = document.activeElement;
   if (a && ["INPUT", "SELECT", "TEXTAREA"].includes(a.tagName)) return;
-  if (ui.tab === "report" || evt.type === "render") render();
+  render();
+}
+wb.on(() => { if (ui.tab === "winback") softRender(); });
+
+store.on((evt) => {
+  if (evt.type === "render") softRender();
 });
 
 render();
