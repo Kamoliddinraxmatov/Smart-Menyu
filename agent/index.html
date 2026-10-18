@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0D0B0A">
+  <meta name="robots" content="noindex">
+  <title>Smart Menyu · Agent</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <style>html, body { margin: 0; background: #0D0B0A; }</style>
+</head>
+<body>
+<script>
+// Yuklovchi: ilova ichidagi app.html va internetdan kelgan (telefonda saqlangan) versiyadan yangisini ochadi.
+// Shuning uchun agent ilovani qayta o'rnatmasdan yangilanishlarni oladi, internetsiz ham ishlaydi.
+(async () => {
+  const ver = (h) => +((h || "").match(/name="agent-version" content="(\d+)"/) || [0, 0])[1];
+  let html = "";
+  try { html = await (await fetch("app.html")).text(); } catch (e) {}
+  try {
+    const s = JSON.parse(localStorage.getItem("agent-code"));
+    if (s && ver(s.html) > ver(html)) html = s.html;
+  } catch (e) {}
+  if (!html) { document.body.style.color = "#F5F0E8"; document.body.textContent = "Ilovani ochib bo'lmadi. Qayta urinib ko'ring."; return; }
+  document.open(); document.write(html); document.close();
+})();
+</script>
+</body>
+</html>

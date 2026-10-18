@@ -3,3 +3,6 @@ node_modules/
 app-owner/node_modules/
 app-owner/www/
 app-owner/android/
+app-agent/node_modules/
+app-agent/www/
+app-agent/android/
