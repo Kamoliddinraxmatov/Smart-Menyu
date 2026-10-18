@@ -134,6 +134,15 @@ export async function checkLicense(text, rid, dev) {
   return { state: "ok", lic, rawKey };
 }
 
+// Restoran kaliti (egasi o'z ro'yxatini yo'qotsa, uni planshetdan tiklashi uchun)
+export async function restaurantKey() {
+  const act = loadAct();
+  if (!act?.rid || !act.lic) return null;
+  const dev = await deviceKeys();
+  const r = await checkLicense(act.lic, act.rid, dev);
+  return r.state === "ok" ? { rid: act.rid, raw: r.rawKey, dev, name: act.name || "" } : null;
+}
+
 export const daysLeft = (lic) => Math.ceil(((lic?.until || 0) - Date.now()) / DAY);
 
 // --- Ekranlar ---
