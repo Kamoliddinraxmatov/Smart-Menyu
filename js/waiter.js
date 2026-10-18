@@ -423,9 +423,8 @@ function renderTables() {
 
   bindCommon();
   app.querySelector("[data-act=tables-back]")?.addEventListener("click", () => {
-    // oxirgi ochilgan stolga qaytadi; bo'lmasa — restoranlar ro'yxatiga
-    if (ui.lastTable && tableById(ui.lastTable)) return openTable(ui.lastTable);
-    location.href = "index.html";
+    // ofitsiant tanlash oynasiga qaytadi (boshqa ofitsiant o'z ismini tanlashi mumkin)
+    saveMe(null); ui.view = "tables"; render(); window.scrollTo(0, 0);
   });
   app.querySelectorAll("[data-filter]").forEach((b) => b.addEventListener("click", () => { ui.filter = b.dataset.filter; render(); }));
   app.querySelectorAll("[data-table]").forEach((b) => b.addEventListener("click", () => tableTap(b.dataset.table)));
