@@ -62,12 +62,19 @@ const TABS = [
   ["devices", "📱", "Qurilmalar"]
 ];
 
+const STARTED = Date.now();
+let loadTimer = null;
+
 function render() {
   applyBrand(cfg().restaurant);
   document.title = `${cfg().restaurant.name} · Admin`;
   // Restoran sozlamalari serverdan kelmaguncha boshqaruvni ochmaymiz (aks holda namoyish menyusi ustiga yozilib ketishi mumkin)
   if (!S.configLoaded) {
-    app.innerHTML = `<div class="adm-loading"><div class="lic-ico lic-spin">⏳</div><h2>Restoran ma'lumotlari yuklanmoqda...</h2><p>${S.online ? "Bir oz kuting." : "Internet yo'q. Planshet internetga ulanishi bilan davom etadi."}</p></div>`;
+    // Serverga ulangan, lekin ma'lumot 12 soniyada kelmadi: cheksiz kutib qolmasin, sababini va chiqish yo'lini ko'rsatamiz
+    const long = S.online && Date.now() - STARTED > 12000;
+    app.innerHTML = `<div class="adm-loading">${backLink()}<div class="lic-ico ${long ? "" : "lic-spin"}">${long ? "⚠️" : "⏳"}</div><h2>${long ? "Restoran ma'lumotlari serverdan kelmadi" : "Restoran ma'lumotlari yuklanmoqda..."}</h2><p>${!S.online ? "Internet yo'q. Planshet internetga ulanishi bilan davom etadi." : long ? "Internetni tekshirib, qayta urinib ko'ring. Takrorlansa, Smart Menyu egasiga murojaat qiling." : "Bir oz kuting."}</p>${long ? `<button class="btn btn-primary" id="admRetry">Qayta urinish</button>` : ""}</div>`;
+    app.querySelector("#admRetry")?.addEventListener("click", () => location.reload());
+    if (!long && !loadTimer) loadTimer = setTimeout(() => { loadTimer = null; render(); }, 12500);
     return;
   }
   if (!ACT.demo) {
