@@ -1,6 +1,7 @@
 // Ofitsiant (menyu) planshet ilovasi
 import { createStore, newId } from "./sync.js";
 import { activate } from "./license.js";
+import { has, currentPlan } from "./plan.js";
 import {
   getRid, esc, money, fullName, initials, ago, clock, shortNo, orderTotal, applyBrand, logoHtml, itemVisual,
   unlockAudio, chime, vibrate, keepAwake, toast, modal, confirmBox, connBadge, registerSW, link
@@ -1165,7 +1166,8 @@ function billModal(t) {
   const orders = activeOrders(t.id);
   const lines = billLines(orders);
   const sub = orders.reduce((s, o) => s + orderTotal(o), 0);
-  const rate = Number(cfg().restaurant.service) || 0;
+  // Xizmat haqi Standart tarifdan boshlab
+  const rate = has("serviceCharge", currentPlan(ACT.watcher?.lic || ACT.lic, ACT.demo)) ? Number(cfg().restaurant.service) || 0 : 0;
   const service = Math.round(sub * rate / 100);
   const total = sub + service;
   const notServed = orders.filter((o) => o.status === "new" || o.status === "cooking" || o.status === "ready").length;

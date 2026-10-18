@@ -1190,3 +1190,40 @@ label:has(> .file-overlay) {
 .pw-eye.on {
   color: var(--gold, #D6B370);
 }
+.side nav button.locked {
+  opacity: .6;
+}
+.side nav .lock-ic {
+  font-style: normal;
+  font-size: 12px;
+  margin-left: auto;
+}
+.chip-locked {
+  opacity: .55;
+}
+.locked-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  border-style: dashed !important;
+}
+.locked-card .locked-ic {
+  font-size: 26px;
+  line-height: 1;
+}
+.locked-card h3 {
+  margin: 0 0 6px;
+}
+.locked-card a {
+  color: var(--gold, var(--brand));
+}
+.plan-feats {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: grid;
+  gap: 8px;
+}
+.plan-feats small {
+  color: var(--muted);
+}

@@ -8,6 +8,7 @@ import {
 } from "./common.js";
 import { itemTr, catTr } from "./i18n.js";
 import { fixUz, translate } from "./translate.js";
+import { has, currentPlan, planOf, needPlan, FEATURES } from "./plan.js";
 
 const ACT = await activate();
 const rid = ACT.rid;
@@ -18,6 +19,9 @@ const app = document.getElementById("app");
 const ui = { tab: new URLSearchParams(location.search).has("owner") ? "brand" : "menu", unlocked: sessionStorage.getItem(`menyu.admin.${rid}`) === "1", catFilter: "all" };
 const cfg = () => S.config;
 const cur = () => cfg().restaurant.currency || "so'm";
+// Restoran tarifi (egasi imzolagan ruxsatnomadan). Egasi o'zgartirsa, "menyu-lic" hodisasi keladi va oyna qayta chiziladi.
+const plan = () => currentPlan(ACT.watcher?.lic || ACT.lic, ACT.demo);
+const can = (f) => has(f, plan());
 
 // O'zgarishlar navbati: 0,4 soniyada bir marta saqlanadi. Shu orada boshqa qurilmadan yangi sozlama
 // kelsa ham, bizning o'zgarishlarimiz o'sha yangisining ustiga qo'llanadi (hech narsa yo'qolmaydi).
@@ -53,6 +57,7 @@ const TABS = [
   ["waiters", "🧑‍💼", "Ofitsiantlar"],
   ["tables", "🪑", "Stollar"],
   ["report", "📊", "Hisobot"],
+  ["winback", "🎁", "Qayta tashrif", "winback"],
   ["devices", "📱", "Qurilmalar"]
 ];
 
@@ -74,16 +79,16 @@ function render() {
   app.innerHTML = `
   <div class="admin">
     <aside class="side">
-      <div class="side-brand">${logoHtml(r)}<div><b>${esc(r.name)}</b><small>Admin panel</small></div></div>
+      <div class="side-brand">${logoHtml(r)}<div><b>${esc(r.name)}</b><small>Admin panel · ${esc(planOf(plan()).name)}</small></div></div>
       <a class="side-back" href="${link("index.html", rid)}">← Orqaga</a>
-      <nav>${TABS.map(([id, ic, name]) => `<button class="${ui.tab === id ? "on" : ""}" data-tab="${id}"><span>${ic}</span>${name}</button>`).join("")}</nav>
+      <nav>${TABS.map(([id, ic, name, f]) => `<button class="${ui.tab === id ? "on" : ""} ${f && !can(f) ? "locked" : ""}" data-tab="${id}"><span>${ic}</span>${name}${f && !can(f) ? ` <i class="lock-ic">🔒</i>` : ""}</button>`).join("")}</nav>
       <div class="side-foot">${connBadge(S.online)}<a href="${link("index.html", rid)}">← Bosh sahifa</a></div>
     </aside>
     <main class="content" id="content"></main>
   </div>`;
   app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { ui.tab = b.dataset.tab; render(); window.scrollTo(0, 0); }));
   const c = app.querySelector("#content");
-  ({ brand: tabBrand, menu: tabMenu, waiters: tabWaiters, tables: tabTables, report: tabReport, devices: tabDevices })[ui.tab](c);
+  ({ brand: tabBrand, menu: tabMenu, waiters: tabWaiters, tables: tabTables, report: tabReport, winback: tabWinback, devices: tabDevices })[ui.tab](c);
 }
 
 const MAX_TRIES = 5;
@@ -525,11 +530,11 @@ function tabWaiters(c) {
     <div><h1>Ofitsiantlar</h1><p>Har bir ofitsiant planshetga ismini tanlab, PIN-kod bilan kiradi. Stolga biriktirilgan ofitsiant buyurtmaga avtomatik yoziladi.</p></div>
     <button class="btn btn-primary" id="add">+ Ofitsiant qo'shish</button>
   </div>
-  <div class="card svc-card">
+  ${can("serviceCharge") ? `<div class="card svc-card">
     <label class="field"><span>Ofitsiantlar xizmat haqi, %</span><input type="number" id="svc" min="0" max="30" step="1" inputmode="numeric" value="${esc(cfg().restaurant.service ?? 0)}"></label>
     <button class="btn btn-primary" id="svcSave">Saqlash</button>
     <p class="hint">Barcha ofitsiantlarga tegishli. Chek yopilganda summaga shu foiz qo'shiladi.</p>
-  </div>
+  </div>` : lockedCard("serviceCharge")}
   <div class="card list">
     ${cfg().waiters.map((w) => {
       const tables = cfg().tables.filter((t) => t.waiterId === w.id).map((t) => t.no);
@@ -541,7 +546,7 @@ function tabWaiters(c) {
       </div>`;
     }).join("") || `<div class="empty">Hali ofitsiant yo'q</div>`}
   </div>`;
-  c.querySelector("#svcSave").addEventListener("click", () => {
+  c.querySelector("#svcSave")?.addEventListener("click", () => {
     const v = Math.round(Number(c.querySelector("#svc").value));
     if (!(v >= 0 && v <= 30)) { toast("Xizmat haqi 0 dan 30 % gacha bo'lishi kerak", { kind: "error" }); return; }
     mutate((x) => { x.restaurant.service = v; }, `Xizmat haqi saqlandi: ${v} %`);
@@ -667,7 +672,10 @@ function salesInRange(from, to) {
   return Object.values(all).filter((x) => x.at >= from.getTime() && x.at < to.getTime()).sort((a, b) => a.at - b.at);
 }
 
+// Start tarifida faqat kunlik hisobot
+const DAILY = ["today", "yesterday"];
 function tabReport(c) {
+  if (!can("reportPeriods") && !DAILY.includes(ui.period)) ui.period = "today";
   store.loadSales();
   const [from, to] = periodRange();
   const list = salesInRange(from, to);
@@ -709,36 +717,37 @@ function tabReport(c) {
   c.innerHTML = `
   <div class="page-head row-between">
     <div><h1>Hisobot</h1><p>${rangeTxt} · ${S.salesLoaded ? "real vaqtda yangilanadi" : "arxiv yuklanmoqda…"}</p></div>
-    <div class="head-actions">
+    ${can("reportExcel") ? `<div class="head-actions">
       <button class="btn btn-ghost" data-csv="checks" ${list.length ? "" : "disabled"}>⬇ Cheklar (Excel)</button>
       <button class="btn btn-ghost" data-csv="items" ${list.length ? "" : "disabled"}>⬇ Taomlar (Excel)</button>
-    </div>
+    </div>` : ""}
   </div>
   <div class="chips-row period-row">
-    ${PERIODS.map(([id, name]) => `<button class="chip ${ui.period === id ? "on" : ""}" data-period="${id}">${name}</button>`).join("")}
+    ${PERIODS.map(([id, name]) => can("reportPeriods") || DAILY.includes(id) ? `<button class="chip ${ui.period === id ? "on" : ""}" data-period="${id}">${name}</button>` : `<button class="chip chip-locked" data-locked="reportPeriods">🔒 ${name}</button>`).join("")}
     ${ui.period === "custom" ? `<span class="range"><input type="date" id="from" value="${ymd(from)}"> — <input type="date" id="to" value="${ymd(new Date(to - 1))}"></span>` : ""}
   </div>
   <div class="kpis">
     <div class="kpi"><small>Tushum</small><b>${money(revenue, cur())}</b><span class="kpi-sub">xizmat haqi: ${money(svc, cur())}</span></div>
     <div class="kpi"><small>Cheklar</small><b>${list.length}</b><span class="kpi-sub">mehmonlar: ${guests}</span></div>
     <div class="kpi"><small>O'rtacha chek</small><b>${money(list.length ? revenue / list.length : 0, cur())}</b><span class="kpi-sub">1 mehmonga: ${money(guests ? revenue / guests : 0, cur())}</span></div>
-    <div class="kpi"><small>O'rtacha tayyorlash</small><b>${avgCook} daq</b><span class="kpi-sub">hozir ochiq: ${openNow.length} ta · ${money(openSum, cur())}</span></div>
+    ${can("cookTime") ? `<div class="kpi"><small>O'rtacha tayyorlash</small><b>${avgCook} daq</b><span class="kpi-sub">hozir ochiq: ${openNow.length} ta · ${money(openSum, cur())}</span></div>`
+      : `<div class="kpi"><small>Hozir ochiq</small><b>${openNow.length} ta</b><span class="kpi-sub">${money(openSum, cur())}</span></div>`}
   </div>
-  <div class="card">
+  ${oneDay && !can("hourlyChart") ? lockedCard("hourlyChart") : `<div class="card">
     <h3>${oneDay ? "Soatlar bo'yicha tushum" : "Kunlar bo'yicha tushum"}</h3>
     <div class="chart">${buckets.map((b) => `<div class="col" title="${esc(b.label)}: ${money(b.v, cur())}"><i style="height:${Math.round((b.v / maxB) * 100)}%"></i><small>${esc(b.label)}</small></div>`).join("")}</div>
-  </div>
+  </div>`}
   <div class="cols">
-    <div class="card">
+    ${can("waiterStats") ? `<div class="card">
       <h3>Ofitsiantlar bo'yicha</h3>
       <table class="tbl"><thead><tr><th>Ofitsiant</th><th>Cheklar</th><th>Mehmon</th><th>Savdo</th><th>Xizmat haqi</th></tr></thead>
       <tbody>${Object.values(byWaiter).sort((a, b) => b.sum - a.sum).map((w) => `<tr><td><b>${esc(w.name)}</b></td><td>${w.n}</td><td>${w.guests}</td><td>${money(w.sum, cur())}</td><td>${money(w.svc, cur())}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Bu davrda yopilgan chek yo'q</td></tr>`}</tbody></table>
-      ${Object.keys(pays).length ? `<h3 class="mt">To'lov turlari</h3><div class="pays">${Object.entries(pays).map(([k, v]) => `<span><small>${payName[k] || esc(k)}</small><b>${money(v, cur())}</b></span>`).join("")}</div>` : ""}
-    </div>
-    <div class="card">
+      ${can("payTypes") && Object.keys(pays).length ? `<h3 class="mt">To'lov turlari</h3><div class="pays">${Object.entries(pays).map(([k, v]) => `<span><small>${payName[k] || esc(k)}</small><b>${money(v, cur())}</b></span>`).join("")}</div>` : ""}
+    </div>` : lockedCard("waiterStats")}
+    ${can("topItems") ? `<div class="card">
       <h3>Eng ko'p sotilgan taomlar</h3>
       ${top.length ? top.map(([n, i]) => `<div class="bar"><span>${esc(n)}</span><div><i style="width:${(i.q / maxTop) * 100}%"></i></div><b>${i.q}</b></div>`).join("") : `<p class="muted">Ma'lumot yo'q</p>`}
-    </div>
+    </div>` : lockedCard("topItems")}
   </div>
   <div class="card">
     <h3>Cheklar ro'yxati</h3>
@@ -748,6 +757,7 @@ function tabReport(c) {
   </div>`;
 
   c.querySelectorAll("[data-period]").forEach((b) => b.addEventListener("click", () => { ui.period = b.dataset.period; render(); }));
+  bindLocked(c);
   c.querySelector("#from")?.addEventListener("change", (e) => { ui.from = e.target.value; render(); });
   c.querySelector("#to")?.addEventListener("change", (e) => { ui.to = e.target.value; render(); });
   c.querySelectorAll("[data-csv]").forEach((b) => b.addEventListener("click", () => {
@@ -780,9 +790,47 @@ function tabDevices(c) {
       <li>Planshet ekranida chiqqan <b>planshet kodini</b> Smart Menyu'ga ayting. Tasdiqlangach ilova o'zi ochiladi.</li>
       <li>Planshetda kerakli bo'limni tanlang: <b>Ofitsiant</b>, <b>Oshxona ekrani</b> yoki <b>Boshqaruv</b>.</li>
     </ol>
-    <p class="muted">Bu planshet: <b class="code">${esc(ACT.dev ? ACT.dev.id.slice(0, 4) + "-" + ACT.dev.id.slice(4) : "namoyish")}</b>${ACT.lic ? ` · Obuna: <b>${new Date(ACT.watcher?.lic?.until || ACT.lic.until).toLocaleDateString("ru-RU")}</b> gacha` : ""}</p>
+    <p class="muted">Bu planshet: <b class="code">${esc(ACT.dev ? ACT.dev.id.slice(0, 4) + "-" + ACT.dev.id.slice(4) : "namoyish")}</b>${ACT.lic ? ` · Obuna: <b>${new Date(ACT.watcher?.lic?.until || ACT.lic.until).toLocaleDateString("ru-RU")}</b> gacha` : ""} · Tarif: <b>${esc(planOf(plan()).name)}</b></p>
   </div>`;
 }
+
+// ---------- Tarif: yopiq funksiyalar ----------
+function upsellText(f) {
+  const ph = ownerPhone();
+  return `Bu funksiya <b>${esc(needPlan(f))}</b> tarifida ochiladi. Hozirgi tarif: <b>${esc(planOf(plan()).name)}</b>.${ph ? ` Tarifni oshirish: <a href="tel:${esc(ph.replace(/[^+\d]/g, ""))}"><b>${esc(ph)}</b></a>` : " Tarifni oshirish uchun Smart Menyu bilan bog'laning."}`;
+}
+function lockedCard(f) {
+  return `<div class="card locked-card"><div class="locked-ic">🔒</div><div><h3>${esc(FEATURES[f].name)}</h3><p class="muted">${upsellText(f)}</p></div></div>`;
+}
+function bindLocked(c) {
+  c.querySelectorAll("[data-locked]").forEach((b) => b.addEventListener("click", () => toast(upsellText(b.dataset.locked), { timeout: 5000 })));
+}
+
+// ---------- Qayta tashrif (mijozni chegirma bilan qaytarish) ----------
+// Funksiyaning o'zi keyingi bosqichda yoziladi. Hozircha: Biznes/Premium'da tavsif, Start/Standart'da qulf (tarifni oshirishga taklif).
+function tabWinback(c) {
+  const head = `<div class="page-head"><h1>Qayta tashrif</h1><p>Mijoz Telegram bot orqali raqamini qoldiradi, keyin unga shaxsiy chegirma kuponi yuboriladi va u qaytib keladi.</p></div>`;
+  if (!can("winback")) { c.innerHTML = head + lockedCard("winback"); return; }
+  c.innerHTML = head + `
+  <div class="card">
+    <h3>Tez orada</h3>
+    <p class="muted">Bu bo'lim tayyorlanmoqda. Restoraningiz tarifida u ochiq: ishga tushishi bilan shu yerda paydo bo'ladi.</p>
+    <ul class="plan-feats">
+      <li>✓ Kutilayotganlar, qaytib kelganlar va kuponi kuyganlar ro'yxati</li>
+      <li>✓ Chegirma foizi va muddatini o'zingiz belgilaysiz, "Pauza" tugmasi</li>
+      <li>✓ Xabarni bitta tugma bilan yuborish</li>
+      <li>${can("winbackAuto") ? "✓" : "🔒"} Unutsangiz, kupon tugashidan 3 kun oldin avtomatik yuborish${can("winbackAuto") ? "" : ` <small>(${esc(needPlan("winbackAuto"))})</small>`}</li>
+    </ul>
+  </div>`;
+}
+
+// Egasi tarifni o'zgartirdi: oyna darhol yangi tarifga moslanadi
+window.addEventListener("menyu-lic", () => {
+  if (document.querySelector(".modal-back")) return;
+  const a = document.activeElement;
+  if (a && ["INPUT", "SELECT", "TEXTAREA"].includes(a.tagName)) { setTimeout(render, 1500); return; }
+  render();
+});
 
 store.on((evt) => {
   if (evt.type !== "render") return;

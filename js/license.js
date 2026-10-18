@@ -248,6 +248,8 @@ function makeWatcher(rid, dev, lic) {
         w.lic = r.lic;
         rememberServer(r.lic);
         closeScreen();
+        // Sahifalar yangi tarif va muddatni darhol ko'rsatsin
+        try { window.dispatchEvent(new CustomEvent("menyu-lic", { detail: r.lic })); } catch {}
         if (moved) setTimeout(() => location.reload(), 500); // egasi serverni o'zgartirdi: yangisiga ulanamiz
         return;
       }
