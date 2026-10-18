@@ -642,3 +642,37 @@ body.lux {
   padding: 10px 12px;
   margin: 0 0 12px;
 }
+.ow-tariffs .ow-plan {
+  background: transparent;
+  border-color: var(--line, rgba(255, 255, 255, .14));
+}
+.ow-tariffs .ow-plan b {
+  font-size: 18px;
+  color: var(--text, #F5EFE6);
+}
+.ow-tariffs .ow-plan.on {
+  background: var(--gold-soft);
+  border: 2px solid var(--gold);
+}
+.ow-tariffs .ow-plan.on b {
+  color: var(--gold);
+}
+.ow-feats {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+.ow-feats li.off {
+  color: var(--muted);
+}
+.ow-feats small {
+  color: var(--gold);
+  font-size: 11px;
+  margin-left: 4px;
+}
+.ow-over {
+  color: #E8846B !important;
+}

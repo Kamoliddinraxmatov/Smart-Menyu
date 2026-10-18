@@ -8,6 +8,7 @@ import {
 } from "./common.js";
 import { itemTr, catTr } from "./i18n.js";
 import { fixUz, translate } from "./translate.js";
+import { has, currentPlan, planOf, needPlan, FEATURES } from "./plan.js";
 
 const ACT = await activate();
 const rid = ACT.rid;
@@ -18,6 +19,9 @@ const app = document.getElementById("app");
 const ui = { tab: new URLSearchParams(location.search).has("owner") ? "brand" : "menu", unlocked: sessionStorage.getItem(`menyu.admin.${rid}`) === "1", catFilter: "all" };
 const cfg = () => S.config;
 const cur = () => cfg().restaurant.currency || "so'm";
+// Restoran tarifi (egasi imzolagan ruxsatnomadan). Egasi o'zgartirsa, "menyu-lic" hodisasi keladi va oyna qayta chiziladi.
+const plan = () => currentPlan(ACT.watcher?.lic || ACT.lic, ACT.demo);
+const can = (f) => has(f, plan());
 
 // O'zgarishlar navbati: 0,4 soniyada bir marta saqlanadi. Shu orada boshqa qurilmadan yangi sozlama
 // kelsa ham, bizning o'zgarishlarimiz o'sha yangisining ustiga qo'llanadi (hech narsa yo'qolmaydi).
@@ -53,6 +57,7 @@ const TABS = [
   ["waiters", "🧑‍💼", "Ofitsiantlar"],
   ["tables", "🪑", "Stollar"],
   ["report", "📊", "Hisobot"],
+  ["winback", "🎁", "Qayta tashrif", "winback"],
   ["devices", "📱", "Qurilmalar"]
 ];
 
@@ -74,16 +79,16 @@ function render() {
   app.innerHTML = `
   <div class="admin">
     <aside class="side">
-      <div class="side-brand">${logoHtml(r)}<div><b>${esc(r.name)}</b><small>Admin panel</small></div></div>
+      <div class="side-brand">${logoHtml(r)}<div><b>${esc(r.name)}</b><small>Admin panel · ${esc(planOf(plan()).name)}</small></div></div>
       <a class="side-back" href="${link("index.html", rid)}">← Orqaga</a>
-      <nav>${TABS.map(([id, ic, name]) => `<button class="${ui.tab === id ? "on" : ""}" data-tab="${id}"><span>${ic}</span>${name}</button>`).join("")}</nav>
+      <nav>${TABS.map(([id, ic, name, f]) => `<button class="${ui.tab === id ? "on" : ""} ${f && !can(f) ? "locked" : ""}" data-tab="${id}"><span>${ic}</span>${name}${f && !can(f) ? ` <i class="lock-ic">🔒</i>` : ""}</button>`).join("")}</nav>
       <div class="side-foot">${connBadge(S.online)}<a href="${link("index.html", rid)}">← Bosh sahifa</a></div>
     </aside>
     <main class="content" id="content"></main>
   </div>`;
   app.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { ui.tab = b.dataset.tab; render(); window.scrollTo(0, 0); }));
   const c = app.querySelector("#content");
-  ({ brand: tabBrand, menu: tabMenu, waiters: tabWaiters, tables: tabTables, report: tabReport, devices: tabDevices })[ui.tab](c);
+  ({ brand: tabBrand, menu: tabMenu, waiters: tabWaiters, tables: tabTables, report: tabReport, winback: tabWinback, devices: tabDevices })[ui.tab](c);
 }
 
 const MAX_TRIES = 5;
@@ -780,9 +785,44 @@ function tabDevices(c) {
       <li>Planshet ekranida chiqqan <b>planshet kodini</b> Smart Menyu'ga ayting. Tasdiqlangach ilova o'zi ochiladi.</li>
       <li>Planshetda kerakli bo'limni tanlang: <b>Ofitsiant</b>, <b>Oshxona ekrani</b> yoki <b>Boshqaruv</b>.</li>
     </ol>
-    <p class="muted">Bu planshet: <b class="code">${esc(ACT.dev ? ACT.dev.id.slice(0, 4) + "-" + ACT.dev.id.slice(4) : "namoyish")}</b>${ACT.lic ? ` · Obuna: <b>${new Date(ACT.watcher?.lic?.until || ACT.lic.until).toLocaleDateString("ru-RU")}</b> gacha` : ""}</p>
+    <p class="muted">Bu planshet: <b class="code">${esc(ACT.dev ? ACT.dev.id.slice(0, 4) + "-" + ACT.dev.id.slice(4) : "namoyish")}</b>${ACT.lic ? ` · Obuna: <b>${new Date(ACT.watcher?.lic?.until || ACT.lic.until).toLocaleDateString("ru-RU")}</b> gacha` : ""} · Tarif: <b>${esc(planOf(plan()).name)}</b></p>
   </div>`;
 }
+
+// ---------- Tarif: yopiq funksiyalar ----------
+function upsellText(f) {
+  const ph = ownerPhone();
+  return `Bu funksiya <b>${esc(needPlan(f))}</b> tarifida ochiladi. Hozirgi tarif: <b>${esc(planOf(plan()).name)}</b>.${ph ? ` Tarifni oshirish: <a href="tel:${esc(ph.replace(/[^+\d]/g, ""))}"><b>${esc(ph)}</b></a>` : " Tarifni oshirish uchun Smart Menyu bilan bog'laning."}`;
+}
+function lockedCard(f) {
+  return `<div class="card locked-card"><div class="locked-ic">🔒</div><div><h3>${esc(FEATURES[f].name)}</h3><p class="muted">${upsellText(f)}</p></div></div>`;
+}
+
+// ---------- Qayta tashrif (mijozni chegirma bilan qaytarish) ----------
+// Funksiyaning o'zi keyingi bosqichda yoziladi. Hozircha: Biznes/Premium'da tavsif, Start/Standart'da qulf (tarifni oshirishga taklif).
+function tabWinback(c) {
+  const head = `<div class="page-head"><h1>Qayta tashrif</h1><p>Mijoz Telegram bot orqali raqamini qoldiradi, keyin unga shaxsiy chegirma kuponi yuboriladi va u qaytib keladi.</p></div>`;
+  if (!can("winback")) { c.innerHTML = head + lockedCard("winback"); return; }
+  c.innerHTML = head + `
+  <div class="card">
+    <h3>Tez orada</h3>
+    <p class="muted">Bu bo'lim tayyorlanmoqda. Restoraningiz tarifida u ochiq: ishga tushishi bilan shu yerda paydo bo'ladi.</p>
+    <ul class="plan-feats">
+      <li>✓ Kutilayotganlar, qaytib kelganlar va kuponi kuyganlar ro'yxati</li>
+      <li>✓ Chegirma foizi va muddatini o'zingiz belgilaysiz, "Pauza" tugmasi</li>
+      <li>✓ Xabarni bitta tugma bilan yuborish</li>
+      <li>${can("winbackAuto") ? "✓" : "🔒"} Unutsangiz, kupon tugashidan 3 kun oldin avtomatik yuborish${can("winbackAuto") ? "" : ` <small>(${esc(needPlan("winbackAuto"))})</small>`}</li>
+    </ul>
+  </div>`;
+}
+
+// Egasi tarifni o'zgartirdi: oyna darhol yangi tarifga moslanadi
+window.addEventListener("menyu-lic", () => {
+  if (document.querySelector(".modal-back")) return;
+  const a = document.activeElement;
+  if (a && ["INPUT", "SELECT", "TEXTAREA"].includes(a.tagName)) { setTimeout(render, 1500); return; }
+  render();
+});
 
 store.on((evt) => {
   if (evt.type !== "render") return;

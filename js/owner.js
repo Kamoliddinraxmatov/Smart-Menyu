@@ -7,6 +7,7 @@ import { OWNER } from "./owner-key.js";
 import { V2, DEFAULT_BROKER } from "./license.js";
 import { createStore } from "./sync.js";
 import { DEFAULT_CONFIG } from "./defaults.js";
+import { PLANS as TARIFFS, FEATURES, planOf } from "./plan.js";
 import {
   passKey, open, seal, importSignKey, sign, importVerifyKey, verify, newEphemeral, wrapFor, genDataKey, importDataKey,
   prettyId, fingerprint, kvGet, kvSet, kvDel, b64, rand
@@ -280,6 +281,7 @@ async function publishLicense(r, save = true) {
     v: 1, rid: r.rid, name: r.name, until: r.until || 0, issued, blocked: !!r.blocked,
     phone: S.settings.phone || "", eph: eph.pub, dev, max: r.max || 5
   };
+  if (planOf(r.plan)) lic.plan = r.plan;
   if (S.settings.broker) {
     lic.broker = S.settings.broker;
     if (S.settings.mqttUser) lic.mqtt = { user: S.settings.mqttUser, pass: S.settings.mqttPass || "" };
@@ -426,7 +428,7 @@ function renderList() {
         ${list.map((r) => {
           const st = status(r), pend = pendingOf(r).length;
           return `<button class="ow-card" data-rid="${esc(r.rid)}">
-            <div class="ow-card-l"><b>${esc(r.name)}</b><small>${esc([r.city, r.rid].filter(Boolean).join(" · "))}</small></div>
+            <div class="ow-card-l"><b>${esc(r.name)}</b><small>${esc([planOf(r.plan)?.name, r.city, r.rid].filter(Boolean).join(" · "))}</small></div>
             <div class="ow-card-r">${pend ? `<span class="ow-pend">📲 ${pend} yangi planshet</span>` : ""}<span class="ow-pill p-${st.k}">${st.t}</span></div>
           </button>`;
         }).join("") || `<div class="ow-empty">${all.length ? "Hech narsa topilmadi" : "Hali restoran yo'q. Birinchi restoranni qo'shing."}</div>`}
@@ -444,9 +446,10 @@ function renderList() {
 function infoForm(r = {}) {
   return `
     <label class="field"><span>Restoran nomi</span><input id="fName" value="${esc(r.name || "")}" placeholder="Masalan: Rayhon"></label>
+    ${r.rid ? "" : `<label class="field"><span>Tarif</span><select id="fPlan">${TARIFFS.map((t) => `<option value="${t.id}" ${t.id === "standart" ? "selected" : ""}>${t.name} · ${t.tablets} planshet · ${money(t.price)}</option>`).join("")}</select></label>`}
     <div class="row2">
       <label class="field"><span>Shahar / viloyat</span><input id="fCity" value="${esc(r.city || "")}" placeholder="Masalan: Samarqand"></label>
-      <label class="field"><span>Planshetlar soni (chegara)</span><input id="fMax" type="number" min="1" max="50" value="${esc(r.max || 5)}"></label>
+      <label class="field"><span>Planshetlar soni (chegara)</span><input id="fMax" type="number" min="1" max="50" value="${esc(r.max || (r.rid ? 5 : planOf("standart").tablets))}"></label>
     </div>
     <div class="row2">
       <label class="field"><span>Mas'ul shaxs</span><input id="fContact" value="${esc(r.contact || "")}" placeholder="Ism familiya"></label>
@@ -470,6 +473,7 @@ function addRestaurant() {
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" data-close>Bekor qilish</button><button class="btn btn-primary" id="ok">Yaratish</button></div>`, {
     onMount(m, close) {
+      m.querySelector("#fPlan").addEventListener("change", (e) => { m.querySelector("#fMax").value = planOf(e.target.value).tablets; });
       m.querySelector("#ok").addEventListener("click", async (e) => {
         const info = readInfo(m);
         if (!info.name) return toast("Restoran nomini kiriting", { kind: "error" });
@@ -478,7 +482,8 @@ function addRestaurant() {
         const rid = old || `${slug(info.name)}-${code4()}`;
         if (S.rests[rid]) return toast("Bu kod bilan restoran allaqachon bor", { kind: "error" });
         e.currentTarget.disabled = true; e.currentTarget.textContent = "Yaratilmoqda...";
-        const r = { rid, ...info, createdAt: Date.now(), until: 0, blocked: false, key: await genDataKey(), devices: {}, payments: [] };
+        const plan = m.querySelector("#fPlan").value;
+        const r = { rid, ...info, plan, createdAt: Date.now(), until: 0, blocked: false, key: await genDataKey(), devices: {}, payments: [] };
         try {
           let config = null;
           if (old) config = await readOldConfig(old);
@@ -573,6 +578,13 @@ function renderRest(r) {
       </section>` : ""}
 
       <section class="ow-sec">
+        <h3>Tarif <small>${planOf(r.plan) ? esc(planOf(r.plan).name) : "tanlanmagan"}</small></h3>
+        <p class="ow-hint">${planOf(r.plan) ? "Tarif o'zgarsa, restoran planshetlarida funksiyalar darhol o'zi yoqiladi yoki yopiladi." : "Tarif tanlanmagan: hozircha hamma funksiya ochiq. Restoran to'layotgan tarifni tanlang."}</p>
+        <div class="ow-plans ow-tariffs">${TARIFFS.map((t) => `<button class="ow-plan ${r.plan === t.id ? "on" : ""}" data-tariff="${t.id}"><b>${t.name}</b><small>${t.tablets} planshet · ${money(t.price)}</small></button>`).join("")}</div>
+        ${planOf(r.plan) ? `<ul class="ow-feats">${tariffFeatures(r.plan)}</ul>` : ""}
+      </section>
+
+      <section class="ow-sec">
         <h3>Dostup berish</h3>
         <p class="ow-hint">To'lov olgach, tegishli tugmani bosing. Muddat ${daysLeft(r) > 0 ? "hozirgi muddat oxiriga" : "bugundan boshlab"} qo'shiladi.</p>
         <div class="ow-plans">${PLANS.map(([m, t]) => `<button class="ow-plan" data-m="${m}"><b>+${t}</b><small>${fmtDate(addMonths(Math.max(Date.now(), r.until || 0), m))} gacha</small></button>`).join("")}</div>
@@ -583,7 +595,8 @@ function renderRest(r) {
       </section>
 
       <section class="ow-sec">
-        <h3>Planshetlar <small>${devs.length} / ${r.max || 5}</small></h3>
+        <h3>Planshetlar <small class="${devs.length > (r.max || 5) ? "ow-over" : ""}">${devs.length} / ${r.max || 5}</small></h3>
+        ${devs.length > (r.max || 5) ? `<p class="ow-hint ow-over">Planshetlar tarif chegarasidan ko'p. Ortiqchasini o'chiring yoki chegarani oshiring.</p>` : ""}
         ${devs.map(([id, d]) => `<div class="ow-dev">
           <div><b class="ow-mono">${prettyId(id)}</b> ${d.name ? `· ${esc(d.name)}` : ""}<small>${esc(devModel(d.ua))} · tasdiqlangan ${fmtDate(d.approvedAt)}</small></div>
           <div class="ow-dev-btns"><button class="btn btn-ghost" data-rm="${esc(id)}">O'chirish</button></div>
@@ -592,7 +605,7 @@ function renderRest(r) {
 
       <section class="ow-sec">
         <h3>To'lovlar tarixi</h3>
-        ${(r.payments || []).slice().reverse().map((p) => `<div class="ow-pay"><span>${fmtDate(p.at)}</span><b>+${PLANS.find(([m]) => m === p.months)?.[1] || p.months + " oy"}</b><span>${p.amount ? money(p.amount) : "—"}</span><small>${fmtDate(p.from)} → ${fmtDate(p.to)}</small></div>`).join("") || `<p class="ow-hint">Hali to'lov yo'q.</p>`}
+        ${(r.payments || []).slice().reverse().map((p) => `<div class="ow-pay"><span>${fmtDate(p.at)}</span><b>+${PLANS.find(([m]) => m === p.months)?.[1] || p.months + " oy"}${planOf(p.plan) ? ` · ${planOf(p.plan).name}` : ""}</b><span>${p.amount ? money(p.amount) : "—"}</span><small>${fmtDate(p.from)} → ${fmtDate(p.to)}</small></div>`).join("") || `<p class="ow-hint">Hali to'lov yo'q.</p>`}
       </section>
 
       <section class="ow-sec">
@@ -608,6 +621,7 @@ function renderRest(r) {
   $("#back").addEventListener("click", () => { ui.view = "list"; render(); });
   $("#copy").addEventListener("click", () => { navigator.clipboard?.writeText(r.rid).then(() => toast("Kod nusxalandi", { kind: "ok" }), () => {}); });
   app.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => grant(r, Number(b.dataset.m))));
+  app.querySelectorAll("[data-tariff]").forEach((b) => b.addEventListener("click", () => setTariff(r, b.dataset.tariff)));
   $("#block").addEventListener("click", async () => {
     if (!r.blocked && !(await confirmBox(`"${esc(r.name)}" to'xtatilsinmi? Barcha planshetlari darhol yopiladi.`, "To'xtatish", { danger: true }))) return;
     r.blocked = !r.blocked; await publishLicense(r); render();
@@ -646,6 +660,33 @@ function renderRest(r) {
   $("#pin").addEventListener("click", () => adminPassword(r));
 }
 
+// Tarifda ochiq va yopiq funksiyalar ro'yxati
+function tariffFeatures(planId) {
+  const rank = (id) => TARIFFS.findIndex((t) => t.id === id);
+  return Object.values(FEATURES).map((f) => {
+    const on = rank(planId) >= rank(f.plan);
+    return `<li class="${on ? "on" : "off"}">${on ? "✓" : "🔒"} ${esc(f.name)}${on ? "" : ` <small>${esc(planOf(f.plan).name)}</small>`}</li>`;
+  }).join("");
+}
+
+// Tarifni o'zgartirish: planshetlar chegarasi tarifga moslanadi, funksiyalar yangi ruxsatnoma bilan o'zi o'zgaradi
+async function setTariff(r, id) {
+  const t = planOf(id);
+  if (!t || r.plan === id) return;
+  const old = planOf(r.plan);
+  const down = old && TARIFFS.indexOf(t) < TARIFFS.indexOf(old);
+  const devs = Object.keys(r.devices || {}).length;
+  const msg = `<b>${esc(r.name)}</b> tarifi <b>${t.name}</b> ga o'zgartirilsinmi?<br>Planshetlar chegarasi: <b>${t.tablets}</b>.` +
+    (down ? `<br>Yuqori tarif funksiyalari restoranda darhol yopiladi.` : "") +
+    (devs > t.tablets ? `<br>⚠️ Hozir ${devs} ta planshet ulangan: ortiqchasini o'zingiz o'chiring.` : "");
+  if (!(await confirmBox(msg, "O'zgartirish", { danger: down }))) return;
+  r.plan = id;
+  r.max = t.tablets;
+  r.planAt = Date.now();
+  await publishLicense(r); render();
+  toast(`Tarif: ${t.name}. Restoran planshetlarida funksiyalar yangilandi.`, { kind: "ok", timeout: 5000 });
+}
+
 function devModel(ua = "") {
   const m = ua.match(/Android [\d.]+; ([^;)]+)/) || ua.match(/\(([^;)]+)/);
   return m ? m[1].replace(/ Build.*/, "").trim() : "Qurilma";
@@ -667,7 +708,7 @@ function grant(r, months) {
         r.until = to;
         r.blocked = false;
         r.payments = r.payments || [];
-        r.payments.push({ at: Date.now(), months, amount: Number(m.querySelector("#amt").value) || 0, from, to });
+        r.payments.push({ at: Date.now(), months, amount: Number(m.querySelector("#amt").value) || 0, from, to, plan: r.plan || "" });
         await publishLicense(r);
         close(); render();
         toast(`Dostup berildi: ${fmtDate(to)} gacha`, { kind: "ok", timeout: 5000 });
