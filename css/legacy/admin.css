@@ -1198,9 +1198,6 @@ label:has(> .file-overlay) {
   font-size: 12px;
   margin-left: auto;
 }
-.chip-locked {
-  opacity: .55;
-}
 .locked-card {
   display: flex;
   gap: 14px;

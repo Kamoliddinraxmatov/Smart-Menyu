@@ -252,7 +252,6 @@ label:has(> .file-overlay) { position: relative; overflow: hidden; }
 /* Tarif: yopiq funksiyalar */
 .side nav button.locked { opacity: .6; }
 .side nav .lock-ic { font-style: normal; font-size: 12px; margin-left: auto; }
-.chip-locked { opacity: .55; }
 .locked-card { display: flex; gap: 14px; align-items: flex-start; border-style: dashed !important; }
 .locked-card .locked-ic { font-size: 26px; line-height: 1; }
 .locked-card h3 { margin: 0 0 6px; }

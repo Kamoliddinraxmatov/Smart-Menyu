@@ -530,11 +530,11 @@ function tabWaiters(c) {
     <div><h1>Ofitsiantlar</h1><p>Har bir ofitsiant planshetga ismini tanlab, PIN-kod bilan kiradi. Stolga biriktirilgan ofitsiant buyurtmaga avtomatik yoziladi.</p></div>
     <button class="btn btn-primary" id="add">+ Ofitsiant qo'shish</button>
   </div>
-  ${can("serviceCharge") ? `<div class="card svc-card">
+  <div class="card svc-card">
     <label class="field"><span>Ofitsiantlar xizmat haqi, %</span><input type="number" id="svc" min="0" max="30" step="1" inputmode="numeric" value="${esc(cfg().restaurant.service ?? 0)}"></label>
     <button class="btn btn-primary" id="svcSave">Saqlash</button>
     <p class="hint">Barcha ofitsiantlarga tegishli. Chek yopilganda summaga shu foiz qo'shiladi.</p>
-  </div>` : lockedCard("serviceCharge")}
+  </div>
   <div class="card list">
     ${cfg().waiters.map((w) => {
       const tables = cfg().tables.filter((t) => t.waiterId === w.id).map((t) => t.no);
@@ -546,7 +546,7 @@ function tabWaiters(c) {
       </div>`;
     }).join("") || `<div class="empty">Hali ofitsiant yo'q</div>`}
   </div>`;
-  c.querySelector("#svcSave")?.addEventListener("click", () => {
+  c.querySelector("#svcSave").addEventListener("click", () => {
     const v = Math.round(Number(c.querySelector("#svc").value));
     if (!(v >= 0 && v <= 30)) { toast("Xizmat haqi 0 dan 30 % gacha bo'lishi kerak", { kind: "error" }); return; }
     mutate((x) => { x.restaurant.service = v; }, `Xizmat haqi saqlandi: ${v} %`);
@@ -672,10 +672,7 @@ function salesInRange(from, to) {
   return Object.values(all).filter((x) => x.at >= from.getTime() && x.at < to.getTime()).sort((a, b) => a.at - b.at);
 }
 
-// Start tarifida faqat kunlik hisobot
-const DAILY = ["today", "yesterday"];
 function tabReport(c) {
-  if (!can("reportPeriods") && !DAILY.includes(ui.period)) ui.period = "today";
   store.loadSales();
   const [from, to] = periodRange();
   const list = salesInRange(from, to);
@@ -717,37 +714,36 @@ function tabReport(c) {
   c.innerHTML = `
   <div class="page-head row-between">
     <div><h1>Hisobot</h1><p>${rangeTxt} · ${S.salesLoaded ? "real vaqtda yangilanadi" : "arxiv yuklanmoqda…"}</p></div>
-    ${can("reportExcel") ? `<div class="head-actions">
+    <div class="head-actions">
       <button class="btn btn-ghost" data-csv="checks" ${list.length ? "" : "disabled"}>⬇ Cheklar (Excel)</button>
       <button class="btn btn-ghost" data-csv="items" ${list.length ? "" : "disabled"}>⬇ Taomlar (Excel)</button>
-    </div>` : ""}
+    </div>
   </div>
   <div class="chips-row period-row">
-    ${PERIODS.map(([id, name]) => can("reportPeriods") || DAILY.includes(id) ? `<button class="chip ${ui.period === id ? "on" : ""}" data-period="${id}">${name}</button>` : `<button class="chip chip-locked" data-locked="reportPeriods">🔒 ${name}</button>`).join("")}
+    ${PERIODS.map(([id, name]) => `<button class="chip ${ui.period === id ? "on" : ""}" data-period="${id}">${name}</button>`).join("")}
     ${ui.period === "custom" ? `<span class="range"><input type="date" id="from" value="${ymd(from)}"> — <input type="date" id="to" value="${ymd(new Date(to - 1))}"></span>` : ""}
   </div>
   <div class="kpis">
     <div class="kpi"><small>Tushum</small><b>${money(revenue, cur())}</b><span class="kpi-sub">xizmat haqi: ${money(svc, cur())}</span></div>
     <div class="kpi"><small>Cheklar</small><b>${list.length}</b><span class="kpi-sub">mehmonlar: ${guests}</span></div>
     <div class="kpi"><small>O'rtacha chek</small><b>${money(list.length ? revenue / list.length : 0, cur())}</b><span class="kpi-sub">1 mehmonga: ${money(guests ? revenue / guests : 0, cur())}</span></div>
-    ${can("cookTime") ? `<div class="kpi"><small>O'rtacha tayyorlash</small><b>${avgCook} daq</b><span class="kpi-sub">hozir ochiq: ${openNow.length} ta · ${money(openSum, cur())}</span></div>`
-      : `<div class="kpi"><small>Hozir ochiq</small><b>${openNow.length} ta</b><span class="kpi-sub">${money(openSum, cur())}</span></div>`}
+    <div class="kpi"><small>O'rtacha tayyorlash</small><b>${avgCook} daq</b><span class="kpi-sub">hozir ochiq: ${openNow.length} ta · ${money(openSum, cur())}</span></div>
   </div>
-  ${oneDay && !can("hourlyChart") ? lockedCard("hourlyChart") : `<div class="card">
+  <div class="card">
     <h3>${oneDay ? "Soatlar bo'yicha tushum" : "Kunlar bo'yicha tushum"}</h3>
     <div class="chart">${buckets.map((b) => `<div class="col" title="${esc(b.label)}: ${money(b.v, cur())}"><i style="height:${Math.round((b.v / maxB) * 100)}%"></i><small>${esc(b.label)}</small></div>`).join("")}</div>
-  </div>`}
+  </div>
   <div class="cols">
-    ${can("waiterStats") ? `<div class="card">
+    <div class="card">
       <h3>Ofitsiantlar bo'yicha</h3>
       <table class="tbl"><thead><tr><th>Ofitsiant</th><th>Cheklar</th><th>Mehmon</th><th>Savdo</th><th>Xizmat haqi</th></tr></thead>
       <tbody>${Object.values(byWaiter).sort((a, b) => b.sum - a.sum).map((w) => `<tr><td><b>${esc(w.name)}</b></td><td>${w.n}</td><td>${w.guests}</td><td>${money(w.sum, cur())}</td><td>${money(w.svc, cur())}</td></tr>`).join("") || `<tr><td colspan="5" class="muted">Bu davrda yopilgan chek yo'q</td></tr>`}</tbody></table>
-      ${can("payTypes") && Object.keys(pays).length ? `<h3 class="mt">To'lov turlari</h3><div class="pays">${Object.entries(pays).map(([k, v]) => `<span><small>${payName[k] || esc(k)}</small><b>${money(v, cur())}</b></span>`).join("")}</div>` : ""}
-    </div>` : lockedCard("waiterStats")}
-    ${can("topItems") ? `<div class="card">
+      ${Object.keys(pays).length ? `<h3 class="mt">To'lov turlari</h3><div class="pays">${Object.entries(pays).map(([k, v]) => `<span><small>${payName[k] || esc(k)}</small><b>${money(v, cur())}</b></span>`).join("")}</div>` : ""}
+    </div>
+    <div class="card">
       <h3>Eng ko'p sotilgan taomlar</h3>
       ${top.length ? top.map(([n, i]) => `<div class="bar"><span>${esc(n)}</span><div><i style="width:${(i.q / maxTop) * 100}%"></i></div><b>${i.q}</b></div>`).join("") : `<p class="muted">Ma'lumot yo'q</p>`}
-    </div>` : lockedCard("topItems")}
+    </div>
   </div>
   <div class="card">
     <h3>Cheklar ro'yxati</h3>
@@ -757,7 +753,6 @@ function tabReport(c) {
   </div>`;
 
   c.querySelectorAll("[data-period]").forEach((b) => b.addEventListener("click", () => { ui.period = b.dataset.period; render(); }));
-  bindLocked(c);
   c.querySelector("#from")?.addEventListener("change", (e) => { ui.from = e.target.value; render(); });
   c.querySelector("#to")?.addEventListener("change", (e) => { ui.to = e.target.value; render(); });
   c.querySelectorAll("[data-csv]").forEach((b) => b.addEventListener("click", () => {
@@ -801,9 +796,6 @@ function upsellText(f) {
 }
 function lockedCard(f) {
   return `<div class="card locked-card"><div class="locked-ic">🔒</div><div><h3>${esc(FEATURES[f].name)}</h3><p class="muted">${upsellText(f)}</p></div></div>`;
-}
-function bindLocked(c) {
-  c.querySelectorAll("[data-locked]").forEach((b) => b.addEventListener("click", () => toast(upsellText(b.dataset.locked), { timeout: 5000 })));
 }
 
 // ---------- Qayta tashrif (mijozni chegirma bilan qaytarish) ----------

@@ -13,20 +13,10 @@ export const PLANS = [
   { id: "premium", name: "Premium", tablets: 10, price: 950000 }
 ];
 
-// Funksiya -> u ochiladigan eng past tarif (tarif kartochkalari asosida)
+// Funksiya -> u ochiladigan eng past tarif. Bu yerda yo'q funksiyalar hamma tarifda ochiq
+// (18 oktabrgacha qilingan hamma narsa: menyu, oshxona, hisobotlar, xizmat haqi va h.k.).
 export const FEATURES = {
-  // Standart
-  reportPeriods: { plan: "standart", name: "Hafta, oy va istalgan sana bo'yicha hisobot" },
-  reportExcel: { plan: "standart", name: "Hisobotni Excel'ga yuklab olish" },
-  waiterStats: { plan: "standart", name: "Har ofitsiantning savdosi va reytingi" },
-  serviceCharge: { plan: "standart", name: "Xizmat haqi avtomatik hisoblanadi" },
-  topItems: { plan: "standart", name: "Eng ko'p sotilgan 10 taom" },
-  // Biznes
-  hourlyChart: { plan: "biznes", name: "Soatlar bo'yicha savdo grafigi" },
-  payTypes: { plan: "biznes", name: "To'lov turlari: naqd, karta, Click/Payme" },
-  cookTime: { plan: "biznes", name: "Taom tayyorlanish vaqti nazorati" },
   winback: { plan: "biznes", name: "Qayta tashrif: mijozni chegirma bilan qaytarish" },
-  // Premium
   winbackAuto: { plan: "premium", name: "Qayta tashrif: kupon tugashidan 3 kun oldin avtomatik yuborish" }
 };
 
