@@ -294,12 +294,18 @@ async function startRecovery(rid) {
   const kp = await genDeviceKeys();
   const pub = await exportPub(kp.publicKey);
   const code = await fingerprint(pub);
+  clearInterval(recovery?.timer);
   recovery = { rid, priv: kp.privateKey, code };
   client.subscribe(`${V2}/${rid}/recover/ans`, { qos: 1 });
-  client.publish(`${V2}/${rid}/recover/req`, JSON.stringify({ pub, at: Date.now() }), { qos: 1, retain: true });
+  // Server saqlangan xabarni yo'qotishi mumkin: so'rovni kod ochiq turgan paytda har 3 soniyada qayta yuboramiz
+  const req = JSON.stringify({ pub, at: Date.now() });
+  const send = () => client?.publish(`${V2}/${rid}/recover/req`, req, { qos: 1, retain: true });
+  send();
+  recovery.timer = setInterval(send, 3000);
   return code;
 }
 function endRecovery(rid) {
+  clearInterval(recovery?.timer);
   client?.publish(`${V2}/${rid}/recover/req`, "", { qos: 1, retain: true });
   client?.publish(`${V2}/${rid}/recover/ans`, "", { qos: 1, retain: true });
   client?.unsubscribe(`${V2}/${rid}/recover/ans`);
