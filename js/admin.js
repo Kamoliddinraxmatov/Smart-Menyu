@@ -826,7 +826,8 @@ function recoverForOwner() {
           clearTimeout(t);
           const eph = await newEphemeral();
           const wrapped = await wrapFor(eph.priv, req.pub, k.raw, `${k.rid}/recover`);
-          const ans = { eph: eph.pub, wrapped, dev: { id: k.dev.id, pub: k.dev.pub, name: k.name }, at: Date.now() };
+          // Ruxsatnoma ham qo'shiladi: serverdagisi yo'qolgan bo'lsa, egasi uni shundan oladi (egasining imzosi bilan)
+          const ans = { eph: eph.pub, wrapped, dev: { id: k.dev.id, pub: k.dev.pub, name: k.name }, lic: k.lic, at: Date.now() };
           cl.publish(`${base}/ans`, JSON.stringify(ans), { qos: 1, retain: true }, () => {
             cl.end();
             close();

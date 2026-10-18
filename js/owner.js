@@ -311,8 +311,24 @@ async function onRecoverAnswer(rid, text) {
   let ans, raw;
   try { ans = JSON.parse(text); raw = await unwrapWith(rc.priv, ans.eph, ans.wrapped, `${rid}/recover`); } catch { return; } // boshqa so'rovga javob
   rc.busy = true;
-  const lic = lics[rid];
-  if (!lic) { rc.busy = false; return toast("Restoranning ruxsatnomasi serverda topilmadi. Internetni tekshirib, qayta urinib ko'ring.", { kind: "error", timeout: 7000 }); }
+  // Ruxsatnoma: serverdagi yoki planshet yuborgani (ikkalasi ham egasining imzosi bilan), qaysi biri yangiroq
+  const fromTab = typeof ans.lic === "string" ? await signed(ans.lic) : null;
+  const cands = [lics[rid], fromTab?.rid === rid ? fromTab : null].filter(Boolean);
+  const lic = cands.sort((a, b) => (b.issued || 0) - (a.issued || 0))[0];
+  if (!lic) { rc.busy = false; return toast("Restoranning ruxsatnomasi topilmadi. Qayta urinib ko'ring.", { kind: "error", timeout: 7000 }); }
+  // Restoran ro'yxatda bor: shu planshetning kalitini qo'shamiz (boshqa planshetlardan ham tiklash mumkin)
+  const have = S.rests[rid];
+  if (have) {
+    const d = ans.dev;
+    if (raw !== have.key || !d?.id || !lic.dev?.[d.id] || !(await validReg(d, d.id))) { rc.busy = false; endRecovery(rid); return toast("Bu planshet ma'lumoti mos kelmadi", { kind: "error" }); }
+    have.devices = have.devices || {};
+    have.devices[d.id] = { pub: { kty: "EC", crv: "P-256", x: d.pub.x, y: d.pub.y }, name: String(d.name || "").slice(0, 40), ua: "", approvedAt: Date.now() };
+    persist();
+    endRecovery(rid);
+    document.querySelector(".modal-back [data-close]")?.click();
+    ui.view = "rest"; ui.rid = rid; render();
+    return toast(`Planshet ${prettyId(d.id)} qo'shildi`, { kind: "ok", timeout: 6000 });
+  }
   const r = {
     rid, name: lic.name || rid, city: "", contact: "", phone: "", note: "", max: lic.max || 5,
     createdAt: Date.now(), until: lic.until || 0, blocked: !!lic.blocked, key: raw, devices: {}, payments: [], licIssued: lic.issued || 0
@@ -344,7 +360,7 @@ function recoverDialog() {
   modal(`
     <div class="modal-head"><h3>Restoranni planshetdan tiklash</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body" id="rcBody">
-      <p class="ow-hint">Restoran ro'yxatdan yo'qolgan bo'lsa, uni ishlab turgan planshetidan tiklash mumkin. Planshetlar o'zgarmaydi va ishlashda davom etadi.</p>
+      <p class="ow-hint">Restoran ro'yxatdan yo'qolgan bo'lsa, uni ishlab turgan planshetidan tiklash mumkin. Planshetlar o'zgarmaydi va ishlashda davom etadi. Restoran tiklangach, uning boshqa planshetlarini ham shu yo'l bilan qo'shing.</p>
       <label class="field"><span>Restoran kodi</span><input id="rcRid" autocapitalize="none" spellcheck="false" placeholder="masalan: yoshlar-trdv"></label>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" data-close>Bekor qilish</button><button class="btn btn-primary" id="rcGo">Davom etish</button></div>`, {
@@ -352,7 +368,6 @@ function recoverDialog() {
       m.querySelector("#rcGo").addEventListener("click", async (e) => {
         const rid = m.querySelector("#rcRid").value.trim().toLowerCase().replace(/\s+/g, "");
         if (!RID_RE.test(rid)) return toast("Restoran kodini to'g'ri kiriting", { kind: "error" });
-        if (S.rests[rid]) return toast("Bu restoran ro'yxatda bor", { kind: "error" });
         if (!client || !online) return toast("Internet yo'q", { kind: "error" });
         const code = await startRecovery(rid);
         e.currentTarget.remove();

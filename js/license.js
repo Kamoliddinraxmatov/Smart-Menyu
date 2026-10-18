@@ -140,7 +140,7 @@ export async function restaurantKey() {
   if (!act?.rid || !act.lic) return null;
   const dev = await deviceKeys();
   const r = await checkLicense(act.lic, act.rid, dev);
-  return r.state === "ok" ? { rid: act.rid, raw: r.rawKey, dev, name: act.name || "" } : null;
+  return r.state === "ok" ? { rid: act.rid, raw: r.rawKey, dev, name: act.name || "", lic: act.lic } : null;
 }
 
 export const daysLeft = (lic) => Math.ceil(((lic?.until || 0) - Date.now()) / DAY);
