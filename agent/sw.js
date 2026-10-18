@@ -1,6 +1,6 @@
 // Agent kalkulyatori: avval keshdan (internetsiz to'liq ishlaydi), orqada yangilanadi
-const CACHE = "agent-v1";
-const FILES = ["./", "index.html", "manifest.webmanifest", "logo-192.png", "logo-512.png"];
+const CACHE = "agent-v2";
+const FILES = ["./", "index.html", "app.html", "version.json", "manifest.webmanifest", "logo-192.png", "logo-512.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith("agent-") && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener("fetch", (e) => {

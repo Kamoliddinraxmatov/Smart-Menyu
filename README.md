@@ -10,7 +10,7 @@ Buyurtma bir zumda oshxona ekraniga tushadi, oshpaz "Tayyor" tugmasini bosgach s
 | `waiter.html` | Ofitsiant planshetlari | Ism + PIN bilan kirish, stollar xaritasi, menyu, savat, izohlar, tasdiqlash, "tayyor" xabarlari, hisob va stolni yopish |
 | `kitchen.html` | Oshxona ekrani | Realtime cheklar, taymer (10 daq sariq, 20 daq qizil), Boshlash/Tayyor, taomni belgilash, umumiy hisob (Σ), stop-list, ovozli signal |
 | `admin.html` | Restoran egasi | Logo, nom, rang, xizmat haqi, menyu va rasmlar, kategoriyalar, ofitsiantlar, stollarni ofitsiantga biriktirish, kunlik hisobot, QR havolalar |
-| `agent/` | Sotuv agentlari | Yo'qotish kalkulyatori, og'riq savollari, saqlangan uchrashuvlar. Internetsiz ishlaydi, alohida ilova: `SmartMenyuAgent.apk` |
+| `agent/` | Sotuv agentlari | Yo'qotish kalkulyatori, og'riq savollari, saqlangan uchrashuvlar. Internetsiz ishlaydi, alohida ilova: `SmartMenyuAgent.apk`. O'zgartirganda `agent/app.html` dagi `agent-version` va `agent/version.json` ni birga oshiring: ilovalar internet bo'lganda o'zi yangilanadi |
 | `index.html` | Hammasi | Restoranni tanlash, yangi restoran ochish |
 
 Bir nechta restoran: har bir restoranning o'z kodi bor (`?r=kod`). Hamma qurilmalar shu kod orqali ulanadi.

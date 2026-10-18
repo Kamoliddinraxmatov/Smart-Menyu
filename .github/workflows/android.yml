@@ -56,7 +56,9 @@ jobs:
           cp owner.html app-owner/www/index.html
           # Agent ilovasi saytga bog'liq emas: hamma fayl ilova ichida, internetsiz ochiladi
           mkdir -p app-agent/www
-          cp agent/index.html agent/manifest.webmanifest agent/logo-192.png agent/logo-512.png app-agent/www/
+          # Versiya raqami app.html va version.json da bir xil bo'lishi kerak (avtomatik yangilanish shunga qaraydi)
+          node -e "const f=require('fs');const a=+f.readFileSync('agent/app.html','utf8').match(/agent-version\" content=\"(\d+)/)[1];const b=require('./agent/version.json').v;if(a!==b){console.error('agent versiyasi mos emas: app.html='+a+' version.json='+b);process.exit(1)}"
+          cp agent/index.html agent/app.html agent/version.json agent/manifest.webmanifest agent/logo-192.png agent/logo-512.png app-agent/www/
 
       - name: Capacitor o'rnatish
         working-directory: app
