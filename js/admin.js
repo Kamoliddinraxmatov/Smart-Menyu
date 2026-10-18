@@ -802,38 +802,59 @@ function recoverForOwner() {
   modal(`
     <div class="modal-head"><h3>Egasiga tiklash</h3><button class="icon-btn" data-close>✕</button></div>
     <div class="modal-body">
-      <p class="muted">Smart Menyu Egasi ilovasida chiqqan 8 belgili kodni kiriting.</p>
+      <p class="muted">Smart Menyu Egasi ilovasida chiqqan 8 belgili kodni kiriting. Egasi ilovasidagi kod oynasini yopmang.</p>
       <label class="field"><span>Kod</span><input id="rc" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX"></label>
+      <p class="muted" id="rcSt"></p>
     </div>
     <div class="modal-actions"><button class="btn btn-ghost" data-close>Bekor qilish</button><button class="btn btn-primary" id="ok">Yuborish</button></div>`, {
     onMount(m, close) {
+      const st = (t, err = false) => { const el = m.querySelector("#rcSt"); el.textContent = t; el.style.color = err ? "#E8846B" : ""; };
+      let cl = null;
+      m.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => { try { cl?.end(true); } catch {} }));
       m.querySelector("#ok").addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        const fail = (msg) => { st(msg, true); try { cl?.end(true); } catch {} cl = null; btn.disabled = false; btn.textContent = "Qayta yuborish"; };
         const code = m.querySelector("#rc").value.toUpperCase().replace(/[^0-9A-Z]/g, "");
-        if (code.length !== 8) return toast("Kod 8 belgidan iborat", { kind: "error" });
-        const k = await restaurantKey();
-        if (!k || !window.mqtt) return toast("Planshet ruxsatnomasi topilmadi", { kind: "error" });
-        const btn = e.currentTarget; btn.disabled = true; btn.textContent = "Yuborilmoqda...";
-        const fail = (msg) => { toast(msg, { kind: "error", timeout: 6000 }); btn.disabled = false; btn.textContent = "Yuborish"; };
-        const base = `${V2}/${k.rid}/recover`;
-        const cl = window.mqtt.connect(brokerUrl(), { ...brokerOpts(), clientId: `menyu_rc_${Math.random().toString(16).slice(2, 8)}`, clean: true, reconnectPeriod: 0, connectTimeout: 8000 });
-        const t = setTimeout(() => { cl.end(true); fail("Egasining so'rovi topilmadi. Egasi ilovasida kod ochiq turganini tekshiring."); }, 8000);
-        cl.on("error", () => { clearTimeout(t); cl.end(true); fail("Server bilan aloqa yo'q"); });
-        cl.on("connect", () => cl.subscribe(`${base}/req`));
-        cl.on("message", async (_, payload) => {
-          let req;
-          try { req = JSON.parse(payload.toString()); } catch { return; }
-          if (!req?.pub || (await fingerprint(req.pub)) !== code) { clearTimeout(t); cl.end(true); return fail("Kod mos kelmadi. Egasi ilovasidagi kodni qayta tekshiring."); }
-          clearTimeout(t);
-          const eph = await newEphemeral();
-          const wrapped = await wrapFor(eph.priv, req.pub, k.raw, `${k.rid}/recover`);
-          // Ruxsatnoma ham qo'shiladi: serverdagisi yo'qolgan bo'lsa, egasi uni shundan oladi (egasining imzosi bilan)
-          const ans = { eph: eph.pub, wrapped, dev: { id: k.dev.id, pub: k.dev.pub, name: k.name }, lic: k.lic, at: Date.now() };
-          cl.publish(`${base}/ans`, JSON.stringify(ans), { qos: 1, retain: true }, () => {
-            cl.end();
-            close();
-            toast("Yuborildi. Egasi ilovasida restoran tiklandi.", { kind: "ok", timeout: 6000 });
+        if (code.length !== 8) return fail("Kod 8 belgidan iborat bo'lishi kerak.");
+        btn.disabled = true; btn.textContent = "Yuborilmoqda...";
+        try {
+          st("Planshet kaliti o'qilmoqda...");
+          const k = await restaurantKey();
+          if (!k) return fail("Bu planshetning ruxsatnomasi topilmadi.");
+          if (!window.mqtt) return fail("Ilova to'liq yuklanmagan. Ilovani yopib, qayta oching.");
+          st("Serverga ulanmoqda...");
+          const base = `${V2}/${k.rid}/recover`;
+          let sent = false;
+          cl = window.mqtt.connect(brokerUrl(), { ...brokerOpts(), clientId: `menyu_rc_${Math.random().toString(16).slice(2, 8)}`, clean: true, reconnectPeriod: 2000, connectTimeout: 10000 });
+          const mine = cl;
+          const t = setTimeout(() => { if (cl === mine && !sent) fail(`Egasining so'rovi kelmadi (restoran: ${k.rid}). Egasi ilovasida shu restoran kodi bilan kod ochiq turganini tekshiring.`); }, 30000);
+          cl.on("error", (er) => st(`Server bilan aloqa: ${er?.message || "xato"}. Qayta urinilmoqda...`, true));
+          cl.on("connect", () => { st("Egasining so'rovi kutilmoqda..."); cl.subscribe(`${base}/req`, { qos: 1 }); });
+          cl.on("message", async (_, payload) => {
+            if (sent || cl !== mine) return;
+            let req;
+            try { req = JSON.parse(payload.toString()); } catch { return; }
+            if (!req?.pub) return;
+            if ((await fingerprint(req.pub)) !== code) { st("Serverdagi kod boshqacha. Egasi ilovasidagi eng oxirgi kodni kiriting.", true); return; }
+            sent = true;
+            clearTimeout(t);
+            st("Kalit yuborilmoqda...");
+            const eph = await newEphemeral();
+            const wrapped = await wrapFor(eph.priv, req.pub, k.raw, `${k.rid}/recover`);
+            // Ruxsatnoma ham qo'shiladi: serverdagisi yo'qolgan bo'lsa, egasi uni shundan oladi (egasining imzosi bilan)
+            const ans = JSON.stringify({ eph: eph.pub, wrapped, dev: { id: k.dev.id, pub: k.dev.pub, name: k.name }, lic: k.lic, at: Date.now() });
+            // Bir necha marta yuboramiz: egasi ilovasi bir lahza uzilib qolgan bo'lsa ham yetib boradi
+            let n = 0;
+            const push = () => { mine.publish(`${base}/ans`, ans, { qos: 1, retain: true }); if (++n >= 5) { clearInterval(iv); setTimeout(() => mine.end(), 1500); } };
+            const iv = setInterval(push, 3000);
+            push();
+            st("✓ Yuborildi. Egasi ilovasida restoran bir necha soniyada paydo bo'ladi.");
+            btn.textContent = "Yuborildi";
+            setTimeout(close, 6000);
           });
-        });
+        } catch (er) {
+          fail(`Xato: ${er?.message || er}`);
+        }
       });
     }
   });
