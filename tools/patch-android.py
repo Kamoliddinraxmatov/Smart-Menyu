@@ -21,8 +21,12 @@ perms = [
     "android.permission.DISABLE_KEYGUARD",
     "android.permission.VIBRATE",
     "android.permission.REQUEST_INSTALL_PACKAGES",
+    "android.permission.CAMERA",  # "Qayta tashrif" kuponini old kamera bilan skanerlash
 ]
 add = "".join(f'    <uses-permission android:name="{p}" />\n' for p in perms if p not in s)
+if "android.hardware.camera" not in s:
+    add += '    <uses-feature android:name="android.hardware.camera" android:required="false" />\n'
+
 s = s.replace("<application", add + "\n    <application", 1)
 comp = '''
         <service android:name=".KitchenService" android:exported="false" android:foregroundServiceType="specialUse">

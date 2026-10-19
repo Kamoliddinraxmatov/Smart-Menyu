@@ -1224,3 +1224,96 @@ label:has(> .file-overlay) {
 .plan-feats small {
   color: var(--muted);
 }
+.wb-bot {
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+.wb-bot.on a {
+  color: inherit;
+}
+.wb-bot.off {
+  color: var(--muted);
+  font-weight: 500;
+}
+.wb-actions {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.wb-send-row {
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.wb-send-row p {
+  margin: 0;
+  flex: 1;
+}
+.wb-li {
+  align-items: center;
+}
+.wb-li .li-main small {
+  display: block;
+}
+.wb-code {
+  font-family: ui-monospace, monospace;
+  letter-spacing: .06em;
+}
+.wb-st {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--line);
+  white-space: nowrap;
+}
+.wb-st.ok {
+  background: rgba(46, 160, 67, .16);
+  color: #2ea043;
+}
+.wb-st.bad {
+  background: rgba(218, 54, 51, .14);
+  color: #da3633;
+}
+.wb-st.new {
+  background: rgba(212, 160, 23, .18);
+  color: #b7860b;
+}
+.wb-toggles {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 14px;
+}
+.wb-preview {
+  white-space: pre-wrap;
+  font: inherit;
+  background: var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 0;
+}
+.wb-qrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.wb-qrs figure {
+  margin: 0;
+  text-align: center;
+  background: #fff;
+  color: #111;
+  border-radius: 12px;
+  padding: 10px;
+}
+.wb-qrs img {
+  width: 100%;
+  image-rendering: pixelated;
+}
+.wb-qrs figcaption {
+  font-weight: 700;
+}
+.wb-li .li-main b,
+.wb-li .li-main .wb-code {
+  display: inline;
+}

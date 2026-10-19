@@ -33,3 +33,14 @@ Ilova avval yangi serverga ulanib ko'radi. Ulana olmasa, hech narsa o'zgarmaydi.
 ## Xavfsizlik
 - Server faqat login va parol bilan ishlaydi.
 - Restoran ma'lumotlarini faqat shu restoranning tasdiqlangan planshetlari o'qiy oladi. Server egasi ham o'qiy olmaydi.
+
+## Telegram botlar ("Qayta tashrif")
+Serverda restoranlarning Telegram botlarini yurituvchi xizmat ham ishga tushadi (`bot/`). Uni alohida sozlash shart emas.
+1. Restoran uchun Telegram'da **@BotFather** → `/newbot` bilan bot oching va tokenini nusxalang.
+2. **Smart Menyu Egasi** ilovasida restoran sahifasidagi **Telegram bot** bo'limiga tokenni qo'ying va **Saqlash**ni bosing.
+3. Bir necha soniyada "✓ @bot_nomi ishlayapti" chiqadi. Restoran boshqaruvida **Qayta tashrif → Stollar uchun QR kodlar** orqali stol QR kodlarini chop eting.
+
+Bot faqat Biznes va Premium tariflarida ishlaydi: tarif tushirilsa yoki restoran to'xtatilsa, o'zi to'xtaydi.
+Token faqat shu serverdagi bot xizmati o'qiy oladigan shaklda shifrlanib yuboriladi.
+
+Yangilash (yangi versiya chiqqanda): serverda `cd Smart-Menyu && git pull && cd server && sudo bash setup.sh server.smartmenyu.uz`.

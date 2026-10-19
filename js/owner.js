@@ -7,7 +7,7 @@ import { OWNER } from "./owner-key.js";
 import { V2, DEFAULT_BROKER } from "./license.js";
 import { createStore } from "./sync.js";
 import { DEFAULT_CONFIG } from "./defaults.js";
-import { PLANS as TARIFFS, FEATURES, planOf } from "./plan.js";
+import { PLANS as TARIFFS, FEATURES, planOf, has } from "./plan.js";
 import {
   passKey, open, seal, importSignKey, sign, importVerifyKey, verify, newEphemeral, wrapFor, genDataKey, importDataKey,
   prettyId, fingerprint, kvGet, kvSet, kvDel, b64, rand, genDeviceKeys, exportPub, unwrapWith
@@ -217,7 +217,7 @@ function connect() {
   client = window.mqtt.connect(brokerOf(), { ...authOf(), clientId: `menyu_owner_${Math.random().toString(16).slice(2, 10)}`, clean: true, keepalive: 30, reconnectPeriod: 2000 });
   client.on("connect", () => {
     online = true;
-    client.subscribe([`${V2}/_owner/${ownerId}/state`, `${V2}/+/reg/+`, `${V2}/+/lic`], { qos: 1 }, (err) => { if (!err) setTimeout(remoteArrived, 8000); });
+    client.subscribe([`${V2}/_owner/${ownerId}/state`, `${V2}/+/reg/+`, `${V2}/+/lic`, `${V2}/_bot/pub`, `${V2}/+/wb/info`], { qos: 1 }, (err) => { if (!err) setTimeout(remoteArrived, 8000); });
     render();
   });
   client.on("close", () => { if (online) { online = false; render(); } });
@@ -251,9 +251,11 @@ async function onMessage(topic, text) {
     if (changedRemote) backup();
     return;
   }
+  if (topic === `${V2}/_bot/pub`) { onBotPub(text); return; }
   const parts = topic.split("/");
   const rid = parts[2];
   if (!RID_RE.test(rid || "") || rid in Object.prototype) return;
+  if (parts[3] === "wb" && parts[4] === "info") { onBotInfo(rid, topic, text); return; }
   if (parts[3] === "reg") {
     const id = parts[4];
     if (!DEV_RE.test(id || "")) return;
@@ -401,6 +403,15 @@ async function publishLicense(r, save = true) {
     phone: S.settings.phone || "", eph: eph.pub, dev, max: r.max || 5
   };
   if (planOf(r.plan)) lic.plan = r.plan;
+  // "Qayta tashrif" boti: token faqat bot xizmati o'qiy oladi, bot kaliti esa restoran planshetlari uchun
+  if (r.bot?.token && S.settings.botPub) {
+    try {
+      lic.wb = {
+        tok: await wrapFor(eph.priv, S.settings.botPub, JSON.stringify({ token: r.bot.token, k: r.bot.k }), `${r.rid}/bot`),
+        k: await seal(await importDataKey(r.key), r.bot.k, `${r.rid}/wbk`)
+      };
+    } catch (e) { console.warn("bot:", e); }
+  }
   if (S.settings.broker) {
     lic.broker = S.settings.broker;
     if (S.settings.mqttUser) lic.mqtt = { user: S.settings.mqttUser, pass: S.settings.mqttPass || "" };
@@ -727,6 +738,8 @@ function renderRest(r) {
         ${(r.payments || []).slice().reverse().map((p) => `<div class="ow-pay"><span>${fmtDate(p.at)}</span><b>+${PLANS.find(([m]) => m === p.months)?.[1] || p.months + " oy"}${planOf(p.plan) ? ` · ${planOf(p.plan).name}` : ""}</b><span>${p.amount ? money(p.amount) : "—"}</span><small>${fmtDate(p.from)} → ${fmtDate(p.to)}</small></div>`).join("") || `<p class="ow-hint">Hali to'lov yo'q.</p>`}
       </section>
 
+      ${botSection(r)}
+
       <section class="ow-sec">
         <h3>Restoran</h3>
         <div class="ow-row-btns">
@@ -775,8 +788,85 @@ function renderRest(r) {
     await publishLicense(r); render();
   }));
   $("#edit").addEventListener("click", () => editInfo(r));
+  bindBot(r);
   $("#brand").addEventListener("click", () => editBrand(r));
   $("#pin").addEventListener("click", () => adminPassword(r));
+}
+
+// ---------- "Qayta tashrif" uchun restoranning Telegram boti ----------
+// Bot xizmati serverda ishlaydi va o'z ochiq kalitini e'lon qiladi (_bot/pub). Birinchi ko'rilgan kalit eslab qolinadi:
+// keyin boshqa kalit chiqsa (kimdir o'zini bot xizmati qilib ko'rsatmoqchi), egasi o'zi tasdiqlamaguncha token unga berilmaydi.
+const botInfo = Object.create(null);
+let botPubSeen = null;
+async function onBotPub(text) {
+  let pub = null;
+  try { const m = JSON.parse(text); if (m.pub?.kty === "EC" && m.pub.crv === "P-256" && m.pub.x && m.pub.y) pub = { kty: "EC", crv: "P-256", x: m.pub.x, y: m.pub.y }; } catch {}
+  botPubSeen = pub;
+  if (pub && !S.settings.botPub) {
+    S.settings.botPub = pub; persist();
+    for (const r of Object.values(S.rests)) if (r.bot?.token) await publishLicense(r, false);
+    persist();
+  }
+  if (ui.view === "rest") render();
+}
+const botPubChanged = () => !!(botPubSeen && S.settings.botPub && (botPubSeen.x !== S.settings.botPub.x || botPubSeen.y !== S.settings.botPub.y));
+async function onBotInfo(rid, topic, text) {
+  const r = S.rests[rid];
+  if (!r?.bot?.k || !text) return;
+  try { botInfo[rid] = JSON.parse(await open(await importDataKey(r.bot.k), text, topic)); } catch { return; }
+  if (ui.view === "rest" && ui.rid === rid) render();
+}
+const TOKEN_RE = /^\d{6,12}:[A-Za-z0-9_-]{30,}$/;
+function botSection(r) {
+  const info = botInfo[r.rid];
+  const allowed = has("winback", planOf(r.plan) ? r.plan : "premium");
+  let st = "";
+  if (!r.bot?.token) st = "Bot ulanmagan.";
+  else if (!S.settings.botPub) st = "⏳ Serverdagi bot xizmati topilmadi. U o'z serveringizda ishga tushgach, bot o'zi ulanadi.";
+  else if (!allowed) st = "⏸ Tarifda \"Qayta tashrif\" yo'q: bot to'xtatilgan.";
+  else if (!info) st = "⏳ Bot xizmati javobini kutyapmiz...";
+  else if (info.ok) st = `✓ <b>@${esc(info.user)}</b> ishlayapti`;
+  else st = info.err === "token" ? "⚠️ Token noto'g'ri. @BotFather'dan qayta nusxalang." : "⚠️ Bot Telegram'ga ulana olmadi, o'zi qayta urinadi.";
+  return `<section class="ow-sec">
+    <h3>Telegram bot <small>Qayta tashrif</small></h3>
+    ${botPubChanged() ? `<p class="ow-hint ow-over">⚠️ Serverdagi bot xizmatining kaliti o'zgardi. Bot xizmatini o'zingiz qayta o'rnatgan bo'lsangiz, yangisini qabul qiling. Aks holda bosmang.</p>
+      <div class="ow-row-btns"><button class="btn btn-ghost" id="botAccept">Yangi kalitni qabul qilish</button></div>` : ""}
+    <p class="ow-hint">${st}</p>
+    ${allowed ? "" : `<p class="ow-hint">Bot faqat Biznes va Premium tariflarida ishlaydi.</p>`}
+    <ol class="ow-steps">
+      <li>Telegram'da <b>@BotFather</b> ni oching va <b>/newbot</b> yozing.</li>
+      <li>Botga restoran nomini bering, keyin username (oxiri <b>bot</b> bilan, masalan <b>yoshlar_cafe_bot</b>).</li>
+      <li>BotFather bergan tokenni shu yerga qo'ying.</li>
+    </ol>
+    <label class="field"><span>Bot tokeni</span><input id="botTok" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="123456789:AA..." value="${esc(r.bot?.token || "")}"></label>
+    <div class="ow-row-btns">
+      <button class="btn btn-primary" id="botSave">Saqlash</button>
+      ${r.bot?.token ? `<button class="btn btn-ghost" id="botOff">Botni o'chirish</button>` : ""}
+    </div>
+  </section>`;
+}
+function bindBot(r) {
+  const $ = (q) => app.querySelector(q);
+  $("#botSave").addEventListener("click", async () => {
+    const tok = $("#botTok").value.trim();
+    if (!TOKEN_RE.test(tok)) return toast("Token noto'g'ri ko'rinishda. BotFather bergan to'liq tokenni qo'ying.", { kind: "error", timeout: 6000 });
+    if (tok === r.bot?.token) return toast("Saqlangan", { kind: "ok" });
+    r.bot = { token: tok, k: r.bot?.k || await genDataKey(), at: Date.now() };
+    delete botInfo[r.rid];
+    await publishLicense(r); render();
+    toast("Bot saqlandi. Bir necha soniyada ishga tushadi.", { kind: "ok" });
+  });
+  $("#botOff")?.addEventListener("click", async () => {
+    if (!(await confirmBox(`"${esc(r.name)}" boti o'chirilsinmi? Mijozlar ro'yxati restoran planshetlarida qoladi.`, "O'chirish", { danger: true }))) return;
+    delete r.bot; delete botInfo[r.rid];
+    await publishLicense(r); render();
+  });
+  $("#botAccept")?.addEventListener("click", async () => {
+    if (!(await confirmBox("Yangi bot xizmati kaliti qabul qilinsinmi? Barcha restoran botlarining tokeni unga beriladi.", "Qabul qilish", { danger: true }))) return;
+    S.settings.botPub = botPubSeen; persist();
+    for (const x of Object.values(S.rests)) if (x.bot?.token) await publishLicense(x, false);
+    persist(); render();
+  });
 }
 
 // Tarifda ochiq va yopiq funksiyalar ro'yxati

@@ -1,4 +1,4 @@
-# Smart Menyu o'z serveri: Mosquitto (MQTT) + Caddy (avtomatik HTTPS sertifikat).
+# Smart Menyu o'z serveri: Mosquitto (MQTT) + Caddy (avtomatik HTTPS sertifikat) + Telegram botlar (Qayta tashrif).
 # Ishga tushirish: README.md ga qarang.
 services:
   mqtt:
@@ -20,6 +20,20 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
+  bot:
+    build:
+      context: ..
+      dockerfile: server/bot/Dockerfile
+    restart: always
+    depends_on:
+      - mqtt
+    environment:
+      - MQTT_URL=${BOT_MQTT_URL:-ws://mqtt:9001}
+      - MQTT_USER=smartmenyu
+      - MQTT_PASS=${MQTT_PASS}
+    volumes:
+      - bot-data:/data
 volumes:
+  bot-data:
   mqtt-data:
   caddy-data:
