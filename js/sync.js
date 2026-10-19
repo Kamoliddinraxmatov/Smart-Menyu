@@ -112,7 +112,8 @@ export function createStore(rid, opts = {}) {
       notifyQueued = true;
       setTimeout(() => {
         notifyQueued = false;
-        save(cacheKey, { config: state.config, stop: state.stop, orders: state.orders });
+        // Sozlama serverdan kelmaguncha keshga yozilmaydi: aks holda keyingi safar standart (namoyish) menyu "yuklangan" deb olinadi
+        save(cacheKey, { config: state.configLoaded ? state.config : cached?.config, stop: state.stop, orders: state.orders });
         emit({ type: "render" });
       }, 30);
     }
