@@ -43,4 +43,29 @@ Serverda restoranlarning Telegram botlarini yurituvchi xizmat ham ishga tushadi 
 Bot faqat Biznes va Premium tariflarida ishlaydi: tarif tushirilsa yoki restoran to'xtatilsa, o'zi to'xtaydi.
 Token faqat shu serverdagi bot xizmati o'qiy oladigan shaklda shifrlanib yuboriladi.
 
+## AI ofis (sotuvga yordamchi)
+Serverda Smart Menyu sotuvini tayyorlaydigan AI ofis ham ishga tushadi (`office/`). Unda 5 ta AI xodim bor: direktor, mijoz qidiruvchi, sotuv boshlig'i, kontent va nazoratchi. Ular tekin AI modellarda ishlaydi, siz ularni Telegram orqali boshqarasiz.
+
+**Ofis o'zi hech kimga yozmaydi.** Har bir xabar avval tekshiriladi: "14 kun bepul", chegirma, kafolat va ro'yxatda yo'q narx bo'lsa, matn qayta yoziladi. Keyin xabar sizga ✅/❌ tugmalari bilan keladi. Tasdiqlasangiz, bot matnni va restoran kontaktini beradi, uni o'zingiz yuborasiz.
+
+1. Telegram'da **@BotFather** → `/newbot` bilan ofis uchun alohida bot oching.
+2. Tekin AI kalitlarini oling (kamida bittasi kerak, uchtasi bo'lsa majlisda 3 xil model gapiradi): [Gemini](https://aistudio.google.com/apikey), [Groq](https://console.groq.com/keys), [OpenRouter](https://openrouter.ai/keys).
+3. Serverda:
+   ```
+   cd Smart-Menyu/server
+   cp office/office.env.example office.env
+   nano office.env        # bot tokeni va kalitlarni yozing
+   docker compose up -d --build office
+   ```
+4. Botga `/start` yozing. U chat ID'ingizni aytadi: uni `office.env` dagi `OWNER_CHAT_ID=` ga yozing va `docker compose up -d office` ni qayta bering. Shundan keyin ofis faqat sizni tinglaydi.
+
+Buyruqlar:
+- **CSV fayl** yuborish: restoranlar ro'yxati (ustunlar: nomi, manzil, telefon, instagram, stol, turi, izoh). Ofis ularni baholaydi va eng yaxshilariga xabar qoralamasini yozadi (kuniga 20 tagacha).
+- `/xabarlar`: navbatdagi restoranlar uchun yana qoralama yozadi.
+- `/vazifa <matn>`: direktor vazifani xodimlarga bo'lib beradi, masalan `/vazifa Samarqand restoranlari uchun Instagram post`.
+- `/majlis [mavzu]`: xodimlar taklif beradi, nazoratchi tanqid qiladi, hamma ovoz beradi. Har dushanba 09:00 da majlis o'zi o'tadi. Direktor yangi xodim kerak deb hisoblasa, vakansiya kartasi keladi: tasdiqlasangiz, yangi AI xodim qo'shiladi.
+- `/holat`: xodimlar, restoranlar va bugungi AI limitlari.
+
+Mijozga nimalar aytilishi mumkinligi `office/facts.md` faylida yozilgan. Narx yoki mahsulot o'zgarsa, shu faylni (va narx bo'lsa `office/guard.mjs` dagi `PRICES`ni) yangilang. Telefon raqamlar faqat shu serverda saqlanadi va AI'ga yuborilmaydi.
+
 Yangilash (yangi versiya chiqqanda): serverda `cd Smart-Menyu && git pull && cd server && sudo bash setup.sh server.smartmenyu.uz`.
