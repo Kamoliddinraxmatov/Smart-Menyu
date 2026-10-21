@@ -6,3 +6,4 @@ app-owner/android/
 app-agent/node_modules/
 app-agent/www/
 app-agent/android/
+server/office.env
