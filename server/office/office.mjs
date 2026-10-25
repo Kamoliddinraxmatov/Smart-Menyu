@@ -4,8 +4,9 @@
 // AI'dan o'tadi va Kamoliddinga "✅ / ❌" tugmalari bilan keladi. Tasdiqlansa, bot matnni va restoran kontaktini beradi,
 // Kamoliddin o'zi yuboradi (Telegram/Instagram spam qoidalari buzilmaydi, akkaunt bloklanmaydi).
 //
-// Buyruqlar: /holat, /vazifa <matn>, /majlis [mavzu], /xabarlar, CSV fayl = restoranlar ro'yxati.
-// Har dushanba 09:00 (Toshkent) majlis o'zi o'tadi. Direktor yangi xodim so'rasa, vakansiya kartasi keladi.
+// Buyruqlar: /holat, /vazifa <matn>, /majlis [mavzu], /kengash [mavzu], /raqamlar <matn>, /xabarlar, CSV fayl = restoranlar ro'yxati.
+// Har dushanba 09:00 (Toshkent) boshqaruv kengashi o'zi yig'iladi (kengash bo'sh bo'lsa, xodimlar majlisi).
+// Direktor yangi xodim so'rasa, vakansiya kartasi keladi. Kim ishlashi profile.json da (roles.mjs ga qarang).
 //
 // Sozlamalar (office.env): OFFICE_BOT_TOKEN, OWNER_CHAT_ID, GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY,
 // LLM_DAILY_LIMIT, OFFICE_DRAFTS_PER_DAY, DATA_DIR, TG_API.
@@ -13,8 +14,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createLLM } from "./llm.mjs";
-import { allRoles } from "./roles.mjs";
-import { scoreLeads, draftMessage, runTask, council, vacancy } from "./work.mjs";
+import { allRoles, BOARD, PROFILE } from "./roles.mjs";
+import { scoreLeads, draftMessage, runTask, council, boardMeeting, vacancy } from "./work.mjs";
 
 const env = process.env;
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -26,7 +27,7 @@ const DRAFTS = Number(env.OFFICE_DRAFTS_PER_DAY || 20);
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
 // ---------- Holat ----------
-let state = { offset: 0, usage: {}, leads: [], approvals: {}, roles: [], decisions: [], lastMajlis: "", seq: 0 };
+let state = { offset: 0, usage: {}, leads: [], approvals: {}, roles: [], decisions: [], metrics: [], lastMajlis: "", seq: 0 };
 const stateFile = path.join(DATA, "state.json");
 async function saveState() {
   await fs.mkdir(DATA, { recursive: true });
@@ -147,6 +148,26 @@ async function majlis(topic) {
   }
 }
 
+// ---------- Boshqaruv kengashi ----------
+// Kengash oxirgi raqamlar, o'tgan qarorlar va ularning vazifalariga qarab gapiradi: shunda har hafta o'tgan haftani tekshiradi.
+function boardContext() {
+  const m = state.metrics.slice(-2).map((x) => `${x.at.slice(0, 10)}: ${x.text}`).join("\n") || "kiritilmagan (egasidan /raqamlar so'rang)";
+  const last = state.decisions.slice(-2).map((d) =>
+    `${d.at.slice(0, 10)} qaror: ${d.text}${d.tasks?.length ? `\nVazifalar: ${d.tasks.map((t) => `${t.vazifa} (${t.kim})`).join("; ")}` : ""}`).join("\n") || "yo'q";
+  return `Haftalik raqamlar:\n${m}\nO'tgan qarorlar:\n${last}\nOfis holati: ${stats()}`;
+}
+async function kengash(topic) {
+  await send(`👔 Boshqaruv kengashi yig'ildi: ${topic}\nA'zolar: ${BOARD.map((b) => b.title).join(", ")}`);
+  const r = await boardMeeting(ctx(), topic, boardContext());
+  const lines = r.proposals.map((p, i) => `${i + 1}. ${p.title} [${p.provider}] — ${r.tally[i]} ovoz\n${p.text}`).join("\n\n");
+  const tasks = r.tasks.map((t, i) => `${i + 1}. ${t.vazifa}\n   Kim: ${t.kim}${t.natija ? `. O'lchov: ${t.natija}` : ""}`).join("\n");
+  const id = nextId();
+  state.approvals[id] = { type: "majlis", topic, text: `${r.winner.title}: ${r.winner.text}`, tasks: r.tasks };
+  await send(`👔 Kengash: ${topic}\n\n${lines}\n\n🔎 Nazoratchi tanqidi:\n${r.critique}\n\n` +
+    `🗳 Qaror: ${r.winnerNo}-taklif (${r.winner.title}).\n\n📋 Keyingi hafta vazifalari:\n${tasks || "direktor vazifa chiqara olmadi"}` +
+    `${r.problems.length ? `\n\n⚠️ Tekshiruv: ${r.problems.join("; ")} — mijozga shu holda aytmang.` : ""}\n\nTasdiqlaysizmi?`, okNo(id));
+}
+
 // ---------- Tasdiqlash tugmalari ----------
 async function decide(id, yes) {
   const a = state.approvals[id];
@@ -162,7 +183,7 @@ async function decide(id, yes) {
     return `✅ ${l.name}: tasdiqlandi.`;
   }
   if (a.type === "majlis") {
-    if (yes) state.decisions.push({ at: new Date().toISOString(), topic: a.topic, text: a.text });
+    if (yes) state.decisions.push({ at: new Date().toISOString(), topic: a.topic, text: a.text, tasks: a.tasks || [] });
     return yes ? "✅ Majlis qarori qabul qilindi va ofis xotirasiga yozildi." : "❌ Majlis qarori rad etildi.";
   }
   if (a.type === "vakansiya") {
@@ -175,10 +196,12 @@ async function decide(id, yes) {
 }
 
 // ---------- Buyruqlar ----------
-const HELP = `Smart Menyu AI ofisi 🏢
+const HELP = `${PROFILE.company} AI ofisi 🏢
 /holat — ofis holati va AI limitlari
 /vazifa <matn> — direktor vazifani xodimlarga bo'lib beradi
 /majlis [mavzu] — xodimlar munozara qilib ovoz beradi
+/kengash [mavzu] — boshqaruv kengashi qaror va haftalik vazifalar chiqaradi
+/raqamlar <matn> — haftalik raqamlar (sotuv, xarajat, yangi mijozlar), kengash shularga qarab gapiradi
 /xabarlar — navbatdagi restoranlarga xabar qoralamasi
 CSV fayl yuboring — restoranlar ro'yxati (ustunlar: nomi, manzil, telefon, instagram, stol, turi, izoh)
 
@@ -199,7 +222,7 @@ async function onMessage(m) {
   if (cmd === "/start" || cmd === "/yordam") return send(HELP);
   if (cmd === "/holat") {
     const u = llm.usage().map((p) => `${p.label}: ${p.used}/${p.limit}`).join(", ") || "AI kaliti yo'q";
-    return send(`🏢 Xodimlar: ${allRoles(state).map((r) => r.title).join(", ")}\n📊 ${stats()}\n🧠 Bugun AI so'rovlari: ${u}\n⏳ Tasdiq kutayotgan kartalar: ${Object.keys(state.approvals).length}`);
+    return send(`🏢 Xodimlar: ${allRoles(state).map((r) => r.title).join(", ")}\n👔 Kengash: ${BOARD.map((b) => b.title).join(", ") || "yo'q"}\n📊 ${stats()}\n🧠 Bugun AI so'rovlari: ${u}\n⏳ Tasdiq kutayotgan kartalar: ${Object.keys(state.approvals).length}`);
   }
   if (cmd === "/vazifa") {
     if (!arg) return send("Vazifani yozing: /vazifa Samarqanddagi restoranlar uchun Instagram post");
@@ -212,6 +235,13 @@ async function onMessage(m) {
     return;
   }
   if (cmd === "/majlis") { job("Majlis", () => majlis(arg || "Keyingi hafta sotuvni qanday oshiramiz?")); return; }
+  if (cmd === "/kengash") { job("Kengash", () => kengash(arg || "Keyingi hafta biznesni qanday o'stiramiz?")); return; }
+  if (cmd === "/raqamlar") {
+    if (!arg) return send("Raqamlarni yozing: /raqamlar sotuv 12 mln, xarajat 8 mln, yangi mijoz 5, demo 3");
+    state.metrics = [...state.metrics, { at: new Date().toISOString(), text: arg.slice(0, 1000) }].slice(-12);
+    await saveState();
+    return send("📈 Raqamlar saqlandi. Kengash keyingi majlisda shularga qaraydi.");
+  }
   if (cmd === "/xabarlar") { job("Xabarlar", draftBatch); return; }
   return send(HELP);
 }
@@ -232,7 +262,8 @@ function weekly() {
   const day = t.toISOString().slice(0, 10);
   if (t.getUTCDay() === 1 && t.getUTCHours() >= 9 && state.lastMajlis !== day && OWNER) {
     state.lastMajlis = day;
-    job("Haftalik majlis", () => majlis("Haftalik majlis: o'tgan haftani baholash va keyingi hafta rejasi"));
+    const topic = "Haftalik majlis: o'tgan haftani baholash va keyingi hafta rejasi";
+    job("Haftalik majlis", () => (BOARD.length ? kengash(topic) : majlis(topic)));
   }
 }
 

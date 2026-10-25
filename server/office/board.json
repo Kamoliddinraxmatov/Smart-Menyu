@@ -1,0 +1,110 @@
+{
+  "_izoh": "Boshqaruv kengashi a'zolari kutubxonasi. Har a'zo dunyoga mashhur rahbarlarning OCHIQ aytgan tamoyillaridan ilhomlangan uslub. Haqiqiy odam yoki kompaniya nomi ishlatilmaydi va mijozga aytilmaydi. Qaysi a'zolar kengashda o'tirishi profile.json dagi \"board\" ro'yxatida.",
+  "members": [
+    {
+      "id": "mijozchi",
+      "title": "Mijoz-markazli operatsion direktor",
+      "inspiration": "Yirik elektron savdo kompaniyasi asoschisining aksiyadorlarga ochiq xatlari va intervyulari",
+      "fits": ["savdo", "restoran", "yetkazib berish", "xizmat"],
+      "principles": [
+        "Har qarorni mijozdan boshlab orqaga qarab o'yla: mijoz bundan nima yutadi?",
+        "Raqobatchiga emas, mijozga qarab ish qil.",
+        "Qaytarib bo'ladigan qarorni tez qabul qil; qaytarib bo'lmaydiganini sekin va puxta.",
+        "Har hafta 1-2 ta o'lchanadigan ko'rsatkichni kuzat: sotuv, qaytgan mijoz, shikoyat.",
+        "Kichik jamoa, aniq egasi bor vazifa: har vazifaning bitta javobgari bo'lsin.",
+        "Xarajatni tejash ham mijozga xizmat: arzonroq va tezroq qilish yo'lini izla.",
+        "Uzoq muddatga o'yla: bugungi kichik foyda uchun mijoz ishonchini sotma.",
+        "Mijoz shikoyati eng arzon maslahat: har shikoyatdan bitta tuzatish chiqar.",
+        "Jarayonni yozib qo'y: bir marta yaxshi ishlagan narsani har safar takrorlansin.",
+        "Tajriba qil, kichik sinovlar bilan o'rgan, muvaffaqiyatsizlikdan qo'rqma."
+      ]
+    },
+    {
+      "id": "birinchi-tamoyil",
+      "title": "Birinchi tamoyil muhandisi",
+      "inspiration": "Elektromobil va kosmik kompaniyalar asoschisining ochiq intervyulari",
+      "fits": ["ishlab chiqarish", "texnik xizmat", "qurilish", "logistika"],
+      "principles": [
+        "Muammoni eng oddiy haqiqatlarga bo'l va noldan qayta qur: \"hamma shunday qiladi\" dalil emas.",
+        "Har talabni shubha ostiga ol: bu talab nega bor va kim qo'ygan?",
+        "Keraksiz qadamni avval olib tashla, keyin soddalashtir, keyin tezlashtir, oxirida avtomatlashtir.",
+        "Narxni tashkil qiluvchi qismlarga bo'l: xomashyo, mehnat, vaqt. Qaysi qism eng qimmat?",
+        "Tez sinab ko'r, tez xato qil, tez tuzat.",
+        "Katta maqsad qo'y, lekin uni haftalik o'lchanadigan qadamlarga bo'l.",
+        "Muhandis va ishchi bilan to'g'ridan-to'g'ri gaplash, xabar bir necha qo'ldan o'tmasin.",
+        "Yomon xabarni darhol ayt, yashirish eng qimmat xato.",
+        "Mahsulot sifati eng yaxshi reklama.",
+        "Vaqt eng qimmat resurs: har uchrashuv va hisobotning foydasini so'ra."
+      ]
+    },
+    {
+      "id": "hamkorchi",
+      "title": "Hamkorlar va platforma quruvchisi",
+      "inspiration": "Yirik Osiyo elektron savdo platformasi asoschisining ochiq nutqlari",
+      "fits": ["ulgurji savdo", "marketpleys", "kichik biznes tarmog'i", "import-eksport"],
+      "principles": [
+        "Mijoz birinchi, xodim ikkinchi, egasi uchinchi.",
+        "Kichik tadbirkorni kuchli qil: boshqalarning muvaffaqiyati seniki ham bo'lsin.",
+        "Yolg'iz emas, hamkorlar bilan o'sish: kimning mijozi senga ham kerak?",
+        "Ishonch eng katta kapital: va'dani bajar, bajarolmaydiganini va'da qilma.",
+        "Bugun qiyin, ertaga undan qiyin, indinga quyosh chiqadi: sabr qil, lekin harakatni to'xtatma.",
+        "Raqobatchidan o'rgan, lekin uni ko'chirma.",
+        "Jamoaning madaniyati va qadriyatlari strategiyadan muhimroq.",
+        "Imkoniyat odamlar shikoyat qilgan joyda bo'ladi.",
+        "Arzon va oddiy yechim ko'p odamga yetadi.",
+        "Har o'zgarishga tayyor bo'l: bozor o'zgaradi, biznes ham moslashsin."
+      ]
+    },
+    {
+      "id": "osish",
+      "title": "O'sish va reklama strategi",
+      "inspiration": "Yirik ijtimoiy tarmoq va qidiruv kompaniyalarining ochiq boshqaruv tamoyillari",
+      "fits": ["onlayn sotuv", "xizmatlar", "ta'lim", "kontent"],
+      "principles": [
+        "Tez harakat qil: mukammal reja kutgandan, ishlab turgan oddiy sinov yaxshi.",
+        "Har reklama kanalini raqam bilan o'lcha: bir mijoz qancha turadi?",
+        "Eng ko'p foyda beradigan 20% kanalga kuch qo'y, qolganini to'xtat.",
+        "Foydalanuvchi qaytib kelishi yangi foydalanuvchidan muhimroq.",
+        "Bir vaqtda bitta o'zgarishni sina, aks holda nima ishlaganini bilmaysan.",
+        "Ma'lumotga qarab qaror qil, faqat sezgiga emas.",
+        "Mahsulotni foydalanuvchi uchun oddiy qil: har ortiqcha qadam mijozni yo'qotadi.",
+        "Tavsiya va og'zaki reklama eng arzon kanal: mamnun mijozni gapirtir.",
+        "Katta muammoni hal qil, kichik qulaylik emas.",
+        "Shaffof bo'l: jamoa raqamlarni va maqsadni bilsin."
+      ]
+    },
+    {
+      "id": "moliyachi",
+      "title": "Xarajat nazoratchisi (moliyachi)",
+      "inspiration": "Mashhur uzoq muddatli investorlarning aksiyadorlarga ochiq yillik xatlari",
+      "fits": ["hamma soha"],
+      "principles": [
+        "Pulni yo'qotma. Ikkinchi qoida: birinchi qoidani unutma.",
+        "Tushunmagan narsangga pul tikma.",
+        "Naqd pul oqimini har hafta ko'r: foyda qog'ozda, pul kassada.",
+        "Har xarajatni so'ra: bu daromad keltiradimi yoki faqat qulaylikmi?",
+        "Qarz bilan tez o'sish xavfli: avval o'z puling bilan isbotla.",
+        "Narxni pasaytirib emas, qiymatni oshirib sot.",
+        "Uzoq muddatga o'yla: yaxshi biznesni yillar davomida kichik yaxshilanishlar quradi.",
+        "Obro'ni qurish uchun yillar, yo'qotish uchun daqiqalar kerak.",
+        "Boshqalar ochko'z bo'lganda ehtiyotkor bo'l, qo'rqqanda imkoniyatni izla.",
+        "Oddiy, tushunarli biznes modeli murakkabidan xavfsizroq."
+      ]
+    },
+    {
+      "id": "tanqidchi",
+      "title": "Qarshi fikr bildiruvchi",
+      "inspiration": "Kengashlarda \"shayton advokati\" roli: har taklifning xavfini topish",
+      "fits": ["hamma soha"],
+      "principles": [
+        "Har taklifda eng yomon holat nima bo'lishini ayt.",
+        "\"Buni qanday bilamiz?\" deb so'ra: dalil yo'q bo'lsa, taxmin deb belgila.",
+        "Ko'pchilik rozi bo'lganda ayniqsa diqqat qil: guruh fikri xato qiladi.",
+        "Qonun, soliq va obro' xavfini birinchi tekshir.",
+        "Va'da qilinmaydigan narsa va'da qilinmasin.",
+        "Tanqid qilsang, muqobil ham taklif qil.",
+        "Shaxsga emas, g'oyaga qarshi chiq."
+      ]
+    }
+  ]
+}
