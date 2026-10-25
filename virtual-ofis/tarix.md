@@ -230,7 +230,7 @@ Repo: `Kamoliddinraxmatov/Smart-Menyu`, papka `server/office/`. Ofis serverdagi 
 
 Server: TuronCloud, 1 vCPU / 1 GB / 10 GB, Ubuntu 24.04 (IP va host nomi ommaviy repoda yozilmaydi) (oyiga 100 000 so'm).
 
-1. Telegram'da **@BotFather** → `/newbot`, ofis uchun alohida bot oching, tokenini oling.
+1. Telegram'da `@BotFather` → `/newbot`, ofis uchun alohida bot oching, tokenini oling.
 2. Tekin AI kalitlari (kamida bittasi, uchtasi yaxshi): [Gemini](https://aistudio.google.com/apikey), [Groq](https://console.groq.com/keys), [OpenRouter](https://openrouter.ai/keys).
 3. Serverda:
    ```
