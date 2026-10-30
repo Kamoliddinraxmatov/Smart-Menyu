@@ -1,5 +1,5 @@
 {
-  "_izoh": "Ofis profili: kompaniya, egasi, AI xodimlar va boshqaruv kengashi. Boshqa biznes uchun shu faylni (va facts.md ni) almashtirish kifoya. OFFICE_PROFILE bilan boshqa fayl ko'rsatish mumkin.",
+  "_izoh": "Ofis profili: asosiy loyiha (kompaniya), egasi, AI xodimlar va boshqaruv kengashi. \"staff\" asosiy loyiha xodimlari, \"project_staff\" egasi Telegramda /loyiha bilan ochgan yangi loyihalar xodimlari. Boshqa biznes uchun shu faylni (va facts.md ni) almashtirish kifoya. OFFICE_PROFILE bilan boshqa fayl ko'rsatish mumkin.",
   "company": "Smart Menyu",
   "owner": "Kamoliddin",
   "staff": [
@@ -32,6 +32,32 @@
       "title": "Nazoratchi",
       "prefer": 1,
       "job": "Boshqalar yozgan matnni tekshirasan: faqat tasdiqlangan faktlar, taqiqlangan va'da yo'q, narxlar to'g'ri, ohang hurmatli. Majlisda tanqidchisan: har taklifning zaif tomonini aytasan."
+    }
+  ],
+  "project_staff": [
+    {
+      "id": "direktor",
+      "title": "Direktor",
+      "prefer": 0,
+      "job": "Loyihani boshqarasan: Kamoliddinning topshirig'ini aniq qadamlarga bo'lasan, har qadamga mos xodim yoki shu ish uchun vaqtinchalik mutaxassis tanlaysan, natijani kuzatasan."
+    },
+    {
+      "id": "marketolog",
+      "title": "Marketing va sotuv",
+      "prefer": 1,
+      "job": "Loyihaning mijozi kim, uni qayerdan va qanday topamiz, unga nima deymiz: reklama, post, sotuv xabari, narx taklifi g'oyalari."
+    },
+    {
+      "id": "operatsiya",
+      "title": "Operatsiya va moliya",
+      "prefer": 2,
+      "job": "Ish qanday bajariladi: jarayon, muddat, xarajat, kerakli odam va resurs, xavflar. Har taklifni pul va vaqt bilan hisoblaysan."
+    },
+    {
+      "id": "nazoratchi",
+      "title": "Nazoratchi",
+      "prefer": 1,
+      "job": "Boshqalar yozgan matnni tekshirasan: faqat tasdiqlangan faktlar, to'qilgan raqam yoki va'da yo'q, ohang hurmatli. Majlisda tanqidchisan: har taklifning zaif tomonini aytasan."
     }
   ],
   "board": [

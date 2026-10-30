@@ -5,17 +5,22 @@
 // Tasdiqlangan narxlar (so'm). Yangi narx paydo bo'lsa, shu yerga va facts.md ga birga qo'shing.
 export const PRICES = [299000, 440000, 599000, 950000, 1100000, 550000, 1050000, 1200000, 300000];
 
+// Har loyihada: AI bepul sinov, chegirma va kafolat va'da qilmaydi.
 const FORBIDDEN = [
-  [/\b14\s*(kun|kunlik|дн|day)/i, "\"14 kun\" va'da qilinmaydi"],
   [/bepul\s+sinov|sinov\s+bepul|tekin\s+sinov/i, "bepul sinov va'da qilinmaydi"],
   [/free\s+trial|trial\s+period/i, "bepul sinov va'da qilinmaydi"],
   [/бесплатн\w*\s+(тест|проб|период)|пробн\w*\s+период/i, "bepul sinov va'da qilinmaydi"],
   [/(chegirma|скидк|discount)[^.\n]{0,40}\d+\s*%|\d+\s*%[^.\n]{0,40}(chegirma|скидк|discount)/i, "AI chegirma taklif qilmaydi"],
+  [/kafolat|гарант|guarantee/i, "kafolat berilmaydi"]
+];
+
+// Faqat asosiy loyiha (Smart Menyu): mahsulotda yo'q narsalar va narxlar ro'yxati.
+const STRICT = [
+  [/\b14\s*(kun|kunlik|дн|day)/i, "\"14 kun\" va'da qilinmaydi"],
   [/\b(fiskal|фискал|fiscal)/i, "fiskal kassa hozir yo'q"],
   [/(chek\s+printer|printer|принтер)/i, "chek printeri hozir yo'q"],
   [/(payme|click)\s*(orqali|bilan)?\s*(to'lov|оплат|payment)/i, "Payme/Click to'lovi hozir yo'q"],
-  [/(iiko|r-?keeper|poster)\s*(bilan|integr|интегр)/i, "iiko/R-Keeper/Poster integratsiyasi yo'q"],
-  [/kafolat|гарант|guarantee/i, "kafolat berilmaydi"]
+  [/(iiko|r-?keeper|poster)\s*(bilan|integr|интегр)/i, "iiko/R-Keeper/Poster integratsiyasi yo'q"]
 ];
 
 // "440 000 so'm", "440 ming", "440000 сум" kabi narxlarni topadi.
@@ -31,11 +36,11 @@ function prices(text) {
   return out;
 }
 
-// Matndagi muammolar ro'yxati. Bo'sh ro'yxat = matn toza.
-export function check(text) {
+// Matndagi muammolar ro'yxati. Bo'sh ro'yxat = matn toza. strict = asosiy loyiha qoidalari va narxlari ham tekshiriladi.
+export function check(text, strict = true) {
   const problems = [];
-  for (const [re, why] of FORBIDDEN) if (re.test(text)) problems.push(why);
-  for (const n of prices(text)) if (!PRICES.includes(n)) problems.push(`ro'yxatda yo'q narx: ${n.toLocaleString("ru-RU")} so'm`);
+  for (const [re, why] of strict ? [...FORBIDDEN, ...STRICT] : FORBIDDEN) if (re.test(text)) problems.push(why);
+  if (strict) for (const n of prices(text)) if (!PRICES.includes(n)) problems.push(`ro'yxatda yo'q narx: ${n.toLocaleString("ru-RU")} so'm`);
   return [...new Set(problems)];
 }
 

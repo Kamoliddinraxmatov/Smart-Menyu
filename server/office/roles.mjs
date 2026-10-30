@@ -1,4 +1,5 @@
-// AI ofis xodimlari va boshqaruv kengashi. Kim ishlashi profile.json da: kompaniya, egasi, xodimlar (staff) va kengashda
+// AI ofis xodimlari va boshqaruv kengashi. Kim ishlashi profile.json da: kompaniya, egasi, xodimlar (staff), yangi loyihalar
+// xodimlari (project_staff) va kengashda
 // o'tiradigan a'zolar (board). Kengash a'zolari board.json kutubxonasidan olinadi: har biri mashhur rahbarlarning ochiq
 // tamoyillaridan ilhomlangan uslub, haqiqiy odam emas. Har rolning o'z asosiy modeli (prefer) bor, shunda majlisda har
 // xil modellar gapiradi. Yangi xodimni direktor "vakansiya" orqali so'raydi, egasi tasdiqlasa state.roles ga qo'shiladi.
@@ -20,21 +21,26 @@ export const BOARD = (PROFILE.board || []).map((id, i) => {
     job: `Boshqaruv kengashi a'zosisan. Biznesni o'z tamoyillaring nuqtai nazaridan baholaysan va aniq maslahat berasan.` };
 });
 
-export function allRoles(state) {
-  return [...BASE_ROLES, ...(state.roles || [])];
+// Yangi loyihalar xodimlari (profile.json "project_staff"). Asosiy loyiha esa "staff" ni oladi.
+export const PROJECT_ROLES = PROFILE.project_staff || BASE_ROLES.filter((r) => ["direktor", "nazoratchi"].includes(r.id));
+
+// project: projects.mjs dagi view() natijasi ({ staff, roles, ... }).
+export function allRoles(project) {
+  return [...project.staff, ...(project.roles || [])];
 }
 
 // Xodimlar va kengash a'zolari birga: majlisda kim gapirsa ham shu ro'yxatdan topiladi.
-export function everyone(state) {
-  return [...allRoles(state), ...BOARD];
+export function everyone(project) {
+  return [...allRoles(project), ...BOARD];
 }
 
-export function systemPrompt(role, facts) {
-  const { company, owner } = PROFILE;
+export function systemPrompt(role, project) {
+  const { owner } = PROFILE;
+  const company = project.name;
   return [
     role.board
       ? `Sen ${company} kompaniyasining AI boshqaruv kengashi a'zosisan. Uslubing: ${role.title}.`
-      : `Sen ${company} kompaniyasining AI ofisidagi xodimsan. Lavoziming: ${role.title}.`,
+      : `Sen ${company} loyihasining AI ofisidagi xodimsan. Lavoziming: ${role.title}.`,
     `Vazifang: ${role.job}`,
     ...(role.board ? [
       "Sening tamoyillaring (har maslahatingni shulardan kelib chiqib ber):",
@@ -45,6 +51,6 @@ export function systemPrompt(role, facts) {
     "Faqat o'zbek tilida (lotin) yoz, agar boshqa til so'ralmasa. Qisqa va aniq yoz.",
     "Quyidagi faktlardan tashqari hech narsa va'da qilma, raqam to'qima. Bilmasang, \"bilmayman\" de.",
     "",
-    facts
+    project.facts || `${company} haqida tasdiqlangan ma'lumot hali yo'q. Loyiha haqida hech narsa to'qima, kerakli ma'lumotni ${owner}dan so'ra.`
   ].join("\n");
 }
