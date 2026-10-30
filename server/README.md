@@ -70,6 +70,10 @@ Buyruqlar:
 **Boshqaruv kengashi.** Kengash a'zolari dunyoga mashhur rahbarlarning ochiq tamoyillaridan (intervyu, xat, nutqlar) ilhomlangan AI uslublar, haqiqiy odamlar emas: ularning nomi ishlatilmaydi. Kutubxona `office/board.json` da (har a'zoning tamoyillari ro'yxati). Kim kengashda o'tirishi `office/profile.json` dagi `board` ro'yxatida. Shu faylda kompaniya nomi, egasi va AI xodimlar ham bor: boshqa biznes uchun ofis ochish uchun `profile.json` va `facts.md` ni almashtirish kifoya.
 - `/holat`: xodimlar, restoranlar va bugungi AI limitlari.
 
+**GitHub va Claude.** `office.env` ga `GITHUB_TOKEN` yozilsa (fine-grained token: kerakli repolar, Contents: Read, Pull requests: Read, Issues: Read and write), ofis loyiha reposini o'qiydi:
+- `/repo [loyiha: egasi/repo]`: loyihaga repo ulash. Smart Menyu reposi `profile.json` dagi `repo` dan avtomatik ulanadi. Shundan keyin `/holat`, `/vazifa`, `/majlis`, `/kengash` reponing so'nggi commit va PRlarini biladi.
+- `/claude <matn>`: kod, sayt yoki dizayn ishini Claude'ga topshirish. Vazifa repoda `@claude` Issue bo'lib ochiladi, Claude Code GitHub Action (`.github/workflows/claude.yml`) uni bajaradi, ofis javobni Telegramga yuboradi va "💬 Claude'ga javob yozish" tugmasini beradi. Kompyuter yoqiq bo'lishi shart emas. Repoda `CLAUDE_CODE_OAUTH_TOKEN` siri bo'lishi kerak (Claude Code'da `/install-github-app`). Repo ochiq bo'lsa Issue ham ochiq: telefon raqam va emaillar avtomatik yashiriladi, lekin maxfiy narsani vazifaga yozmang.
+
 Mijozga nimalar aytilishi mumkinligi `office/facts.md` faylida yozilgan. Narx yoki mahsulot o'zgarsa, shu faylni (va narx bo'lsa `office/guard.mjs` dagi `PRICES`ni) yangilang. Telefon raqamlar faqat shu serverda saqlanadi va AI'ga yuborilmaydi.
 
 Yangilash (yangi versiya chiqqanda): serverda `cd Smart-Menyu && git pull && cd server && sudo bash setup.sh server.smartmenyu.uz`.

@@ -10,12 +10,17 @@
 // Kamoliddin o'zi yuboradi (Telegram/Instagram spam qoidalari buzilmaydi, akkaunt bloklanmaydi).
 //
 // Buyruqlar: /loyiha [nom], /fakt <matn>, /holat, /vazifa <matn>, /majlis [mavzu], /kengash [mavzu], /raqamlar <matn>,
-// /bekor, /xabarlar va CSV fayl (restoranlar ro'yxati, faqat asosiy loyiha). Oddiy matn = yangi topshiriq.
+// /repo [egasi/repo], /claude <matn>, /bekor, /xabarlar va CSV fayl (restoranlar ro'yxati, faqat asosiy loyiha).
+// Oddiy matn = yangi topshiriq.
+//
+// GitHub (github.mjs): loyihaga repo ulansa, AI xodimlar reponing so'nggi commit va PRlarini biladi. /claude esa haqiqiy
+// kod/sayt ishini Claude'ga beradi: vazifa repoda "@claude" Issue bo'lib ochiladi, Claude Code GitHub Action uni bajaradi,
+// ofis Issue'ni kuzatib natijani Telegramga yuboradi (kompyuter yoqiq bo'lishi shart emas).
 // Har dushanba 09:00 (Toshkent) bot haftalik kengash qaysi loyiha bo'yicha bo'lishini so'raydi, o'zi boshlamaydi.
 // Direktor yangi xodim so'rasa, vakansiya kartasi keladi. Kim ishlashi profile.json da (roles.mjs ga qarang).
 //
 // Sozlamalar (office.env): OFFICE_BOT_TOKEN, OWNER_CHAT_ID, GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY,
-// LLM_DAILY_LIMIT, OFFICE_DRAFTS_PER_DAY, DATA_DIR, TG_API.
+// LLM_DAILY_LIMIT, OFFICE_DRAFTS_PER_DAY, GITHUB_TOKEN, DATA_DIR, TG_API.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,6 +28,8 @@ import { createLLM } from "./llm.mjs";
 import { allRoles, BOARD, PROFILE } from "./roles.mjs";
 import { scoreLeads, draftMessage, runTask, council, boardMeeting, vacancy } from "./work.mjs";
 import { MAIN, migrate, list, find, create, view } from "./projects.mjs";
+import { createGitHub, parseRepo, claudeDone, cleanComment } from "./github.mjs";
+import { redact } from "./guard.mjs";
 
 const env = process.env;
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -35,7 +42,8 @@ const log = (...a) => console.log(new Date().toISOString(), ...a);
 
 // ---------- Holat ----------
 // projects: loyihalar (projects.mjs). asks: "qaysi loyiha?" kartalari. waiting: bot egasidan matn kutyapti (mavzu, topshiriq...).
-let state = { offset: 0, usage: {}, leads: [], approvals: {}, projects: {}, asks: {}, waiting: null, lastMajlis: "", seq: 0 };
+// claude: Claude'ga berilgan vazifalar (GitHub Issue), natijasi kuzatiladi.
+let state = { offset: 0, usage: {}, leads: [], approvals: {}, projects: {}, asks: {}, waiting: null, lastMajlis: "", seq: 0, claude: {} };
 const stateFile = path.join(DATA, "state.json");
 // Bir nechta loyiha bir vaqtda saqlaydi: yozuvlar ketma-ket bo'lsin, fayl buzilmasin.
 let saving = Promise.resolve();
@@ -73,8 +81,17 @@ const okNo = (id) => [{ text: "✅ Tasdiqlash", callback_data: `ok:${id}` }, { t
 
 // ---------- AI ----------
 let llm, facts;
+const github = createGitHub(env);
 const name = (pid) => state.projects[pid]?.name || pid;
 const ctx = (pid) => ({ ask: llm.ask, project: view(state, pid, facts) });
+// Repo ulangan loyihada AI xodimlar reponing so'nggi o'zgarishlarini ham biladi. GitHub javob bermasa, ish to'xtamaydi.
+async function liveCtx(pid) {
+  const c = ctx(pid);
+  const repo = state.projects[pid]?.repo;
+  if (!repo || !github.enabled) return c;
+  try { c.project.facts = [c.project.facts, await github.summary(repo)].filter(Boolean).join("\n\n"); } catch (e) { log(pid, "github:", e.message); }
+  return c;
+}
 // Har loyihaning AI ishlari o'z navbatida ketma-ket bajariladi (majlis bilan xabarlar aralashmasin), loyihalar esa parallel.
 const queues = {};
 const busy = {};
@@ -148,12 +165,54 @@ async function draftBatch() {
 
 // ---------- Topshiriq ----------
 async function vazifa(pid, goal) {
-  const res = await runTask(ctx(pid), goal);
+  const res = await runTask(await liveCtx(pid), goal);
   if (!res.length) { await send(`[${name(pid)}] Direktor topshiriqni bo'la olmadi, aniqroq yozing.`); return; }
   const temp = res.filter((r) => r.temp).map((r) => r.title);
   if (temp.length) await send(`[${name(pid)}] 🧑‍🔧 Shu topshiriq uchun vaqtinchalik mutaxassis olindi: ${temp.join(", ")}. Ish tugagach ular ketadi.`);
   for (const r of res) await send(`[${name(pid)}] 👤 ${r.title} [${r.provider}]\nTopshiriq: ${r.vazifa}\n\n${r.text}${r.problems.length ? `\n\n⚠️ Tekshiruv: ${r.problems.join("; ")} — mijozga yubormang.` : ""}`);
+  // Kod, sayt yoki dizaynni o'zgartirish kerak bo'lsa, shu topshiriqni bir tugma bilan Claude'ga berish mumkin.
+  if (state.projects[pid].repo && github.enabled) {
+    const id = nextId();
+    state.asks[id] = { kind: "claude", text: goal, project: pid };
+    return send(`[${name(pid)}] ✅ Topshiriq bajarildi: ${goal.slice(0, 200)}\nKodda yoki saytda o'zgartirish kerak bo'lsa, Claude'ga bering:`,
+      [{ text: "🤖 Claude'ga topshirish", callback_data: `cl:${id}` }]);
+  }
   await send(`[${name(pid)}] ✅ Topshiriq bajarildi: ${goal.slice(0, 200)}`);
+}
+
+// ---------- Claude'ga topshiriq (GitHub Issue orqali) ----------
+async function toClaude(pid, task) {
+  const p = state.projects[pid];
+  // Repo ochiq bo'lishi mumkin: telefon raqam va emaillar Issue'ga yozilmaydi.
+  const clean = redact(task);
+  const body = `@claude\n\n${clean}\n\n---\nLoyiha: ${p.name}. Topshiriq ${PROFILE.owner}dan Telegram orqali keldi (Virtual ofis).\n` +
+    `Qoidalar: o'zgarishni alohida branchda qil, main'ga to'g'ridan-to'g'ri yozma. Tugatgach qisqa, oddiy o'zbekcha xulosa yoz: ` +
+    `nima qilindi va ${PROFILE.owner} nimani tekshirishi kerak. Kalit, token yoki parol so'rama va yozma.`;
+  const i = await github.createIssue(p.repo, `[Ofis] ${clean.split("\n")[0].slice(0, 80)}`, body);
+  const id = nextId();
+  state.claude[id] = { project: pid, repo: p.repo, n: i.number, url: i.url, at: new Date().toISOString(), seen: {} };
+  await send(`🤖 [${p.name}] Claude'ga topshirildi: ${i.url}\nClaude ishlab bo'lgach, javobini shu yerga yuboraman (odatda 5-20 daqiqa).`);
+}
+
+// Har 2 daqiqada ochiq vazifalarni tekshiradi: Claude'ning tugagan javobini Telegramga yuboradi.
+let watching = false;
+async function watchClaude() {
+  if (watching || !github.enabled) return;
+  watching = true;
+  try {
+    for (const [id, t] of Object.entries(state.claude)) {
+      // 3 kundan eski vazifalar kuzatilmaydi.
+      if (Date.now() - Date.parse(t.at) > 3 * 86400000) { delete state.claude[id]; continue; }
+      let i;
+      try { i = await github.issue(t.repo, t.n); } catch (e) { log("claude kuzatuv:", e.message); continue; }
+      for (const c of i.comments.filter((c) => c.bot && t.seen[c.id] !== c.updated && claudeDone(c.body))) {
+        t.seen[c.id] = c.updated;
+        await send(`🤖 [${name(t.project)}] Claude javobi (${t.url}):\n\n${cleanComment(c.body)}`,
+          [{ text: "💬 Claude'ga javob yozish", callback_data: `cj:${id}` }]);
+      }
+      if (i.state === "closed") { delete state.claude[id]; await send(`✅ [${name(t.project)}] Claude vazifasi yopildi: ${t.url}`); }
+    }
+  } finally { watching = false; await saveState(); }
 }
 
 // ---------- Majlis ----------
@@ -166,7 +225,7 @@ function stats(pid) {
 }
 async function majlis(pid, topic) {
   await send(`🏛 [${name(pid)}] Majlis boshlandi: ${topic}`);
-  const r = await council(ctx(pid), topic, `Holat: ${stats(pid)}`);
+  const r = await council(await liveCtx(pid), topic, `Holat: ${stats(pid)}`);
   const lines = r.proposals.map((p, i) => `${i + 1}. ${p.title} [${p.provider}] — ${r.tally[i]} ovoz\n${p.text}`).join("\n\n");
   const id = nextId();
   state.approvals[id] = { type: "majlis", project: pid, topic, text: `${r.winner.title}: ${r.winner.text}` };
@@ -191,7 +250,7 @@ function boardContext(pid) {
 }
 async function kengash(pid, topic) {
   await send(`👔 [${name(pid)}] Boshqaruv kengashi yig'ildi: ${topic}\nA'zolar: ${BOARD.map((b) => b.title).join(", ")}`);
-  const r = await boardMeeting(ctx(pid), topic, boardContext(pid));
+  const r = await boardMeeting(await liveCtx(pid), topic, boardContext(pid));
   const lines = r.proposals.map((p, i) => `${i + 1}. ${p.title} [${p.provider}] — ${r.tally[i]} ovoz\n${p.text}`).join("\n\n");
   const tasks = r.tasks.map((t, i) => `${i + 1}. ${t.vazifa}\n   Kim: ${t.kim}${t.natija ? `. O'lchov: ${t.natija}` : ""}`).join("\n");
   const id = nextId();
@@ -237,6 +296,8 @@ const KINDS = {
   majlis: { what: "xodimlar majlisi", ask: "Majlis mavzusini yozing: nimani muhokama qilamiz?" },
   raqamlar: { what: "haftalik raqamlar", ask: "Raqamlarni yozing: sotuv, xarajat, yangi mijozlar..." },
   fakt: { what: "loyiha ma'lumoti", ask: "Loyiha haqida AI bilishi kerak bo'lgan faktni yozing (narx, mahsulot, taqiq...)." },
+  repo: { what: "GitHub repo", ask: "GitHub repo nomini yozing: egasi/repo (masalan Kamoliddinraxmatov/UZBIONIC) yoki havolasini tashlang." },
+  claude: { what: "Claude'ga topshiriq", ask: "Claude nima qilsin? Aniq yozing: qaysi sahifa yoki fayl, nima o'zgarsin, natija qanday bo'lsin." },
   haqida: { what: "loyiha tavsifi", ask: "" }
 };
 
@@ -276,6 +337,23 @@ async function proceed(kind, pid, text) {
     await saveState();
     return send(`📈 [${p.name}] Raqamlar saqlandi. Kengash keyingi majlisda shularga qaraydi.`);
   }
+  if (kind === "repo") {
+    const repo = parseRepo(text);
+    if (!repo) return send("Repo nomini tushunmadim. Masalan: Kamoliddinraxmatov/UZBIONIC");
+    if (github.enabled) {
+      try { await github.activity(repo); } catch (e) { return send(`⚠️ ${e.message}. Tokenda shu repoga ruxsat borligini tekshiring.`); }
+    }
+    p.repo = repo;
+    await saveState();
+    return send(`🔗 [${p.name}] GitHub repo ulandi: ${repo}\nEndi AI xodimlar reponing so'nggi o'zgarishlarini biladi, /claude bilan Claude'ga ish berish mumkin.` +
+      (github.enabled ? "" : "\n⚠️ Serverda GITHUB_TOKEN yo'q: hozircha repo o'qilmaydi."));
+  }
+  if (kind === "claude") {
+    if (!github.enabled) return send("⚠️ Serverda GITHUB_TOKEN yo'q. Uni «OFIS ISHGA TUSHIR» orqali qo'shing.");
+    if (!p.repo) return send(`⚠️ [${p.name}] loyihasiga GitHub repo ulanmagan. Avval: /repo ${p.name}: egasi/repo\nClaude faqat GitHub'dagi loyihada ishlay oladi.`);
+    job(pid, "Claude", () => toClaude(pid, text));
+    return;
+  }
   if (kind === "fakt" || kind === "haqida") {
     p.facts = `${p.facts ? p.facts + "\n" : ""}- ${text.slice(0, 1500)}`.slice(-6000);
     await saveState();
@@ -310,6 +388,8 @@ Oddiy matn yozsangiz ham topshiriq deb qabul qilinadi.
 /majlis [mavzu] — xodimlar munozara qilib ovoz beradi
 /raqamlar <matn> — loyihaning haftalik raqamlari, kengash shularga qaraydi
 /fakt <matn> — loyiha haqida AI bilishi kerak bo'lgan ma'lumot
+/repo — loyihaga GitHub repo ulash (ofis uning so'nggi o'zgarishlarini biladi)
+/claude <matn> — kod, sayt, dizayn ishini Claude'ga topshirish: natija shu yerga keladi
 /holat — loyihalar holati va AI limitlari
 /bekor — kutilayotgan savolni bekor qilish
 Loyihani darrov ko'rsatish mumkin: /vazifa UZBIONIC: sayt uchun matn
@@ -318,13 +398,24 @@ ${PROFILE.company} uchun: /xabarlar — restoranlarga xabar qoralamasi; CSV fayl
 
 Ofis o'zi hech kimga yozmaydi: har xabar sizning tasdig'ingiz bilan keladi.`;
 
-function holat() {
+async function holat() {
   const u = llm.usage().map((p) => `${p.label}: ${p.used}/${p.limit}`).join(", ") || "AI kaliti yo'q";
   const ps = list(state).map((p) => {
     const v = view(state, p.id, facts);
     return `📁 ${p.name}${busy[p.id] ? ` — ishlayapti (${busy[p.id]} ta ish)` : " — bo'sh"}\n   Xodimlar: ${allRoles(v).map((r) => r.title).join(", ")}\n   ${stats(p.id)}`;
-  }).join("\n");
-  return `🏢 Loyihalar:\n${ps}\n👔 Kengash: ${BOARD.map((b) => b.title).join(", ") || "yo'q"}\n🧠 Bugun AI so'rovlari: ${u}\n⏳ Tasdiq kutayotgan kartalar: ${Object.keys(state.approvals).length}`;
+  });
+  // Repo ulangan loyihalar: oxirgi commit va ochiq PRlar.
+  for (const [i, p] of list(state).entries()) {
+    if (!p.repo) continue;
+    if (!github.enabled) { ps[i] += `\n   GitHub: ${p.repo} (token yo'q)`; continue; }
+    try {
+      const a = await github.activity(p.repo);
+      const open = a.prs.filter((x) => x.state === "ochiq").length;
+      ps[i] += `\n   GitHub: ${a.commits[0] ? `oxirgi o'zgarish ${a.commits[0].at.slice(0, 10)}: ${a.commits[0].text}` : "commit yo'q"}; ochiq PR: ${open}`;
+    } catch (e) { ps[i] += `\n   GitHub: ${e.message}`; }
+  }
+  const claude = Object.values(state.claude).map((t) => `${name(t.project)} #${t.n}`).join(", ");
+  return `🏢 Loyihalar:\n${ps.join("\n")}\n${claude ? `🤖 Claude ishlayapti: ${claude}\n` : ""}👔 Kengash: ${BOARD.map((b) => b.title).join(", ") || "yo'q"}\n🧠 Bugun AI so'rovlari: ${u}\n⏳ Tasdiq kutayotgan kartalar: ${Object.keys(state.approvals).length}`;
 }
 
 async function onMessage(m) {
@@ -343,6 +434,13 @@ async function onMessage(m) {
     const w = state.waiting;
     if (!w) return askProject("vazifa", text);
     if (w.kind === "yangi") return newProject(text, w.after);
+    if (w.kind === "izoh") {
+      state.waiting = null;
+      const t = state.claude[w.task];
+      if (!t) return send("Bu Claude vazifasi endi kuzatilmayapti. Yangi vazifa: /claude");
+      await github.comment(t.repo, t.n, `@claude ${redact(text)}`);
+      return send(`💬 [${name(t.project)}] Claude'ga yuborildi, javobini kutyapman.`);
+    }
     state.waiting = null;
     await proceed(w.kind, w.project, text);
     if (w.kind === "haqida" && w.after) return proceed(w.after.kind, w.project, w.after.text);
@@ -354,7 +452,7 @@ async function onMessage(m) {
   const arg = rest.join(" ");
   if (cmd === "/start" || cmd === "/yordam") return send(HELP);
   if (cmd === "/bekor") { await saveState(); return send("Bekor qilindi."); }
-  if (cmd === "/holat") return send(holat());
+  if (cmd === "/holat") return send(await holat());
   if (cmd === "/loyiha" || cmd === "/loyihalar") {
     if (arg) return find(state, arg) ? send(`📁 ${find(state, arg).name}\n${stats(find(state, arg).id)}`) : newProject(arg);
     return send(`📂 Loyihalar:\n${list(state).map((p) => `• ${p.name}${busy[p.id] ? " ⏳" : ""}`).join("\n")}\n\nYangi loyiha: /loyiha <nom>`,
@@ -365,6 +463,8 @@ async function onMessage(m) {
   if (cmd === "/majlis") return askProject("majlis", arg);
   if (cmd === "/raqamlar") return askProject("raqamlar", arg);
   if (cmd === "/fakt") return askProject("fakt", arg);
+  if (cmd === "/repo") return askProject("repo", arg);
+  if (cmd === "/claude") return askProject("claude", arg);
   if (cmd === "/xabarlar") { job(MAIN, "Xabarlar", draftBatch); return; }
   return send(HELP);
 }
@@ -373,6 +473,19 @@ async function onCallback(q) {
   if (String(q.message?.chat?.id) !== OWNER) return;
   const [kind, id, pid] = String(q.data || "").split(":");
   await tg("answerCallbackQuery", { callback_query_id: q.id }).catch(() => {});
+  if (kind === "cl") {
+    const a = state.asks[id];
+    if (!a) return send("Bu tugma eskirgan. Yangi vazifa: /claude");
+    delete state.asks[id];
+    await tg("editMessageReplyMarkup", { chat_id: OWNER, message_id: q.message.message_id, reply_markup: { inline_keyboard: [] } }).catch(() => {});
+    return proceed("claude", a.project, a.text);
+  }
+  if (kind === "cj") {
+    if (!state.claude[id]) return send("Bu Claude vazifasi endi kuzatilmayapti. Yangi vazifa: /claude");
+    state.waiting = { kind: "izoh", task: id };
+    await saveState();
+    return send("✍️ Claude'ga javobingizni yozing (masalan: «rangini ko'k qil» yoki «PR och»).\n(Bekor qilish: /bekor)");
+  }
   if (kind === "p") {
     const a = id === "0" ? { kind: null, text: "" } : state.asks[id];
     if (!a) return send("Bu savol eskirgan, buyruqni qayta yuboring.");
@@ -406,8 +519,9 @@ async function main() {
   facts = await fs.readFile(path.join(DIR, "facts.md"), "utf8");
   llm = createLLM(env, state.usage);
   if (!TOKEN) { log("OFFICE_BOT_TOKEN yo'q: ofis kutish rejimida (office.env ni to'ldiring)"); setInterval(() => {}, 1 << 30); return; }
-  log(`ofis ishga tushdi: ${llm.providers.map((p) => p.label).join(", ") || "AI kaliti yo'q"}; loyihalar: ${list(state).map((p) => p.name).join(", ")}`);
+  log(`ofis ishga tushdi: ${llm.providers.map((p) => p.label).join(", ") || "AI kaliti yo'q"}; loyihalar: ${list(state).map((p) => p.name).join(", ")}; GitHub: ${github.enabled ? "ulangan" : "token yo'q"}`);
   setInterval(weekly, 60000);
+  setInterval(() => watchClaude().catch((e) => log("claude kuzatuv:", e.message)), 120000);
   for (;;) {
     try {
       const ups = await tg("getUpdates", { offset: state.offset, timeout: 50, allowed_updates: ["message", "callback_query"] });

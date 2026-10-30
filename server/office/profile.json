@@ -2,6 +2,7 @@
   "_izoh": "Ofis profili: asosiy loyiha (kompaniya), egasi, AI xodimlar va boshqaruv kengashi. \"staff\" asosiy loyiha xodimlari, \"project_staff\" egasi Telegramda /loyiha bilan ochgan yangi loyihalar xodimlari. Boshqa biznes uchun shu faylni (va facts.md ni) almashtirish kifoya. OFFICE_PROFILE bilan boshqa fayl ko'rsatish mumkin.",
   "company": "Smart Menyu",
   "owner": "Kamoliddin",
+  "repo": "Kamoliddinraxmatov/Smart-Menyu",
   "staff": [
     {
       "id": "direktor",

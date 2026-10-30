@@ -18,6 +18,9 @@ export function migrate(state) {
     state.projects[MAIN] = { id: MAIN, name: PROFILE.company, facts: "", roles: state.roles || [], decisions: state.decisions || [],
       metrics: state.metrics || [], created: new Date().toISOString() };
   }
+  // Asosiy loyihaning reposi profile.json da ("repo"). Egasi /repo bilan boshqasini ulagan bo'lsa, o'shanisi qoladi.
+  if (PROFILE.repo && state.projects[MAIN].repo === undefined) state.projects[MAIN].repo = PROFILE.repo;
+  state.claude = state.claude || {};
   delete state.roles; delete state.decisions; delete state.metrics;
   return state;
 }
