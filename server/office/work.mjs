@@ -1,13 +1,15 @@
 // AI ofisning ishi: lidlarni baholash, xabar yozish, vazifalarni bo'lish, majlis (munozara + ovoz) va vakansiya.
-// Hamma funksiya `ctx` oladi: { ask, facts, state }. ask = llm.ask. Shunda testda haqiqiy AI o'rniga soxtasini beramiz.
+// Hamma funksiya `ctx` oladi: { ask, project }. ask = llm.ask (testda soxtasi), project = projects.mjs dagi view():
+// qaysi loyiha, uning faktlari, xodimlari va qarorlari. Shunda bir loyihaning ishi boshqasiga aralashmaydi.
 import { check, redact } from "./guard.mjs";
 import { allRoles, everyone, BOARD, PROFILE, systemPrompt } from "./roles.mjs";
 
-const role = (ctx, id) => everyone(ctx.state).find((r) => r.id === id);
+const role = (ctx, id) => everyone(ctx.project).find((r) => r.id === id);
 
-async function say(ctx, roleId, prompt, opts = {}) {
-  const r = role(ctx, roleId);
-  return ctx.ask([{ role: "system", content: systemPrompt(r, ctx.facts) }, { role: "user", content: prompt }], { prefer: r.prefer || 0, ...opts });
+// who: rol id si yoki rolning o'zi (vazifa uchun olingan vaqtinchalik mutaxassis).
+async function say(ctx, who, prompt, opts = {}) {
+  const r = typeof who === "string" ? role(ctx, who) : who;
+  return ctx.ask([{ role: "system", content: systemPrompt(r, ctx.project) }, { role: "user", content: prompt }], { prefer: r.prefer || 0, ...opts });
 }
 
 // AI'ga faqat ochiq biznes ma'lumoti boradi: telefon va email yashiriladi.
@@ -38,7 +40,7 @@ export async function draftMessage(ctx, lead, kind = "birinchi") {
       (lead.why ? ` Nega mos: ${lead.why}.` : "") +
       (feedback ? `\n\nOldingi variant rad etildi: ${feedback}. Shu muammolarsiz qayta yoz.` : "") +
       "\nFaqat xabar matnini qaytar, izohsiz.");
-    const problems = check(text);
+    const problems = check(text, ctx.project.strict);
     if (problems.length) { feedback = problems.join("; "); continue; }
     const { data } = await say(ctx, "nazoratchi",
       `Shu xabarni tekshir. Faqat JSON qaytar: {"ok":true|false,"izoh":"..."}\n\n${text}`, { json: true });
@@ -49,23 +51,34 @@ export async function draftMessage(ctx, lead, kind = "birinchi") {
 }
 
 // ---------- Vazifa: direktor bo'ladi, xodimlar bajaradi ----------
+// Mos xodim bo'lmasa, direktor shu topshiriq uchun vaqtinchalik mutaxassis oladi (masalan "Veb dizayner"). U faqat shu
+// vazifada ishlaydi va ofis xodimlari ro'yxatiga qo'shilmaydi: doimiy xodim faqat egasi vakansiyani tasdiqlasa qo'shiladi.
 export async function runTask(ctx, goal) {
-  const ids = allRoles(ctx.state).filter((r) => r.id !== "direktor").map((r) => `${r.id} (${r.title})`).join(", ");
+  const ids = allRoles(ctx.project).filter((r) => r.id !== "direktor").map((r) => `${r.id} (${r.title})`).join(", ");
   const { data } = await say(ctx, "direktor",
-    `${PROFILE.owner}ning vazifasi: "${goal}".\nUni ko'pi bilan 4 ta qadamga bo'l va har birini bitta xodimga ber. Xodimlar: ${ids}.\n` +
-    `Faqat JSON qaytar: [{"rol":"sotuv","vazifa":"..."}]`, { json: true });
-  const steps = (Array.isArray(data) ? data : []).filter((s) => role(ctx, s.rol)).slice(0, 4);
+    `Loyiha: ${ctx.project.name}. ${PROFILE.owner}ning topshirig'i: "${goal}".\nUni ko'pi bilan 4 ta qadamga bo'l va har birini bitta xodimga ber. Xodimlar: ${ids}.\n` +
+    `Agar qadamga mos xodim yo'q bo'lsa, shu ish uchun vaqtinchalik mutaxassis ol: "rol" o'rniga "lavozim" va "ish" (1-2 gap) yoz.\n` +
+    `Faqat JSON qaytar: [{"rol":"${ids.split(" ")[0] || "nazoratchi"}","vazifa":"..."},{"lavozim":"Veb dizayner","ish":"...","vazifa":"..."}]`, { json: true });
+  const steps = [];
+  for (const s of (Array.isArray(data) ? data : []).filter((s) => s && s.vazifa)) {
+    if (steps.length >= 4) break;
+    const r = role(ctx, s.rol) || (s.lavozim && {
+      id: `vaqtinchalik-${steps.length + 1}`, title: String(s.lavozim).slice(0, 60), temp: true, prefer: steps.length,
+      job: String(s.ish || s.vazifa).slice(0, 400)
+    });
+    if (r) steps.push({ r, vazifa: String(s.vazifa).slice(0, 600) });
+  }
   const results = [];
-  for (const s of steps) {
-    const { text, provider } = await say(ctx, s.rol, `Direktor topshirig'i: ${s.vazifa}\nUmumiy maqsad: ${goal}`);
-    results.push({ rol: s.rol, title: role(ctx, s.rol).title, vazifa: s.vazifa, text, provider, problems: check(text) });
+  for (const { r, vazifa } of steps) {
+    const { text, provider } = await say(ctx, r, `Direktor topshirig'i: ${vazifa}\nUmumiy maqsad: ${goal}`);
+    results.push({ rol: r.id, title: r.title, temp: !!r.temp, vazifa, text, provider, problems: check(text, ctx.project.strict) });
   }
   return results;
 }
 
 // ---------- Majlis: har kim taklif beradi, nazoratchi tanqid qiladi, hamma ovoz beradi ----------
 // members berilmasa, ofis xodimlari (nazoratchidan tashqari) gapiradi. Kengash majlisida esa kengash a'zolari.
-export async function council(ctx, topic, context = "", members = allRoles(ctx.state).filter((r) => r.id !== "nazoratchi")) {
+export async function council(ctx, topic, context = "", members = allRoles(ctx.project).filter((r) => r.id !== "nazoratchi")) {
   const proposals = [];
   for (const m of members) {
     try {
@@ -107,12 +120,12 @@ export async function boardMeeting(ctx, topic, context = "") {
     `Faqat JSON: [{"vazifa":"...","kim":"${PROFILE.owner} yoki xodim lavozimi","natija":"qanday o'lchaymiz"}]`, { json: true });
   const tasks = (Array.isArray(data) ? data : []).filter((t) => t && t.vazifa).slice(0, 5)
     .map((t) => ({ vazifa: String(t.vazifa).slice(0, 300), kim: String(t.kim || PROFILE.owner).slice(0, 60), natija: String(t.natija || "").slice(0, 200) }));
-  return { ...r, tasks, problems: check([r.winner.text, ...tasks.map((t) => t.vazifa)].join("\n")) };
+  return { ...r, tasks, problems: check([r.winner.text, ...tasks.map((t) => t.vazifa)].join("\n"), ctx.project.strict) };
 }
 
 // ---------- Vakansiya: direktor yangi xodim kerakmi deb o'ylaydi ----------
 export async function vacancy(ctx, summary) {
-  const team = allRoles(ctx.state).map((r) => r.title).join(", ");
+  const team = allRoles(ctx.project).map((r) => r.title).join(", ");
   const { data } = await say(ctx, "direktor",
     `Hozirgi xodimlar: ${team}.\nSo'nggi majlis xulosasi: ${summary}\n` +
     `Ish natijasini yaxshilash uchun yangi AI xodim kerakmi? Faqat haqiqatan kerak bo'lsa "kerak":true. ` +
