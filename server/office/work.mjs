@@ -1,9 +1,9 @@
 // AI ofisning ishi: lidlarni baholash, xabar yozish, vazifalarni bo'lish, majlis (munozara + ovoz) va vakansiya.
 // Hamma funksiya `ctx` oladi: { ask, facts, state }. ask = llm.ask. Shunda testda haqiqiy AI o'rniga soxtasini beramiz.
 import { check, redact } from "./guard.mjs";
-import { allRoles, systemPrompt } from "./roles.mjs";
+import { allRoles, everyone, BOARD, PROFILE, systemPrompt } from "./roles.mjs";
 
-const role = (ctx, id) => allRoles(ctx.state).find((r) => r.id === id);
+const role = (ctx, id) => everyone(ctx.state).find((r) => r.id === id);
 
 async function say(ctx, roleId, prompt, opts = {}) {
   const r = role(ctx, roleId);
@@ -52,7 +52,7 @@ export async function draftMessage(ctx, lead, kind = "birinchi") {
 export async function runTask(ctx, goal) {
   const ids = allRoles(ctx.state).filter((r) => r.id !== "direktor").map((r) => `${r.id} (${r.title})`).join(", ");
   const { data } = await say(ctx, "direktor",
-    `Kamoliddinning vazifasi: "${goal}".\nUni ko'pi bilan 4 ta qadamga bo'l va har birini bitta xodimga ber. Xodimlar: ${ids}.\n` +
+    `${PROFILE.owner}ning vazifasi: "${goal}".\nUni ko'pi bilan 4 ta qadamga bo'l va har birini bitta xodimga ber. Xodimlar: ${ids}.\n` +
     `Faqat JSON qaytar: [{"rol":"sotuv","vazifa":"..."}]`, { json: true });
   const steps = (Array.isArray(data) ? data : []).filter((s) => role(ctx, s.rol)).slice(0, 4);
   const results = [];
@@ -64,8 +64,8 @@ export async function runTask(ctx, goal) {
 }
 
 // ---------- Majlis: har kim taklif beradi, nazoratchi tanqid qiladi, hamma ovoz beradi ----------
-export async function council(ctx, topic, context = "") {
-  const members = allRoles(ctx.state).filter((r) => r.id !== "nazoratchi");
+// members berilmasa, ofis xodimlari (nazoratchidan tashqari) gapiradi. Kengash majlisida esa kengash a'zolari.
+export async function council(ctx, topic, context = "", members = allRoles(ctx.state).filter((r) => r.id !== "nazoratchi")) {
   const proposals = [];
   for (const m of members) {
     try {
@@ -93,6 +93,21 @@ export async function council(ctx, topic, context = "") {
   const tally = live.map((_, i) => votes.filter((v) => v.n === i + 1).length);
   const best = tally.indexOf(Math.max(...tally));
   return { topic, proposals: live, critique, votes, tally, winner: live[best], winnerNo: best + 1 };
+}
+
+// ---------- Boshqaruv kengashi: haftalik majlis + keyingi hafta vazifalari ----------
+// Kengash a'zolari raqamlar va o'tgan qarorlarga qarab taklif beradi, ovoz beradi; direktor g'olib taklifni 3-5 ta vazifaga
+// bo'ladi. Hech narsa o'zi bajarilmaydi: qaror va vazifalar egasiga tasdiq uchun boradi.
+export async function boardMeeting(ctx, topic, context = "") {
+  if (!BOARD.length) throw new Error("kengash bo'sh: profile.json dagi \"board\" ro'yxatiga a'zo qo'shing");
+  const r = await council(ctx, topic, context, BOARD);
+  const { data } = await say(ctx, "direktor",
+    `Kengash qarori: ${r.winner.title}: ${r.winner.text}\n${context}\n` +
+    `Shu qarorni keyingi hafta uchun 3-5 ta aniq, o'lchanadigan vazifaga bo'l. Pul, imzo, mijozga yozish kabi ishlar faqat ${PROFILE.owner}da. ` +
+    `Faqat JSON: [{"vazifa":"...","kim":"${PROFILE.owner} yoki xodim lavozimi","natija":"qanday o'lchaymiz"}]`, { json: true });
+  const tasks = (Array.isArray(data) ? data : []).filter((t) => t && t.vazifa).slice(0, 5)
+    .map((t) => ({ vazifa: String(t.vazifa).slice(0, 300), kim: String(t.kim || PROFILE.owner).slice(0, 60), natija: String(t.natija || "").slice(0, 200) }));
+  return { ...r, tasks, problems: check([r.winner.text, ...tasks.map((t) => t.vazifa)].join("\n")) };
 }
 
 // ---------- Vakansiya: direktor yangi xodim kerakmi deb o'ylaydi ----------

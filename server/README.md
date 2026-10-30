@@ -63,7 +63,11 @@ Buyruqlar:
 - **CSV fayl** yuborish: restoranlar ro'yxati (ustunlar: nomi, manzil, telefon, instagram, stol, turi, izoh). Ofis ularni baholaydi va eng yaxshilariga xabar qoralamasini yozadi (kuniga 20 tagacha).
 - `/xabarlar`: navbatdagi restoranlar uchun yana qoralama yozadi.
 - `/vazifa <matn>`: direktor vazifani xodimlarga bo'lib beradi, masalan `/vazifa Samarqand restoranlari uchun Instagram post`.
-- `/majlis [mavzu]`: xodimlar taklif beradi, nazoratchi tanqid qiladi, hamma ovoz beradi. Har dushanba 09:00 da majlis o'zi o'tadi. Direktor yangi xodim kerak deb hisoblasa, vakansiya kartasi keladi: tasdiqlasangiz, yangi AI xodim qo'shiladi.
+- `/majlis [mavzu]`: xodimlar taklif beradi, nazoratchi tanqid qiladi, hamma ovoz beradi. Direktor yangi xodim kerak deb hisoblasa, vakansiya kartasi keladi: tasdiqlasangiz, yangi AI xodim qo'shiladi.
+- `/raqamlar <matn>`: haftalik raqamlarni yozasiz, masalan `/raqamlar sotuv 12 mln, xarajat 8 mln, yangi mijoz 4, demo 3`. Kengash shularga qarab gapiradi.
+- `/kengash [mavzu]`: boshqaruv kengashi yig'iladi. A'zolar taklif beradi va ovoz beradi, direktor g'olib qarorni keyingi hafta uchun 3-5 ta vazifaga bo'ladi. Tasdiqlasangiz, qaror va vazifalar xotiraga yoziladi va keyingi majlisda tekshiriladi. Har dushanba 09:00 da kengash o'zi yig'iladi.
+
+**Boshqaruv kengashi.** Kengash a'zolari dunyoga mashhur rahbarlarning ochiq tamoyillaridan (intervyu, xat, nutqlar) ilhomlangan AI uslublar, haqiqiy odamlar emas: ularning nomi ishlatilmaydi. Kutubxona `office/board.json` da (har a'zoning tamoyillari ro'yxati). Kim kengashda o'tirishi `office/profile.json` dagi `board` ro'yxatida. Shu faylda kompaniya nomi, egasi va AI xodimlar ham bor: boshqa biznes uchun ofis ochish uchun `profile.json` va `facts.md` ni almashtirish kifoya.
 - `/holat`: xodimlar, restoranlar va bugungi AI limitlari.
 
 Mijozga nimalar aytilishi mumkinligi `office/facts.md` faylida yozilgan. Narx yoki mahsulot o'zgarsa, shu faylni (va narx bo'lsa `office/guard.mjs` dagi `PRICES`ni) yangilang. Telefon raqamlar faqat shu serverda saqlanadi va AI'ga yuborilmaydi.
