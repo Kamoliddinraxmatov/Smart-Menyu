@@ -10,7 +10,7 @@
 // Kamoliddin o'zi yuboradi (Telegram/Instagram spam qoidalari buzilmaydi, akkaunt bloklanmaydi).
 //
 // Buyruqlar: /loyiha [nom], /fakt <matn>, /holat, /vazifa <matn>, /majlis [mavzu], /kengash [mavzu], /raqamlar <matn>,
-// /repo [egasi/repo], /claude <matn>, /bekor, /xabarlar va CSV fayl (restoranlar ro'yxati, faqat asosiy loyiha).
+// /repo [egasi/repo], /claude <matn>, /sozlama [NOM qiymat], /bekor, /xabarlar va CSV fayl (restoranlar ro'yxati, faqat asosiy loyiha).
 // Oddiy matn = yangi topshiriq.
 //
 // GitHub (github.mjs): loyihaga repo ulansa, AI xodimlar reponing so'nggi commit va PRlarini biladi. /claude esa haqiqiy
@@ -21,6 +21,9 @@
 //
 // Sozlamalar (office.env): OFFICE_BOT_TOKEN, OWNER_CHAT_ID, GEMINI_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY,
 // LLM_DAILY_LIMIT, OFFICE_DRAFTS_PER_DAY, GITHUB_TOKEN, DATA_DIR, TG_API.
+// Kalitlarni telefondan ham qo'yish mumkin: botga kalitning o'zini yuborish yetarli (settings.mjs, sozlama.json).
+// settings.mjs birinchi: telefondan qo'yilgan kalitlar boshqa modullardan oldin process.env ga yuklanadi.
+import { detectSecret, containsSecret, saveSetting, SECRET_KEYS, PLAIN_KEYS } from "./settings.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -349,7 +352,7 @@ async function proceed(kind, pid, text) {
       (github.enabled ? "" : "\n⚠️ Serverda GITHUB_TOKEN yo'q: hozircha repo o'qilmaydi."));
   }
   if (kind === "claude") {
-    if (!github.enabled) return send("⚠️ Serverda GITHUB_TOKEN yo'q. Uni «OFIS ISHGA TUSHIR» orqali qo'shing.");
+    if (!github.enabled) return send("⚠️ Serverda GITHUB_TOKEN yo'q. GitHub tokenini (github_pat_...) shu botga yuboring: o'zi saqlaydi.");
     if (!p.repo) return send(`⚠️ [${p.name}] loyihasiga GitHub repo ulanmagan. Avval: /repo ${p.name}: egasi/repo\nClaude faqat GitHub'dagi loyihada ishlay oladi.`);
     job(pid, "Claude", () => toClaude(pid, text));
     return;
@@ -392,6 +395,7 @@ Oddiy matn yozsangiz ham topshiriq deb qabul qilinadi.
 /claude <matn> — kod, sayt, dizayn ishini Claude'ga topshirish: natija shu yerga keladi
 /holat — loyihalar holati va AI limitlari
 /bekor — kutilayotgan savolni bekor qilish
+/sozlama — kalit qo'yish: kalitning o'zini (github_pat_..., AIza..., gsk_..., sk-or-...) botga yuboring, bot uni serverga yozadi va chatdan o'chiradi
 Loyihani darrov ko'rsatish mumkin: /vazifa UZBIONIC: sayt uchun matn
 
 ${PROFILE.company} uchun: /xabarlar — restoranlarga xabar qoralamasi; CSV fayl — restoranlar ro'yxati (nomi, manzil, telefon, instagram, stol, turi, izoh)
@@ -418,6 +422,42 @@ async function holat() {
   return `🏢 Loyihalar:\n${ps.join("\n")}\n${claude ? `🤖 Claude ishlayapti: ${claude}\n` : ""}👔 Kengash: ${BOARD.map((b) => b.title).join(", ") || "yo'q"}\n🧠 Bugun AI so'rovlari: ${u}\n⏳ Tasdiq kutayotgan kartalar: ${Object.keys(state.approvals).length}`;
 }
 
+// ---------- Kalitlar (telefondan) ----------
+const SOZLAMA_HELP = `🔑 Kalitni qo'yish uchun uning o'zini shu chatga yuboring (boshqa so'z qo'shmang). Bot turini o'zi taniydi:
+${Object.values(SECRET_KEYS).map((k) => "• " + k.label).join("\n")}
+Boshqa sozlamalar: ${Object.keys(PLAIN_KEYS).map((k) => `/sozlama ${k} qiymat`).join(", ")}
+Bot kalitni faqat shu serverga yozadi, xabaringizni chatdan o'chiradi va ofisni qayta ishga tushiradi.`;
+
+async function githubTokenWorks(token) {
+  try {
+    const r = await fetch("https://api.github.com/user", { headers: { authorization: `Bearer ${token}`, "user-agent": "virtual-ofis" } });
+    return r.status !== 401;
+  } catch { return true; } // GitHub javob bermasa ham saqlaymiz, /holat keyin ko'rsatadi
+}
+
+async function applySetting(m, text) {
+  state.waiting = null;
+  const hasSecret = containsSecret(text);
+  // Kalitli xabar chatda qolmasin (telefon yo'qolsa ham ko'rinmasin).
+  if (hasSecret) await tg("deleteMessage", { chat_id: m.chat.id, message_id: m.message_id }).catch(() => {});
+  const parts = text.split(/\s+/).slice(text.startsWith("/") ? 1 : 0);
+  let key = null, value = null;
+  if (parts.length === 1 && detectSecret(parts[0])) [key, value] = [detectSecret(parts[0]), parts[0]];
+  else if (parts.length === 2) [key, value] = parts;
+  if (!key) {
+    if (hasSecret) return send("⚠️ Xabaringizda kalit bor edi: uni o'chirdim va hech qayerga yubormadim. Kalitni alohida, faqat o'zini yuboring.");
+    return send(SOZLAMA_HELP);
+  }
+  key = key.toUpperCase();
+  if (key === "GITHUB_TOKEN" && !(await githubTokenWorks(value))) return send("❌ GitHub bu tokenni qabul qilmadi (eskirgan yoki to'liq nusxalanmagan). Yangisini yarating va qayta yuboring.");
+  const r = saveSetting(key, value);
+  if (!r.ok) return send(`❌ ${r.error}\n\n${SOZLAMA_HELP}`);
+  log(`sozlama yangilandi: ${key}`);
+  await send(`✅ ${r.label} serverga saqlandi${hasSecret ? ", xabaringizni chatdan o'chirdim" : ""}. Ofis 10 soniyada qayta ishga tushadi, keyin /holat yozing.`);
+  await saveState();
+  setTimeout(() => process.exit(0), 1500); // docker (restart: always) ofisni yangi kalit bilan qayta ochadi
+}
+
 async function onMessage(m) {
   const chat = String(m.chat.id);
   if (!OWNER) { await tg("sendMessage", { chat_id: chat, text: `Sizning chat ID: ${chat}\noffice.env ga OWNER_CHAT_ID=${chat} yozing va ofisni qayta ishga tushiring.` }); return; }
@@ -429,6 +469,8 @@ async function onMessage(m) {
     return;
   }
   if (!text) return;
+  // Kalit hech qachon AI'ga yoki GitHub'ga ketmasin: buyruqlardan oldin tekshiramiz.
+  if (/^\/sozlama(@\w+)?(\s|$)/i.test(text) || containsSecret(text)) return applySetting(m, text);
   if (!text.startsWith("/")) {
     // Bot savol bergan bo'lsa, bu javob. Aks holda yangi topshiriq: avval qaysi loyiha ekanini so'raymiz.
     const w = state.waiting;
