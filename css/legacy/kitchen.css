@@ -919,3 +919,23 @@ body.kds {
 .kback:active {
   background: rgba(214, 179, 112, .15);
 }
+.kt-tick {
+  flex: none;
+  align-self: center;
+  min-width: 46px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(34, 197, 94, .45);
+  color: var(--ok);
+  font-weight: 800;
+  font-size: 16px;
+  white-space: nowrap;
+}
+.kt-items li.done .kt-tick {
+  background: var(--ok);
+  color: #fff;
+  border-color: var(--ok);
+}

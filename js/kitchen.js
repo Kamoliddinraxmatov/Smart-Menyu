@@ -151,6 +151,7 @@ function ticket(o, q) {
           <span class="kt-qty">${it.qty}</span>
           ${thumb(it)}
           <span class="kt-name">${esc(it.name)}<em class="kt-opts">${esc(portionText(it.opts))}</em>${it.note ? `<em>📝 ${esc(it.note)}</em>` : ""}</span>
+          <span class="kt-tick">${it.served ? "🍽" : it.done ? "✓ Tayyor" : "✓"}</span>
         </li>`).join("")}
     </ul>
     ${o.comment ? `<div class="kt-comment">💬 ${esc(o.comment)}</div>` : ""}
@@ -204,11 +205,21 @@ function bindBoard() {
     const id = card.dataset.id;
     card.querySelectorAll("[data-item]").forEach((li) => li.addEventListener("click", () => {
       const idx = Number(li.dataset.item);
+      // Har bir taom alohida tayyor bo'ladi: ofitsiantga darhol xabar ketadi (choy, non shashlikni kutmaydi).
+      // Hammasi tayyor bo'lsa, buyurtma o'zi "Tayyor"ga o'tadi.
+      const it = S.orders[id]?.items[idx];
+      if (it?.served) return; // stolga olib ketilgan taomni qaytarib bo'lmaydi
       store.updateOrder(id, (o) => {
-        o.items[idx].done = !o.items[idx].done;
-        if (o.status === "new") { o.status = "cooking"; o.startedAt = Date.now(); }
+        const now = Date.now();
+        const x = o.items[idx];
+        x.done = !x.done;
+        if (x.done) x.doneAt = now; else { x.doneAt = null; x.undoneAt = now; }
+        if (o.status === "new") { o.status = "cooking"; o.startedAt = now; }
+        if (o.items.every((i) => i.done)) { o.status = "ready"; o.readyAt = now; }
+        else if (o.status === "ready") { o.status = "cooking"; o.readyAt = null; }
         return o;
       });
+      if (it && !it.done) toast(`✓ ${esc(it.name)} tayyor — ofitsiantga xabar ketdi`, { kind: "ok", timeout: 2500 });
     }));
     card.querySelector("[data-start]")?.addEventListener("click", () => {
       ui.fresh.delete(id);
@@ -218,7 +229,7 @@ function bindBoard() {
       const o = S.orders[id];
       card.classList.add("leaving");
       setTimeout(() => {
-        store.updateOrder(id, (x) => ({ ...x, status: "ready", readyAt: Date.now(), items: x.items.map((i) => ({ ...i, done: true })) }));
+        store.updateOrder(id, (x) => ({ ...x, status: "ready", readyAt: Date.now(), items: x.items.map((i) => (i.done ? i : { ...i, done: true, doneAt: Date.now() })) }));
         toast(`✓ Stol ${esc(o.tableNo)} tayyor — ofitsiant ${esc(o.waiterName || "")}ga xabar ketdi`, { kind: "ok" });
       }, 220);
     });

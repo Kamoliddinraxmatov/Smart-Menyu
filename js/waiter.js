@@ -108,6 +108,7 @@ function tableState(tid) {
   if (!os.length && S.reserves?.[tid] && Date.now() - (S.reserves[tid].at || 0) < 24 * 3600 * 1000) return { key: "reserved", label: `🔖 ${L("Bron", "Бронь", "Reserved")}`, orders: os, res: S.reserves[tid] };
   if (!os.length) return { key: "free", label: L("Bo'sh", "Свободен", "Free"), orders: os };
   if (os.some((o) => o.status === "ready")) return { key: "ready", label: L("Tayyor ✓", "Готово ✓", "Ready ✓"), orders: os };
+  if (os.some((o) => readyItems(o).length)) return { key: "ready", label: L("Qisman tayyor ✓", "Частично готово ✓", "Partly ready ✓"), orders: os };
   if (os.some((o) => o.status === "cooking")) return { key: "cooking", label: L("Tayyorlanmoqda", "Готовится", "Cooking"), orders: os };
   if (os.some((o) => o.status === "new")) return { key: "new", label: L("Oshxonada", "На кухне", "In the kitchen"), orders: os };
   if (os.every((o) => o.status === "served")) return { key: "served", label: L("🍽 Taom stolda", "🍽 Блюда на столе", "🍽 Served"), orders: os };
@@ -127,12 +128,20 @@ function tableWaiterId(t) {
   return S.reserves?.[t.id]?.waiterId || "";
 }
 // qo'ng'iroqcha faqat buyurtmani olgan ofitsiantda yonadi ("Barcha stollar" tanlangan bo'lsa ham)
-function myReady() {
-  return Object.values(S.orders).filter((o) => o.status === "ready" && o.waiterId === ui.me?.id);
+// Oshxona tayyor qilgan, lekin hali stolga olib borilmagan taomlar (choy, non shashlikni kutmaydi)
+function readyItems(o) {
+  if (!o || o.status === "served" || o.status === "closed" || o.status === "new") return [];
+  return (o.items || []).filter((i) => i.done && !i.served);
 }
+function myReady() {
+  return Object.values(S.orders).filter((o) => o.waiterId === ui.me?.id && readyItems(o).length);
+}
+const readyAtOf = (o) => o.status === "ready" ? (o.readyAt || 0) : Math.min(...readyItems(o).map((i) => i.doneAt || o.startedAt || 0));
+const readyWhat = (o, sep) => readyItems(o).map((i) => `${i.qty}× ${esc(i.name)}${i.opts ? ` (${esc(i.opts)})` : ""}`).join(sep);
+const restCount = (o) => (o.items || []).filter((i) => !i.done).length;
 // tayyor buyurtmalar faqat uni olgan ofitsiantga ko'rinadi
 function readyForMe() {
-  return myReady().sort((a, b) => (a.readyAt || 0) - (b.readyAt || 0));
+  return myReady().sort((a, b) => readyAtOf(a) - readyAtOf(b));
 }
 
 // ---------- Ko'rinishlar ----------
@@ -390,7 +399,7 @@ function renderTables() {
       <section class="ready-strip">
         ${ready.map((o) => `
           <div class="ready-item">
-            <div><span class="check">✓</span><b>${ST(esc(o.tableNo))}</b> ${L("buyurtmasi tayyor", "заказ готов", "order ready")} <span class="ready-go">${L("Mijozga olib boring", "Отнесите гостю", "Take it to the guest")}</span><span class="ready-what">${o.items.map((i) => `${i.qty}× ${esc(i.name)}${i.opts ? ` (${esc(i.opts)})` : ""}`).join("<br>")}</span><small>#${esc(shortNo(o))} · ${agoL(o.readyAt)} ${L("oldin", "назад", "ago")} · ${esc(o.waiterName)}</small></div>
+            <div><span class="check">✓</span><b>${ST(esc(o.tableNo))}</b> ${o.status === "ready" ? L("buyurtmasi tayyor", "заказ готов", "order ready") : L("— shulari tayyor", "— это готово", "— these are ready")} <span class="ready-go">${L("Mijozga olib boring", "Отнесите гостю", "Take it to the guest")}</span><span class="ready-what">${readyWhat(o, "<br>")}</span>${restCount(o) ? `<span class="ready-rest">⏳ ${L(`Yana ${restCount(o)} ta taom tayyorlanmoqda`, `Ещё ${restCount(o)} блюд готовится`, `${restCount(o)} more still cooking`)}</span>` : ""}<small>#${esc(shortNo(o))} · ${agoL(readyAtOf(o))} ${L("oldin", "назад", "ago")} · ${esc(o.waiterName)}</small></div>
             <button class="btn btn-ok" data-served="${esc(o.id)}">🍽 ${L("Stolga olib kelindi", "Подано на стол", "Served to table")}</button>
           </div>`).join("")}
       </section>` : ""}
@@ -1025,8 +1034,8 @@ function renderCart() {
           ${orders.map((o) => `
             <div class="ticket">
               <div class="tk-head"><b>#${esc(shortNo(o))}</b><span class="badge b-${o.status}">${ui.guest ? T("st_" + o.status) : statusLabel(o.status)}</span><small>${clock(o.createdAt)}</small></div>
-              <ul>${o.items.map((it) => `<li class="${it.done ? "done" : ""}"><span>${it.qty} × ${esc(cartName(it))}${it.opts ? ` <i class="tk-opts">(${esc(optsText(it))})</i>` : ""}</span><span>${money(it.qty * it.price, cur())}</span></li>`).join("")}</ul>
-              ${ui.guest ? "" : o.status === "ready" ? `<button class="btn btn-ok btn-block" data-served="${esc(o.id)}">🍽 ${L("Stolga olib kelindi", "Подано на стол", "Served to table")}</button>` : ""}
+              <ul>${o.items.map((it) => `<li class="${it.served ? "done" : it.done ? "rdy" : ""}"><span>${it.served ? "🍽 " : it.done ? "✓ " : ""}${it.qty} × ${esc(cartName(it))}${it.opts ? ` <i class="tk-opts">(${esc(optsText(it))})</i>` : ""}</span><span>${money(it.qty * it.price, cur())}</span></li>`).join("")}</ul>
+              ${ui.guest ? "" : readyItems(o).length ? `<button class="btn btn-ok btn-block" data-served="${esc(o.id)}">🍽 ${L("Stolga olib kelindi", "Подано на стол", "Served to table")}</button>` : ""}
               ${!ui.guest && o.status === "new" ? `<button class="link-btn" data-cancel="${esc(o.id)}">${L("Bekor qilish", "Отменить", "Cancel")}</button>` : ""}
             </div>`).join("")}
         </div>` : ""}
@@ -1148,7 +1157,13 @@ function confirmOrder(t) {
 function markServed(id) {
   const o = S.orders[id];
   if (!o) return;
-  store.updateOrder(id, { status: "served", servedAt: Date.now() });
+  // Faqat oshxona tayyor qilgan taomlar stolga olib borildi; hammasi borgach buyurtma "stolda" bo'ladi
+  store.updateOrder(id, (x) => {
+    const now = Date.now();
+    x.items.forEach((i) => { if (i.done && !i.served) { i.served = true; i.servedAt = now; } });
+    if (x.items.every((i) => i.served)) { x.status = "served"; x.servedAt = now; }
+    return x;
+  });
   toast(`${ST(esc(o.tableNo))}: ${L("taom stolga olib kelindi", "блюда поданы на стол", "food served")}`, { kind: "ok" });
 }
 
@@ -1424,7 +1439,7 @@ function showReadyList() {
     <div class="modal-body">
       ${list.length ? list.map((o) => `
         <div class="ready-item">
-          <div><span class="check">✓</span><b>${ST(esc(o.tableNo))}</b> <small>#${esc(shortNo(o))} · ${o.items.map((i) => `${i.qty}× ${esc(i.name)}`).join(", ")}</small></div>
+          <div><span class="check">✓</span><b>${ST(esc(o.tableNo))}</b> <small>#${esc(shortNo(o))} · ${readyWhat(o, ", ")}${restCount(o) ? ` · ⏳ ${L(`yana ${restCount(o)} ta tayyorlanmoqda`, `ещё ${restCount(o)} готовится`, `${restCount(o)} more cooking`)}` : ""}</small></div>
           <button class="btn btn-ok" data-served="${esc(o.id)}" data-close>🍽 ${L("Stolga olib kelindi", "Подано на стол", "Served to table")}</button>
         </div>`).join("") : `<div class="empty"><span class="big">🍽️</span>${L("Hozircha tayyor buyurtma yo'q", "Пока нет готовых заказов", "No ready orders yet")}</div>`}
     </div>`, {
@@ -1468,6 +1483,17 @@ store.on((evt) => {
       chime("ready");
       vibrate([300, 120, 300, 120, 300]);
       toast(`<b>✓ ${ST(esc(o.tableNo))}</b> ${L("buyurtmasi tayyor! Oshxonadan olib chiqing.", "заказ готов! Заберите на кухне.", "order is ready! Pick it up from the kitchen.")}`, { kind: "ready", timeout: 9000, onClick: () => openTable(o.tableId) });
+      flashTitle(`✓ ${ST(o.tableNo)} ${L("tayyor", "готов", "ready")}`);
+    }
+  }
+  // Oshxona bitta-ikkita taomni tayyor qildi (masalan choy, non) — butun buyurtmani kutmasdan xabar
+  if (evt.type === "order" && !evt.local && evt.prev && evt.order.status !== "ready" && evt.order.status !== "served" && evt.order.status !== "closed") {
+    const o = evt.order;
+    const fresh = (o.items || []).filter((it, i) => it.done && !it.served && !evt.prev.items?.[i]?.done);
+    if (fresh.length && ui.me && o.waiterId === ui.me.id) {
+      chime("ready");
+      vibrate([300, 120, 300]);
+      toast(`<b>✓ ${ST(esc(o.tableNo))}:</b> ${fresh.map((i) => `${i.qty}× ${esc(i.name)}`).join(", ")} ${L("tayyor! Oshxonadan olib chiqing.", "готово! Заберите на кухне.", "ready! Pick it up from the kitchen.")}`, { kind: "ready", timeout: 9000, onClick: () => openTable(o.tableId) });
       flashTitle(`✓ ${ST(o.tableNo)} ${L("tayyor", "готов", "ready")}`);
     }
   }

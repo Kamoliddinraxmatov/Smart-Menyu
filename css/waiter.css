@@ -601,3 +601,7 @@ body.lux {
 .cp-res { min-height: 1.4em; font-weight: 700; margin: 8px 0 0; }
 .cp-res.ok { color: #2ea043; font-size: 20px; }
 .cp-res.bad { color: #da3633; }
+
+/* Taom alohida tayyor bo'lganda */
+.ticket li.rdy span:first-child { color: var(--ok); font-weight: 700; }
+.ready-rest { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }

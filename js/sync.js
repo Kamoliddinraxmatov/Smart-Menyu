@@ -57,6 +57,18 @@ function mergeOrder(a, b) {
   const out = { ...hi };
   if ((RANK[lo.status] ?? 0) > (RANK[hi.status] ?? 0)) out.status = lo.status;
   for (const k of STAMPS) if (out[k] == null && lo[k] != null) out[k] = lo[k];
+  // Taomlar alohida tayyor/stolga olib borilgan bo'lishi mumkin: har birining eng so'nggi belgisini saqlaymiz
+  if (Array.isArray(hi.items) && Array.isArray(lo.items) && hi.items.length === lo.items.length) {
+    const t = (i) => Math.max(i.doneAt || 0, i.undoneAt || 0);
+    out.items = hi.items.map((a, i) => {
+      const b = lo.items[i] || {};
+      const x = { ...a };
+      if (t(b) > t(a)) { x.done = !!b.done; x.doneAt = b.doneAt ?? null; if (b.undoneAt) x.undoneAt = b.undoneAt; }
+      if (b.served && !x.served) { x.served = true; x.servedAt = b.servedAt; }
+      if (x.served) x.done = true;
+      return x;
+    });
+  }
   return out;
 }
 

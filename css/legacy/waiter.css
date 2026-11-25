@@ -2518,3 +2518,13 @@ body.lux {
 .cp-res.bad {
   color: #da3633;
 }
+.ticket li.rdy span:first-child {
+  color: var(--ok);
+  font-weight: 700;
+}
+.ready-rest {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
